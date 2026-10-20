@@ -7,6 +7,7 @@
 <script setup lang="ts">
   import type { PatientSearchForm } from '@/views/dli/patient/constants'
   import {
+    ENTRY_TYPE_CONFIG,
     GROUP_TYPE_CONFIG,
     MED_STATUS_CONFIG,
     RISK_LEVEL_CONFIG
@@ -49,6 +50,16 @@
       type: 'input',
       placeholder: '姓名 / 编号 / 医生',
       clearable: true
+    },
+    {
+      label: '入组入口',
+      key: 'entryType',
+      type: 'select',
+      props: {
+        placeholder: '请选择入组入口',
+        clearable: true,
+        options: toOptions(ENTRY_TYPE_CONFIG)
+      }
     },
     {
       label: '风险分层',

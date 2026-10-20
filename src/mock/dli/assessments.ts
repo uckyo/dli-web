@@ -13,6 +13,7 @@ export const RISK_ASSESSMENTS: RiskAssessment[] = [
     patientName: '王**（DLI-2026-0001）',
     phase: 'pre',
     modelVersion: 'DLI-CDSS v2.3.1',
+    triggerMode: 'auto',
     score: 65,
     riskLevel: 'L2',
     riskFactors: [
@@ -56,6 +57,7 @@ export const RISK_ASSESSMENTS: RiskAssessment[] = [
     patientName: '王**（DLI-2026-0001）',
     phase: 'during',
     modelVersion: 'DLI-CDSS v2.3.1',
+    triggerMode: 'auto',
     score: 82,
     riskLevel: 'L1',
     riskFactors: [
@@ -94,6 +96,7 @@ export const RISK_ASSESSMENTS: RiskAssessment[] = [
     patientName: '赵**（DLI-2026-0005）',
     phase: 'post',
     modelVersion: 'DLI-CDSS v2.3.1',
+    triggerMode: 'manual',
     score: 35,
     riskLevel: 'L4',
     riskFactors: [
@@ -134,6 +137,7 @@ export const RISK_ASSESSMENTS: RiskAssessment[] = [
     patientName: '李**（DLI-2026-0002）',
     phase: 'during',
     modelVersion: 'DLI-CDSS v2.3.1',
+    triggerMode: 'manual',
     score: 70,
     riskLevel: 'L2',
     riskFactors: [
@@ -167,6 +171,7 @@ export const RISK_ASSESSMENTS: RiskAssessment[] = [
     patientName: '郑**（DLI-2026-0009）',
     phase: 'during',
     modelVersion: 'DLI-CDSS v2.3.1',
+    triggerMode: 'auto',
     score: 88,
     riskLevel: 'L1',
     riskFactors: [

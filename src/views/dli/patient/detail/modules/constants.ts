@@ -4,7 +4,13 @@
  * 风险分层 / 入组分组 / 知情同意状态徽章，以及时间轴事件类型的
  * 图标与颜色映射，供详情页各 Tab 共用。
  */
-import type { ConsentStatus, GroupType, RiskLevel, TimelineEvent } from '@/mock/dli/types'
+import type {
+  ConsentStatus,
+  EntryType,
+  GroupType,
+  RiskLevel,
+  TimelineEvent
+} from '@/mock/dli/types'
 
 /** ElTag 标签类型 */
 export type DetailTagType = 'success' | 'warning' | 'info' | 'danger' | 'primary'
@@ -21,6 +27,12 @@ export const RISK_TAG_CONFIG: Record<RiskLevel, DetailTagConfig> = {
   L2: { label: 'L2 高', tagType: 'warning' },
   L3: { label: 'L3 中', tagType: 'primary' },
   L4: { label: 'L4 低', tagType: 'success' }
+}
+
+/** 入组入口展示配置（拟接受高危药物治疗 / 已确诊 DLI） */
+export const ENTRY_TAG_CONFIG: Record<EntryType, DetailTagConfig> = {
+  premed: { label: '拟接受高危药物治疗', tagType: 'info' },
+  diagnosed: { label: '已确诊 DLI', tagType: 'danger' }
 }
 
 /** 入组分组展示配置（AI 组 / 常规组） */

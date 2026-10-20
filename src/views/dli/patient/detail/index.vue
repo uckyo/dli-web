@@ -27,6 +27,10 @@
                 <span class="text-g-900">{{ patient?.center || '—' }}</span>
               </div>
               <div class="flex gap-2">
+                <span class="shrink-0 text-g-500">入组入口：</span>
+                <span class="text-g-900">{{ entryMeta?.label || '—' }}</span>
+              </div>
+              <div class="flex gap-2">
                 <span class="shrink-0 text-g-500">主管医生：</span>
                 <span class="text-g-900">{{ patient?.doctor || '—' }}</span>
               </div>
@@ -50,7 +54,7 @@
 
         <div class="flex flex-wrap items-center gap-2">
           <ElButton @click="handleBack">返回列表</ElButton>
-          <ElButton type="primary" @click="router.push('/dli/cdss')">发起评估</ElButton>
+          <ElButton type="primary" @click="startAssessment">{{ assessmentButtonText }}</ElButton>
           <ElButton @click="router.push('/dli/followup')">下发随访</ElButton>
         </div>
       </div>
@@ -106,6 +110,7 @@
     fetchGetRiskAssessments
   } from '@/mock/dli/api'
   import type {
+    AssessPhase,
     DliPatientDetail,
     ImagingStudy,
     LabTrendSeries,
@@ -114,7 +119,12 @@
     RiskAssessment,
     TimelineEvent
   } from '@/mock/dli/types'
-  import { CONSENT_TAG_CONFIG, GROUP_TAG_CONFIG, RISK_TAG_CONFIG } from './modules/constants'
+  import {
+    CONSENT_TAG_CONFIG,
+    ENTRY_TAG_CONFIG,
+    GROUP_TAG_CONFIG,
+    RISK_TAG_CONFIG
+  } from './modules/constants'
   import TimelineTab from './modules/timeline-tab.vue'
   import ExamTab from './modules/exam-tab.vue'
   import RiskTab from './modules/risk-tab.vue'
@@ -147,6 +157,23 @@
   /** 入组分组徽章 */
   const groupMeta = computed(() =>
     patient.value ? GROUP_TAG_CONFIG[patient.value.groupType] : null
+  )
+
+  /** 入组入口徽章 */
+  const entryMeta = computed(() =>
+    patient.value ? ENTRY_TAG_CONFIG[patient.value.entryType] : null
+  )
+
+  /** 发起评估的默认阶段：已确诊 DLI 直接进入诊断后管理 */
+  const assessmentPhase = computed<AssessPhase>(() => {
+    if (!patient.value) return 'pre'
+    if (patient.value.entryType === 'diagnosed') return 'post'
+    return patient.value.medStatus === 'during' ? 'during' : 'pre'
+  })
+
+  /** 发起评估按钮文案 */
+  const assessmentButtonText = computed(() =>
+    assessmentPhase.value === 'post' ? '发起诊断后评估' : '发起评估'
   )
 
   /** 知情同意徽章 */
@@ -211,6 +238,17 @@
     } else {
       router.push('/dli/patient/list')
     }
+  }
+
+  /**
+   * 发起评估（携带患者与阶段，进入 CDSS 手动评估入口）
+   */
+  const startAssessment = () => {
+    if (!patient.value) return
+    router.push({
+      path: '/dli/cdss',
+      query: { patientId: patient.value.id, phase: assessmentPhase.value }
+    })
   }
 
   onMounted(loadDetail)

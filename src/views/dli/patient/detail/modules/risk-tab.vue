@@ -11,6 +11,9 @@
             </ElTag>
             <span class="text-sm text-g-500">评估时间：{{ item.assessTime }}</span>
             <span class="text-sm text-g-500">模型版本：{{ item.modelVersion }}</span>
+            <ElTag size="small" :type="TRIGGER_META[item.triggerMode].type" effect="plain">
+              {{ TRIGGER_META[item.triggerMode].label }}
+            </ElTag>
           </div>
           <ElButton size="small" @click="goCdss">查看完整报告</ElButton>
         </div>
@@ -115,6 +118,15 @@
     literature: '文献',
     case: '相似病例',
     model: '模型特征'
+  }
+
+  /** 触发方式展示配置 */
+  const TRIGGER_META: Record<
+    RiskAssessment['triggerMode'],
+    { label: string; type: 'success' | 'warning' }
+  > = {
+    auto: { label: '自动触发', type: 'success' },
+    manual: { label: '手动发起', type: 'warning' }
   }
 
   /**

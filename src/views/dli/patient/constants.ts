@@ -8,6 +8,7 @@ import type {
   AssessPhase,
   ConfirmAction,
   ConsentStatus,
+  EntryType,
   GroupType,
   MedStatus,
   RiskLevel
@@ -27,6 +28,7 @@ export interface EnumDisplayConfig {
 /** 患者搜索表单参数 */
 export interface PatientSearchForm {
   keyword?: string
+  entryType?: string
   riskLevel?: string
   medStatus?: string
   groupType?: string
@@ -38,6 +40,12 @@ export const RISK_LEVEL_CONFIG: Record<RiskLevel, EnumDisplayConfig> = {
   L2: { label: 'L2 高', tagType: 'warning' },
   L3: { label: 'L3 中', tagType: 'info' },
   L4: { label: 'L4 低', tagType: 'success' }
+}
+
+/** 入组入口展示配置（拟接受高危药物治疗 / 已确诊 DLI） */
+export const ENTRY_TYPE_CONFIG: Record<EntryType, EnumDisplayConfig> = {
+  premed: { label: '拟接受高危药物治疗', tagType: 'info' },
+  diagnosed: { label: '已确诊 DLI', tagType: 'danger' }
 }
 
 /** 用药状态展示配置（用药前 / 用药中 / 诊断后） */

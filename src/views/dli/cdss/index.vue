@@ -6,11 +6,14 @@
       <div class="flex-cb flex-wrap gap-3">
         <div>
           <h3 class="text-xl font-medium text-g-900">CDSS 决策支持</h3>
-          <p class="mt-1 text-sm text-g-600"> 所有 AI 建议需医生确认后生效，确认过程全程留痕 </p>
+          <p class="mt-1 text-sm text-g-600">
+            新数据入库且满足评估条件时自动调用模型生成评估，医生也可按需手动发起；所有 AI
+            建议需医生确认后生效，确认过程全程留痕
+          </p>
         </div>
         <ElButton type="primary" @click="handleNewAssessment">
           <ArtSvgIcon icon="ri:add-line" class="mr-1" />
-          发起新评估
+          手动发起评估
         </ElButton>
       </div>
 
@@ -68,12 +71,19 @@
               </ElTag>
               <span class="text-xs text-g-500">{{ item.assessTime }}</span>
             </div>
-            <div
-              class="mt-2 flex-c items-center gap-1 text-xs"
-              :class="item.doctorConfirm ? 'text-success' : 'text-warning'"
-            >
-              <ArtSvgIcon :icon="item.doctorConfirm ? 'ri:checkbox-circle-line' : 'ri:time-line'" />
-              <span>{{ item.doctorConfirm ? '已确认' : '待确认' }}</span>
+            <div class="mt-2 flex-cb gap-2">
+              <div
+                class="flex-c items-center gap-1 text-xs"
+                :class="item.doctorConfirm ? 'text-success' : 'text-warning'"
+              >
+                <ArtSvgIcon
+                  :icon="item.doctorConfirm ? 'ri:checkbox-circle-line' : 'ri:time-line'"
+                />
+                <span>{{ item.doctorConfirm ? '已确认' : '待确认' }}</span>
+              </div>
+              <ElTag size="small" :type="TRIGGER_META[item.triggerMode].type" effect="plain">
+                {{ TRIGGER_META[item.triggerMode].label }}
+              </ElTag>
             </div>
           </div>
         </div>
@@ -91,6 +101,9 @@
                 {{ PHASE_LABEL[selectedReport.phase] }}
               </ElTag>
               <ElTag type="info" effect="plain">{{ selectedReport.modelVersion }}</ElTag>
+              <ElTag :type="TRIGGER_META[selectedReport.triggerMode].type" effect="plain">
+                {{ TRIGGER_META[selectedReport.triggerMode].label }}
+              </ElTag>
             </div>
             <span class="text-sm text-g-500">评估时间：{{ selectedReport.assessTime }}</span>
           </div>
@@ -245,12 +258,70 @@
         <ElEmpty v-else description="请选择左侧评估报告查看详情" :image-size="100" />
       </div>
     </div>
+
+    <!-- 手动发起评估 -->
+    <ElDialog v-model="newDialogVisible" title="手动发起评估" width="540px" align-center>
+      <ElAlert type="info" :closable="false" show-icon class="mb-4">
+        <template #title>自动评估为主，手动评估为辅</template>
+        新数据入库且满足评估条件时系统自动调用模型；医生也可按需手动发起，所用模型与评估依据一致。
+      </ElAlert>
+
+      <ElForm label-width="90px">
+        <ElFormItem label="患者" required>
+          <ElSelect v-model="newForm.patientId" class="!w-full" filterable placeholder="请选择患者">
+            <ElOption
+              v-for="item in patientOptions"
+              :key="item.id"
+              :label="`${item.name}（${item.id}）`"
+              :value="item.id"
+            />
+          </ElSelect>
+        </ElFormItem>
+        <ElFormItem label="评估阶段" required>
+          <ElRadioGroup v-model="newForm.phase">
+            <ElRadioButton v-for="phase in PHASE_LIST" :key="phase.value" :value="phase.value">
+              {{ phase.label }}
+            </ElRadioButton>
+          </ElRadioGroup>
+        </ElFormItem>
+        <ElFormItem label="发起原因">
+          <ElInput
+            v-model="newForm.reason"
+            type="textarea"
+            :rows="3"
+            maxlength="200"
+            show-word-limit
+            placeholder="如：症状变化、检验指标异常、随访复评（选填）"
+          />
+        </ElFormItem>
+      </ElForm>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <ElButton @click="newDialogVisible = false">取消</ElButton>
+          <ElButton type="primary" :loading="newSubmitting" @click="submitNewAssessment">
+            提交评估
+          </ElButton>
+        </div>
+      </template>
+    </ElDialog>
   </div>
 </template>
 
 <script setup lang="ts">
-  import { fetchConfirmAssessment, fetchGetRiskAssessments } from '@/mock/dli/api'
-  import type { AssessPhase, RiskAssessment, RiskLevel, TraceabilityItem } from '@/mock/dli/types'
+  import {
+    fetchConfirmAssessment,
+    fetchCreateManualAssessment,
+    fetchGetPatientList,
+    fetchGetRiskAssessments
+  } from '@/mock/dli/api'
+  import type {
+    AssessPhase,
+    DliPatient,
+    RiskAssessment,
+    RiskLevel,
+    TraceabilityItem
+  } from '@/mock/dli/types'
 
   defineOptions({ name: 'DliCdss' })
 
@@ -345,6 +416,13 @@
     reject: '不采纳'
   }
 
+  /** 触发方式展示配置 */
+  const TRIGGER_META: Record<RiskAssessment['triggerMode'], { label: string; type: TagType }> = {
+    auto: { label: '自动触发', type: 'success' },
+    manual: { label: '手动发起', type: 'warning' }
+  }
+
+  const route = useRoute()
   const loading = ref(false)
   const assessments = ref<RiskAssessment[]>([])
   const activePhase = ref<AssessPhase>('pre')
@@ -353,6 +431,16 @@
   const confirmOpinion = ref('')
   const submitting = ref(false)
   const expandedTrace = ref<string[]>(['trace'])
+
+  // 手动发起评估
+  const newDialogVisible = ref(false)
+  const newSubmitting = ref(false)
+  const patientOptions = ref<DliPatient[]>([])
+  const newForm = reactive({
+    patientId: '',
+    phase: 'pre' as AssessPhase,
+    reason: ''
+  })
 
   /** 当前阶段报告 */
   const phaseAssessments = computed(() =>
@@ -422,10 +510,56 @@
   }
 
   /**
-   * 发起新评估（演示）
+   * 加载可选患者（手动评估）
    */
-  const handleNewAssessment = () => {
-    ElMessage.info('已提交评估任务（演示）')
+  const loadPatients = async () => {
+    if (patientOptions.value.length) return
+    const res = await fetchGetPatientList({ current: 1, size: 100 })
+    patientOptions.value = res.records
+  }
+
+  /**
+   * 打开手动发起评估弹窗
+   */
+  const handleNewAssessment = async () => {
+    try {
+      await loadPatients()
+      newForm.patientId = ''
+      newForm.phase = activePhase.value
+      newForm.reason = ''
+      newDialogVisible.value = true
+    } catch {
+      ElMessage.error('患者列表加载失败，请稍后重试')
+    }
+  }
+
+  /**
+   * 提交手动评估（与自动评估使用同一模型与依据）
+   */
+  const submitNewAssessment = async () => {
+    if (!newForm.patientId) {
+      ElMessage.warning('请选择患者')
+      return
+    }
+
+    newSubmitting.value = true
+    try {
+      const record = await fetchCreateManualAssessment({
+        patientId: newForm.patientId,
+        phase: newForm.phase,
+        reason: newForm.reason
+      })
+      newDialogVisible.value = false
+      ElMessage.success('已发起手动评估，模型评估结果已生成')
+      await loadAssessments()
+      activePhase.value = record.phase
+      await nextTick()
+      selectedId.value = record.id
+    } catch {
+      ElMessage.error('发起评估失败，请稍后重试')
+    } finally {
+      newSubmitting.value = false
+    }
   }
 
   /**
@@ -462,5 +596,25 @@
     confirmOpinion.value = ''
   })
 
-  onMounted(loadAssessments)
+  onMounted(async () => {
+    await loadAssessments()
+
+    const { phase, patientId } = route.query
+    if (phase === 'pre' || phase === 'during' || phase === 'post') {
+      activePhase.value = phase
+    }
+
+    // 由患者详情页「发起评估」进入时，直接打开手动评估弹窗
+    if (typeof patientId === 'string' && patientId) {
+      try {
+        await loadPatients()
+        newForm.patientId = patientId
+        newForm.phase = activePhase.value
+        newForm.reason = ''
+        newDialogVisible.value = true
+      } catch {
+        ElMessage.error('患者列表加载失败，请稍后重试')
+      }
+    }
+  })
 </script>

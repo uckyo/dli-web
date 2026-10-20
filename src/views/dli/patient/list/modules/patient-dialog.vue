@@ -33,6 +33,18 @@
 
       <ElRow :gutter="12">
         <ElCol :span="12">
+          <ElFormItem label="入组入口" prop="entryType">
+            <ElSelect v-model="formData.entryType" class="!w-full" placeholder="请选择入组入口">
+              <ElOption
+                v-for="option in entryTypeOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </ElSelect>
+          </ElFormItem>
+        </ElCol>
+        <ElCol :span="12">
           <ElFormItem label="入组分组" prop="groupType">
             <ElSelect v-model="formData.groupType" class="!w-full" placeholder="请选择入组分组">
               <ElOption
@@ -44,6 +56,9 @@
             </ElSelect>
           </ElFormItem>
         </ElCol>
+      </ElRow>
+
+      <ElRow :gutter="12">
         <ElCol :span="12">
           <ElFormItem label="用药状态" prop="medStatus">
             <ElSelect v-model="formData.medStatus" class="!w-full" placeholder="请选择用药状态">
@@ -56,9 +71,6 @@
             </ElSelect>
           </ElFormItem>
         </ElCol>
-      </ElRow>
-
-      <ElRow :gutter="12">
         <ElCol :span="12">
           <ElFormItem label="风险分层" prop="riskLevel">
             <ElSelect v-model="formData.riskLevel" class="!w-full" placeholder="请选择风险分层">
@@ -71,6 +83,9 @@
             </ElSelect>
           </ElFormItem>
         </ElCol>
+      </ElRow>
+
+      <ElRow :gutter="12">
         <ElCol :span="12">
           <ElFormItem label="知情同意" prop="consentStatus">
             <ElSelect
@@ -87,11 +102,16 @@
             </ElSelect>
           </ElFormItem>
         </ElCol>
+        <ElCol :span="12">
+          <ElFormItem label="主管医生" prop="doctor">
+            <ElInput v-model="formData.doctor" placeholder="请输入主管医生" />
+          </ElFormItem>
+        </ElCol>
       </ElRow>
 
-      <ElFormItem label="主管医生" prop="doctor">
-        <ElInput v-model="formData.doctor" placeholder="请输入主管医生" />
-      </ElFormItem>
+      <p v-if="formData.entryType === 'diagnosed'" class="ml-[100px] text-xs text-g-500">
+        已确诊 DLI 患者建档后直接进入诊断后管理，无需完成治疗前、治疗中阶段。
+      </p>
     </ElForm>
 
     <template #footer>
@@ -108,6 +128,7 @@
   import { fetchSavePatient } from '@/mock/dli/api'
   import {
     CONSENT_STATUS_CONFIG,
+    ENTRY_TYPE_CONFIG,
     GROUP_TYPE_CONFIG,
     MED_STATUS_CONFIG,
     RISK_LEVEL_CONFIG
@@ -152,6 +173,7 @@
     sex: 'male' as DliPatient['sex'],
     age: 50,
     center: '',
+    entryType: 'premed' as DliPatient['entryType'],
     groupType: 'ai' as DliPatient['groupType'],
     medStatus: 'before' as DliPatient['medStatus'],
     riskLevel: 'L3' as DliPatient['riskLevel'],
@@ -169,6 +191,7 @@
   const medStatusOptions = computed(() => toOptions(MED_STATUS_CONFIG))
   const groupOptions = computed(() => toOptions(GROUP_TYPE_CONFIG))
   const consentOptions = computed(() => toOptions(CONSENT_STATUS_CONFIG))
+  const entryTypeOptions = computed(() => toOptions(ENTRY_TYPE_CONFIG))
 
   // 表单验证规则
   const rules: FormRules = {
@@ -176,6 +199,7 @@
     sex: [{ required: true, message: '请选择性别', trigger: 'change' }],
     age: [{ required: true, message: '请输入年龄', trigger: 'blur' }],
     center: [{ required: true, message: '请输入所属中心', trigger: 'blur' }],
+    entryType: [{ required: true, message: '请选择入组入口', trigger: 'change' }],
     groupType: [{ required: true, message: '请选择入组分组', trigger: 'change' }],
     medStatus: [{ required: true, message: '请选择用药状态', trigger: 'change' }],
     riskLevel: [{ required: true, message: '请选择风险分层', trigger: 'change' }],
@@ -196,6 +220,7 @@
       sex: row?.sex ?? 'male',
       age: row?.age ?? 50,
       center: row?.center ?? '',
+      entryType: row?.entryType ?? 'premed',
       groupType: row?.groupType ?? 'ai',
       medStatus: row?.medStatus ?? 'before',
       riskLevel: row?.riskLevel ?? 'L3',

@@ -22,6 +22,7 @@ import {
   TIMELINE_EVENTS
 } from './patients'
 import type {
+  AssessPhase,
   DliAlert,
   DliPatient,
   DliPatientDetail,
@@ -61,6 +62,7 @@ export interface PatientListParams {
   current: number
   size: number
   keyword?: string
+  entryType?: string
   riskLevel?: string
   medStatus?: string
   groupType?: string
@@ -129,6 +131,7 @@ export async function fetchGetPatientList(
       (p) => p.name.includes(kw) || p.id.toLowerCase().includes(kw) || p.doctor.includes(kw)
     )
   }
+  if (params.entryType) list = list.filter((p) => p.entryType === params.entryType)
   if (params.riskLevel) list = list.filter((p) => p.riskLevel === params.riskLevel)
   if (params.medStatus) list = list.filter((p) => p.medStatus === params.medStatus)
   if (params.groupType) list = list.filter((p) => p.groupType === params.groupType)
@@ -165,6 +168,7 @@ export async function fetchSavePatient(data: Partial<DliPatient>): Promise<void>
       sex: data.sex || 'male',
       age: data.age || 50,
       center: data.center || '同济医院',
+      entryType: data.entryType || 'premed',
       groupType: data.groupType || 'ai',
       medStatus: data.medStatus || 'before',
       riskLevel: data.riskLevel || 'L3',
@@ -216,6 +220,55 @@ export async function fetchGetRiskAssessments(patientId?: string): Promise<RiskA
   let list = [...RISK_ASSESSMENTS]
   if (patientId) list = list.filter((r) => r.patientId === patientId)
   return list.sort((a, b) => b.assessTime.localeCompare(a.assessTime))
+}
+
+/** 手动发起评估（医生按需，模型与自动评估一致） */
+export async function fetchCreateManualAssessment(params: {
+  patientId: string
+  phase: AssessPhase
+  reason?: string
+}): Promise<RiskAssessment> {
+  await delay(600)
+  const patient = PATIENT_LIST.find((p) => p.id === params.patientId)
+  if (!patient) throw new Error('患者不存在')
+
+  const scoreMap: Record<DliPatient['riskLevel'], number> = { L1: 86, L2: 68, L3: 48, L4: 28 }
+  const now = new Date()
+  const pad = (value: number) => String(value).padStart(2, '0')
+  const assessTime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
+  const record: RiskAssessment = {
+    id: `RA-${new Date().getFullYear()}-${String(4100 + RISK_ASSESSMENTS.length)}`,
+    patientId: patient.id,
+    patientName: `${patient.name}（${patient.id}）`,
+    phase: params.phase,
+    modelVersion: 'DLI-CDSS v2.3.1',
+    triggerMode: 'manual',
+    score: scoreMap[patient.riskLevel],
+    riskLevel: patient.riskLevel,
+    riskFactors: patient.drugs.length
+      ? patient.drugs.map((drug) => ({ factor: `高危药物：${drug}`, weight: '中' }))
+      : [{ factor: '暂无结构化高危因素，按基线资料评估', weight: '低' }],
+    suggestions: [
+      { type: '评估说明', content: params.reason?.trim() || '医生按需发起评估' },
+      { type: '监测建议', content: '结合近期症状、体征与检验检查结果动态复评' }
+    ],
+    traceability: [
+      {
+        sourceType: 'guideline',
+        title: '《药物相关性肺损伤诊治专家共识（2024）》',
+        excerpt: '医生可根据临床需要随时发起风险评估，评估依据与自动评估一致。'
+      },
+      {
+        sourceType: 'model',
+        title: '模型特征贡献度',
+        excerpt: '基于患者基线资料与近期监测数据生成。'
+      }
+    ],
+    assessTime,
+    doctorConfirm: null
+  }
+  RISK_ASSESSMENTS.unshift(record)
+  return record
 }
 
 /** 医生确认评估建议（采纳 / 修改 / 不采纳，留痕） */

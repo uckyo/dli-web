@@ -44,6 +44,7 @@
   import { fetchDeletePatient, fetchGetPatientList } from '@/mock/dli/api'
   import type { DliPatient, RiskLevel } from '@/mock/dli/types'
   import {
+    ENTRY_TYPE_CONFIG,
     GROUP_TYPE_CONFIG,
     MED_STATUS_CONFIG,
     RISK_LEVEL_CONFIG,
@@ -68,6 +69,7 @@
   // 搜索表单
   const searchForm = ref<PatientSearchForm>({
     keyword: undefined,
+    entryType: undefined,
     riskLevel: undefined,
     medStatus: undefined,
     groupType: undefined
@@ -139,6 +141,17 @@
           label: '性别/年龄',
           width: 110,
           formatter: (row) => `${row.sex === 'male' ? '男' : '女'} · ${row.age} 岁`
+        },
+        {
+          prop: 'entryType',
+          label: '入组入口',
+          minWidth: 150,
+          formatter: (row) => {
+            const config = ENTRY_TYPE_CONFIG[row.entryType]
+            return config
+              ? h(ElTag, { type: config.tagType, effect: 'plain' }, () => config.label)
+              : h('span', { class: 'text-g-500' }, '—')
+          }
         },
         {
           prop: 'center',

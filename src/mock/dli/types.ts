@@ -11,6 +11,9 @@ export type RiskLevel = 'L1' | 'L2' | 'L3' | 'L4'
 /** 用药状态：用药前 / 用药中 / 诊断后 */
 export type MedStatus = 'before' | 'during' | 'after'
 
+/** 入组入口：拟接受高危药物治疗 / 已确诊 DLI（可直接进入诊断后管理） */
+export type EntryType = 'premed' | 'diagnosed'
+
 /** 入组分组：AI 组 / 常规组 */
 export type GroupType = 'ai' | 'routine'
 
@@ -51,6 +54,8 @@ export interface DliPatient {
   age: number
   center: string
   groupType: GroupType
+  /** 入组入口 */
+  entryType: EntryType
   medStatus: MedStatus
   riskLevel: RiskLevel
   drugs: string[]
@@ -132,6 +137,8 @@ export interface RiskAssessment {
   riskFactors: Array<{ factor: string; weight: string }>
   suggestions: Array<{ type: string; content: string }>
   traceability: TraceabilityItem[]
+  /** 触发方式：自动（新数据入库且满足评估条件）/ 手动（医生按需发起） */
+  triggerMode: 'auto' | 'manual'
   assessTime: string
   /** 医生确认记录（未确认为 null） */
   doctorConfirm: {
