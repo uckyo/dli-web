@@ -113,7 +113,7 @@
   import { useI18n } from 'vue-i18n'
   import { HttpError } from '@/utils/http/error'
   import { fetchLogin } from '@/api/auth'
-  import { ElNotification, type FormInstance, type FormRules } from 'element-plus'
+  import { ElMessage, ElNotification, type FormInstance, type FormRules } from 'element-plus'
   import { useSettingStore } from '@/store/modules/setting'
 
   defineOptions({ name: 'Login' })
@@ -128,7 +128,7 @@
     formKey.value++
   })
 
-  type AccountKey = 'super' | 'admin' | 'user'
+  type AccountKey = 'doctor' | 'assistant' | 'nurse' | 'admin'
 
   export interface Account {
     key: AccountKey
@@ -138,27 +138,35 @@
     roles: string[]
   }
 
+  // 按《DLI 疾病管理系统项目建设蓝图》提供的四类角色账号
   const accounts = computed<Account[]>(() => [
     {
-      key: 'super',
-      label: t('login.roles.super'),
-      userName: 'Super',
+      key: 'doctor',
+      label: t('login.roles.doctor'),
+      userName: 'doctor',
       password: '123456',
-      roles: ['R_SUPER']
+      roles: ['R_DOCTOR']
+    },
+    {
+      key: 'assistant',
+      label: t('login.roles.assistant'),
+      userName: 'assistant',
+      password: '123456',
+      roles: ['R_ASSISTANT']
+    },
+    {
+      key: 'nurse',
+      label: t('login.roles.nurse'),
+      userName: 'nurse',
+      password: '123456',
+      roles: ['R_NURSE']
     },
     {
       key: 'admin',
       label: t('login.roles.admin'),
-      userName: 'Admin',
+      userName: 'admin',
       password: '123456',
       roles: ['R_ADMIN']
-    },
-    {
-      key: 'user',
-      label: t('login.roles.user'),
-      userName: 'User',
-      password: '123456',
-      roles: ['R_USER']
     }
   ])
 
@@ -188,7 +196,7 @@
   const loading = ref(false)
 
   onMounted(() => {
-    setupAccount('super')
+    setupAccount('doctor')
   })
 
   // 设置账号
@@ -244,8 +252,8 @@
       if (error instanceof HttpError) {
         // console.log(error.code)
       } else {
-        // 处理非 HttpError
-        // ElMessage.error('登录失败，请稍后重试')
+        // 处理非 HttpError（如 Mock 登录校验失败）
+        ElMessage.error(error instanceof Error ? error.message : '登录失败，请稍后重试')
         console.error('[Login] Unexpected error:', error)
       }
     } finally {

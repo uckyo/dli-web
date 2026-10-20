@@ -1,4 +1,4 @@
-import request from '@/utils/http'
+import { fetchMockLogin, fetchMockUserInfo } from '@/mock/dli/users'
 
 /**
  * 登录
@@ -6,12 +6,7 @@ import request from '@/utils/http'
  * @returns 登录响应
  */
 export function fetchLogin(params: Api.Auth.LoginParams) {
-  return request.post<Api.Auth.LoginResponse>({
-    url: '/api/auth/login',
-    params
-    // showSuccessMessage: true // 显示成功消息
-    // showErrorMessage: false // 不显示错误消息
-  })
+  return fetchMockLogin(params)
 }
 
 /**
@@ -19,11 +14,5 @@ export function fetchLogin(params: Api.Auth.LoginParams) {
  * @returns 用户信息
  */
 export function fetchGetUserInfo() {
-  return request.get<Api.Auth.UserInfo>({
-    url: '/api/user/info'
-    // 自定义请求头
-    // headers: {
-    //   'X-Custom-Header': 'your-custom-value'
-    // }
-  })
+  return fetchMockUserInfo()
 }

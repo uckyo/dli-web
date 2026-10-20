@@ -6,6 +6,12 @@ import { AppRouteRecord } from '@/types/router'
  * 菜单结构对应《DLI 疾病管理系统项目建设蓝图》用户前台导航：
  * 首页、患者管理、评估预警、处理记录、随访计划、审核发布
  *
+ * 菜单权限按蓝图角色裁剪：
+ * - 医生：全部菜单
+ * - 医生助理：首页、患者管理、随访计划
+ * - 护士：首页、患者管理、处理记录
+ * - 管理员：全部菜单 + 系统管理
+ *
  * 说明：各页面均作为一级菜单平铺展示，患者详情为隐藏路由（从患者列表进入）
  */
 export const dliRoutes: AppRouteRecord[] = [
@@ -17,7 +23,8 @@ export const dliRoutes: AppRouteRecord[] = [
       title: 'menus.dli.home',
       icon: 'ri:dashboard-3-line',
       fixedTab: true,
-      keepAlive: false
+      keepAlive: false,
+      roles: ['R_ADMIN', 'R_DOCTOR', 'R_ASSISTANT', 'R_NURSE']
     }
   },
   {
@@ -27,7 +34,8 @@ export const dliRoutes: AppRouteRecord[] = [
     meta: {
       title: 'menus.dli.patient.title',
       icon: 'ri:group-line',
-      keepAlive: true
+      keepAlive: true,
+      roles: ['R_ADMIN', 'R_DOCTOR', 'R_ASSISTANT', 'R_NURSE']
     }
   },
   {
@@ -39,7 +47,8 @@ export const dliRoutes: AppRouteRecord[] = [
       icon: 'ri:user-heart-line',
       isHide: true,
       activePath: '/dli/patient/list',
-      keepAlive: false
+      keepAlive: false,
+      roles: ['R_ADMIN', 'R_DOCTOR', 'R_ASSISTANT', 'R_NURSE']
     }
   },
   {
@@ -49,7 +58,8 @@ export const dliRoutes: AppRouteRecord[] = [
     meta: {
       title: 'menus.dli.cdss',
       icon: 'ri:stethoscope-line',
-      keepAlive: true
+      keepAlive: true,
+      roles: ['R_ADMIN', 'R_DOCTOR']
     }
   },
   {
@@ -59,7 +69,8 @@ export const dliRoutes: AppRouteRecord[] = [
     meta: {
       title: 'menus.dli.alert',
       icon: 'ri:alarm-warning-line',
-      keepAlive: true
+      keepAlive: true,
+      roles: ['R_ADMIN', 'R_DOCTOR', 'R_NURSE']
     }
   },
   {
@@ -69,7 +80,8 @@ export const dliRoutes: AppRouteRecord[] = [
     meta: {
       title: 'menus.dli.followup',
       icon: 'ri:calendar-check-line',
-      keepAlive: true
+      keepAlive: true,
+      roles: ['R_ADMIN', 'R_DOCTOR', 'R_ASSISTANT']
     }
   },
   {
@@ -79,7 +91,8 @@ export const dliRoutes: AppRouteRecord[] = [
     meta: {
       title: 'menus.dli.review',
       icon: 'ri:shield-check-line',
-      keepAlive: true
+      keepAlive: true,
+      roles: ['R_ADMIN', 'R_DOCTOR']
     }
   }
 ]

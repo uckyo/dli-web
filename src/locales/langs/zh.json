@@ -135,8 +135,11 @@
     "title": "欢迎回来",
     "subTitle": "输入您的账号和密码登录",
     "roles": {
-      "super": "超级管理员",
+      "doctor": "医生",
+      "assistant": "医生助理",
+      "nurse": "护士",
       "admin": "管理员",
+      "super": "超级管理员",
       "user": "普通用户"
     },
     "placeholder": {

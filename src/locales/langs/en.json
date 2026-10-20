@@ -135,8 +135,11 @@
     "title": "Welcome back",
     "subTitle": "Please enter your account and password to login",
     "roles": {
+      "doctor": "Doctor",
+      "assistant": "Doctor Assistant",
+      "nurse": "Nurse",
+      "admin": "Administrator",
       "super": "Super Admin",
-      "admin": "Admin",
       "user": "User"
     },
     "placeholder": {
