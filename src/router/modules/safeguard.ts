@@ -7,7 +7,8 @@ export const safeguardRoutes: AppRouteRecord = {
   meta: {
     title: 'menus.safeguard.title',
     icon: 'ri:shield-check-line',
-    keepAlive: false
+    keepAlive: false,
+    isHide: true // 暂时隐藏该菜单，恢复时删除此行
   },
   children: [
     {

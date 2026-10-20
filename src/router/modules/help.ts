@@ -11,7 +11,8 @@ export const helpRoutes: AppRouteRecord[] = [
       icon: 'ri:bill-line',
       link: WEB_LINKS.DOCS,
       isIframe: false,
-      keepAlive: false
+      keepAlive: false,
+      isHide: true // 暂时隐藏该菜单，恢复时删除此行
     }
   },
   {
@@ -23,7 +24,8 @@ export const helpRoutes: AppRouteRecord[] = [
       icon: 'ri:bus-2-line',
       link: WEB_LINKS.LiteVersion,
       isIframe: false,
-      keepAlive: false
+      keepAlive: false,
+      isHide: true // 暂时隐藏该菜单，恢复时删除此行
     }
   },
   {
@@ -35,7 +37,8 @@ export const helpRoutes: AppRouteRecord[] = [
       icon: 'ri:subway-line',
       link: WEB_LINKS.OldVersion,
       isIframe: false,
-      keepAlive: false
+      keepAlive: false,
+      isHide: true // 暂时隐藏该菜单，恢复时删除此行
     }
   },
   {
@@ -46,7 +49,8 @@ export const helpRoutes: AppRouteRecord[] = [
       title: 'menus.plan.log',
       showTextBadge: `v${__APP_VERSION__}`,
       icon: 'ri:gamepad-line',
-      keepAlive: false
+      keepAlive: false,
+      isHide: true // 暂时隐藏该菜单，恢复时删除此行
     }
   }
 ]

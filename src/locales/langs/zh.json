@@ -227,6 +227,19 @@
       "analysis": "分析页",
       "ecommerce": "电子商务"
     },
+    "dli": {
+      "title": "DLI 诊疗平台",
+      "home": "首页",
+      "patient": {
+        "title": "患者管理",
+        "list": "患者列表",
+        "detail": "患者详情"
+      },
+      "cdss": "评估预警",
+      "alert": "处理记录",
+      "followup": "随访计划",
+      "review": "审核发布"
+    },
     "widgets": {
       "title": "组件中心",
       "icon": "图标",

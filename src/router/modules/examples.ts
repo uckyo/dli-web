@@ -6,7 +6,8 @@ export const examplesRoutes: AppRouteRecord = {
   component: '/index/index',
   meta: {
     title: 'menus.examples.title',
-    icon: 'ri:sparkling-line'
+    icon: 'ri:sparkling-line',
+    isHide: true // 暂时隐藏该菜单，恢复时删除此行
   },
   children: [
     {

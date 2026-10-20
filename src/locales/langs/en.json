@@ -227,6 +227,19 @@
       "analysis": "Analysis",
       "ecommerce": "Ecommerce"
     },
+    "dli": {
+      "title": "DLI Clinic",
+      "home": "Home",
+      "patient": {
+        "title": "Patient Mgmt",
+        "list": "Patient List",
+        "detail": "Patient Detail"
+      },
+      "cdss": "CDSS",
+      "alert": "Alerts",
+      "followup": "Follow-up",
+      "review": "Review & Publish"
+    },
     "widgets": {
       "title": "Components",
       "icon": "Icon",
