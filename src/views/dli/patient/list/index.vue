@@ -12,6 +12,18 @@
         <template #left>
           <ElSpace wrap>
             <ElButton @click="showDialog('add')" v-ripple>新增患者</ElButton>
+            <ArtExcelExport
+              :data="exportData"
+              :columns="exportColumns"
+              filename="患者数据"
+              sheet-name="患者列表"
+              :auto-index="true"
+              button-text="导出 Excel"
+              type="default"
+              @export-success="handleExportSuccess"
+            />
+            <ElButton @click="importVisible = true" v-ripple>导入 Excel</ElButton>
+            <ElButton @click="aiImportVisible = true" v-ripple>智能导入</ElButton>
           </ElSpace>
         </template>
       </ArtTableHeader>
@@ -34,6 +46,12 @@
         :patient-data="currentPatientData"
         @submit="handleDialogSubmit"
       />
+
+      <!-- Excel 导入弹窗 -->
+      <PatientImportDialog v-model="importVisible" @success="getData" />
+
+      <!-- 智能导入弹窗 -->
+      <PatientAiImportDialog v-model="aiImportVisible" @confirm="getData" />
     </ElCard>
   </div>
 </template>
@@ -44,6 +62,7 @@
   import { fetchDeletePatient, fetchGetPatientList } from '@/mock/dli/api'
   import type { DliPatient, RiskLevel } from '@/mock/dli/types'
   import {
+    CONSENT_STATUS_CONFIG,
     ENTRY_TYPE_CONFIG,
     GROUP_TYPE_CONFIG,
     MED_STATUS_CONFIG,
@@ -52,6 +71,9 @@
   } from '@/views/dli/patient/constants'
   import PatientSearch from './modules/patient-search.vue'
   import PatientDialog from './modules/patient-dialog.vue'
+  import PatientImportDialog from './modules/patient-import-dialog.vue'
+  import PatientAiImportDialog from './modules/patient-ai-import-dialog.vue'
+  import ArtExcelExport from '@/components/core/forms/art-excel-export/index.vue'
   import { ElTag, ElMessageBox } from 'element-plus'
   import { DialogType } from '@/types'
 
@@ -65,6 +87,8 @@
   const dialogType = ref<DialogType>('add')
   const dialogVisible = ref(false)
   const currentPatientData = ref<Partial<DliPatient>>({})
+  const importVisible = ref(false)
+  const aiImportVisible = ref(false)
 
   // 搜索表单
   const searchForm = ref<PatientSearchForm>({
@@ -249,6 +273,69 @@
   const handleSearch = (params: PatientSearchForm) => {
     replaceSearchParams(params)
     getData()
+  }
+
+  /**
+   * 导出数据（仅选取需要导出的字段）
+   */
+  const exportData = computed(() =>
+    data.value.map((row) => ({
+      name: row.name,
+      sex: row.sex,
+      age: row.age,
+      center: row.center,
+      entryType: row.entryType,
+      groupType: row.groupType,
+      medStatus: row.medStatus,
+      riskLevel: row.riskLevel,
+      consentStatus: row.consentStatus,
+      doctor: row.doctor,
+      lastAssessTime: row.lastAssessTime
+    }))
+  )
+
+  /**
+   * 导出列标题与格式化配置
+   */
+  const exportColumns = {
+    name: { title: '姓名' },
+    sex: { title: '性别', formatter: (value: unknown) => (value === 'male' ? '男' : '女') },
+    age: { title: '年龄' },
+    center: { title: '所属中心' },
+    entryType: {
+      title: '入组入口',
+      formatter: (value: unknown) =>
+        ENTRY_TYPE_CONFIG[value as keyof typeof ENTRY_TYPE_CONFIG]?.label ?? ''
+    },
+    groupType: {
+      title: '入组分组',
+      formatter: (value: unknown) =>
+        GROUP_TYPE_CONFIG[value as keyof typeof GROUP_TYPE_CONFIG]?.label ?? ''
+    },
+    medStatus: {
+      title: '用药状态',
+      formatter: (value: unknown) =>
+        MED_STATUS_CONFIG[value as keyof typeof MED_STATUS_CONFIG]?.label ?? ''
+    },
+    riskLevel: {
+      title: '风险分层',
+      formatter: (value: unknown) =>
+        RISK_LEVEL_CONFIG[value as keyof typeof RISK_LEVEL_CONFIG]?.label ?? ''
+    },
+    consentStatus: {
+      title: '知情同意',
+      formatter: (value: unknown) =>
+        CONSENT_STATUS_CONFIG[value as keyof typeof CONSENT_STATUS_CONFIG]?.label ?? ''
+    },
+    doctor: { title: '主管医生' },
+    lastAssessTime: { title: '最近评估时间' }
+  }
+
+  /**
+   * 导出成功提示
+   */
+  const handleExportSuccess = (): void => {
+    ElMessage.success('患者数据导出成功')
   }
 
   /**
