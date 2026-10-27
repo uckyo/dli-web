@@ -138,7 +138,10 @@
       "doctor": "医生",
       "assistant": "医生助理",
       "nurse": "护士",
-      "admin": "管理员",
+      "platform": "平台管理员",
+      "center": "中心管理员",
+      "group": "课题组管理员",
+      "sys": "系统管理员",
       "super": "超级管理员",
       "user": "普通用户"
     },
@@ -231,17 +234,36 @@
       "ecommerce": "电子商务"
     },
     "dli": {
-      "title": "DLI 诊疗平台",
-      "home": "首页",
-      "patient": {
-        "title": "患者管理",
-        "list": "患者列表",
-        "detail": "患者详情"
+      "workbench": "工作台",
+      "patient": "患者管理",
+      "model": "模型管理",
+      "intelligence": {
+        "title": "智能管理",
+        "skill": "技能管理",
+        "knowledge": "知识库管理",
+        "mcp": "MCP 管理",
+        "llm": "LLM 管理",
+        "agent": "Agent 管理"
       },
-      "cdss": "评估预警",
-      "alert": "处理记录",
-      "followup": "随访计划",
-      "review": "审核发布"
+      "exam": "检查管理",
+      "sample": {
+        "title": "生物样本",
+        "record": "样本管理",
+        "test": "检测管理"
+      },
+      "research": "研究管理",
+      "profile": "个人中心",
+      "status": "状态管理",
+      "staff": "人员管理",
+      "platform": "平台管理",
+      "center": "中心管理",
+      "group": "课题组管理",
+      "system": {
+        "title": "系统管理",
+        "config": "基础配置",
+        "platform": "平台管理",
+        "user": "用户管理"
+      }
     },
     "widgets": {
       "title": "组件中心",

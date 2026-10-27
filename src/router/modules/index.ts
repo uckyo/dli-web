@@ -1,29 +1,10 @@
 import { AppRouteRecord } from '@/types/router'
-import { dashboardRoutes } from './dashboard'
-import { templateRoutes } from './template'
-import { widgetsRoutes } from './widgets'
-import { examplesRoutes } from './examples'
-import { systemRoutes } from './system'
-import { articleRoutes } from './article'
-import { resultRoutes } from './result'
-import { exceptionRoutes } from './exception'
-import { safeguardRoutes } from './safeguard'
-import { helpRoutes } from './help'
 import { dliRoutes } from './dli'
 
 /**
  * 导出所有模块化路由
+ *
+ * 本系统为 DLI 疾病智能管理平台，仅注册业务菜单；
+ * 模板自带的示例模块（dashboard / widgets / template 等）不再挂载。
  */
-export const routeModules: AppRouteRecord[] = [
-  ...dliRoutes,
-  dashboardRoutes,
-  templateRoutes,
-  widgetsRoutes,
-  examplesRoutes,
-  systemRoutes,
-  articleRoutes,
-  resultRoutes,
-  exceptionRoutes,
-  safeguardRoutes,
-  ...helpRoutes
-]
+export const routeModules: AppRouteRecord[] = [...dliRoutes]

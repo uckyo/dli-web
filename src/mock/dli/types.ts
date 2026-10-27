@@ -1,247 +1,308 @@
 /**
- * DLI 医患双端智能诊疗平台 - Mock 领域类型定义
+ * DLI 疾病智能管理平台 - Web 端领域类型
  *
- * 对应《DLI 医患双端应用产品设计文档》§4 数据结构设计（ER 模型）。
- * 全部为前端 mock 类型，供医生端页面开发使用。
+ * 对应《疾病智能管理平台系统.md》定义的 14 个菜单：
+ * 工作台、患者管理、模型管理、智能管理、检查管理、生物样本、
+ * 研究管理、个人中心、状态管理、人员管理、平台管理、中心管理、
+ * 课题组管理、系统管理。
+ *
+ * 全部为前端 mock 类型，供 useTable 与服务层复用。
  */
 
-/** 风险分层：L1 极高 / L2 高 / L3 中 / L4 低 */
-export type RiskLevel = 'L1' | 'L2' | 'L3' | 'L4'
+/** Web 端角色编码 */
+export type WebRoleCode =
+  | 'R_DOCTOR'
+  | 'R_ASSISTANT'
+  | 'R_NURSE'
+  | 'R_PLATFORM'
+  | 'R_CENTER'
+  | 'R_GROUP'
+  | 'R_SYS'
 
-/** 用药状态：用药前 / 用药中 / 诊断后 */
-export type MedStatus = 'before' | 'during' | 'after'
+/** 预警等级：高风险 / 中风险 / 低风险 / 未触发 */
+export type WarnLevel = 'high' | 'medium' | 'low' | 'none'
 
-/** 入组入口：拟接受高危药物治疗 / 已确诊 DLI（可直接进入诊断后管理） */
-export type EntryType = 'premed' | 'diagnosed'
+/** 患者状态 */
+export type PatientStatus = '待评估' | '用药中' | '随访中' | '已结案'
 
-/** 入组分组：AI 组 / 常规组 */
-export type GroupType = 'ai' | 'routine'
+/** 转归预测窗口 */
+export type OutcomeWindow = '3个月' | '6个月' | '12个月'
 
-/** 知情同意状态 */
-export type ConsentStatus = 'signed' | 'unsigned' | 'withdrawn'
-
-/** 预警等级：红 / 橙 / 黄 */
-export type AlertLevel = 'red' | 'orange' | 'yellow'
-
-/** 预警来源 */
-export type AlertSource = 'system' | 'patient'
-
-/** 预警状态：待处理 / 已处理 / 已升级 */
-export type AlertStatus = 'pending' | 'handled' | 'escalated'
-
-/** 评估阶段：治疗前 / 治疗中 / 诊断后 */
-export type AssessPhase = 'pre' | 'during' | 'post'
-
-/** 医生确认动作：采纳 / 修改 / 不采纳 */
-export type ConfirmAction = 'agree' | 'modify' | 'reject'
-
-/** 高危用药记录 */
-export interface MedicationCourse {
-  drugName: string
-  dose: string
-  route: string
-  frequency: string
-  startDate: string
-  endDate?: string
-}
-
-/** 患者列表项 */
-export interface DliPatient {
+/** 医患对话消息 */
+export interface ChatMessage {
   id: string
-  /** 脱敏姓名，如「王**」 */
-  name: string
-  sex: 'male' | 'female'
-  age: number
-  center: string
-  groupType: GroupType
-  /** 入组入口 */
-  entryType: EntryType
-  medStatus: MedStatus
-  riskLevel: RiskLevel
-  drugs: string[]
-  lastAssessTime: string
-  unreadReports: number
-  consentStatus: ConsentStatus
-  doctor: string
-}
-
-/** 患者详情（360° 视图聚合） */
-export interface DliPatientDetail extends DliPatient {
-  phone: string
-  idNoMasked: string
-  enrollDate: string
-  diagnosis: string
-  medicationCourses: MedicationCourse[]
-}
-
-/** 诊疗时间轴事件 */
-export interface TimelineEvent {
-  id: string
-  patientId: string
-  /** 事件类型：用药 / 检测 / 预警 / 上报 / 评估 */
-  type: 'medication' | 'lab' | 'alert' | 'report' | 'assess'
-  title: string
+  from: 'doctor' | 'patient'
+  sender: string
   content: string
   time: string
 }
 
-/** 检验指标趋势序列 */
-export interface LabTrendSeries {
-  /** 指标编码 */
-  itemCode: string
-  /** 指标名称 */
-  itemName: string
-  unit: string
-  refRange: string
-  /** 时间点（MM-DD） */
-  dates: string[]
-  values: number[]
-}
-
-/** 影像报告 */
-export interface ImagingStudy {
+/** 诊疗历程事件 */
+export interface HistoryEvent {
   id: string
-  patientId: string
-  modality: 'HRCT' | 'X-Ray' | 'PET-CT'
-  studyDate: string
-  pacsUid: string
-  reportText: string
-  conclusion: string
-}
-
-/** 病理报告 */
-export interface PathologyReport {
-  id: string
-  patientId: string
-  sampleDate: string
-  sampleType: string
-  reportText: string
-}
-
-/** 可追溯依据条目 */
-export interface TraceabilityItem {
-  sourceType: 'guideline' | 'literature' | 'case' | 'model'
+  date: string
+  category: '现病史' | '既往史' | '用药' | '检查' | '诊断' | '随访'
   title: string
-  excerpt: string
+  detail: string
 }
 
-/** CDSS 风险评估报告 */
-export interface RiskAssessment {
-  id: string
-  patientId: string
-  patientName: string
-  phase: AssessPhase
-  modelVersion: string
-  score: number
-  riskLevel: RiskLevel
-  riskFactors: Array<{ factor: string; weight: string }>
-  suggestions: Array<{ type: string; content: string }>
-  traceability: TraceabilityItem[]
-  /** 触发方式：自动（新数据入库且满足评估条件）/ 手动（医生按需发起） */
-  triggerMode: 'auto' | 'manual'
-  assessTime: string
-  /** 医生确认记录（未确认为 null） */
-  doctorConfirm: {
-    action: ConfirmAction
-    opinion: string
-    doctor: string
-    time: string
-  } | null
-}
-
-/** 患者上报（症状 / 体征 / 日记） */
-export interface PatientReport {
-  id: string
-  patientId: string
-  patientName: string
-  reportType: 'symptom' | 'vital' | 'diary'
-  symptoms: Array<{ name: string; level: string }>
-  vitals: { temp?: string; spo2?: string; hr?: string }
-  diaryText?: string
-  /** AI 预判：normal 正常宣教 / abnormal 异常推送医生 */
-  aiTriage: 'normal' | 'abnormal'
-  reportTime: string
-  read: boolean
-}
-
-/** 预警 */
-export interface DliAlert {
-  id: string
-  patientId: string
-  patientName: string
-  level: AlertLevel
-  source: AlertSource
-  /** 触发规则名称 */
-  ruleName: string
-  /** 原始触发数据摘要 */
-  triggerData: string
-  status: AlertStatus
-  occurTime: string
-  /** 响应时限（SLA） */
-  deadline: string
-  /** 处置记录（未处置为 null） */
-  handleRecord: {
-    action: 'mark' | 'escalate' | 'followup'
-    opinion: string
-    handler: string
-    handleTime: string
-  } | null
-}
-
-/** 随访模板 */
-export interface FollowupTemplate {
+/** 患者列表项 */
+export interface WebPatient {
   id: string
   name: string
-  /** 时点：诊断后 1/3/6/12 月 */
-  timePoint: string
-  items: Array<{ name: string; type: 'exam' | 'lab' | 'questionnaire' }>
+  gender: '男' | '女'
+  age: number
+  center: string
+  group: 'AI 组' | '常规组'
+  status: PatientStatus
+  /** 早筛预警 */
+  earlyScreen: { level: WarnLevel; score: number }
+  /** 早诊预警 */
+  earlyDiagnosis: { level: WarnLevel; score: number }
+  /** 转归预测 */
+  outcome: { window: OutcomeWindow; probability: number; label: string }
+  lastUpdate: string
+  doctor: string
+}
+
+/** 患者 360° 详情 */
+export interface WebPatientDetail extends WebPatient {
+  phone: string
+  chiefComplaint: string
+  medication: string[]
+  conversations: ChatMessage[]
+  history: HistoryEvent[]
+}
+
+/** 检查分类 */
+export type ExamCategory = '影像' | '病理' | '检验' | '病历' | '其他'
+
+/** 检查记录 */
+export interface ExamRecord {
+  id: string
+  patientId: string
+  patientName: string
+  category: ExamCategory
+  item: string
+  center: string
+  date: string
+  status: '已归档' | '待解析' | '解析中'
+}
+
+/** 生物样本 */
+export interface SampleRecord {
+  id: string
+  patientId: string
+  patientName: string
+  type: '全血' | '血浆' | '血清' | '组织' | '尿液'
+  collectedAt: string
+  location: string
+  status: '已入库' | '待入库' | '已出库'
+}
+
+/** 样本检测记录 */
+export interface SampleTestRecord {
+  id: string
+  sampleId: string
+  patientName: string
+  item: string
+  result: string
+  testedAt: string
+  status: '已完成' | '检测中' | '异常'
+}
+
+/** 模型方向：纵向 = 多时间点，横向 = 单时间点 */
+export type ModelDirection = '纵向' | '横向'
+
+/** AI 模型 */
+export interface AiModel {
+  id: string
+  name: string
+  direction: ModelDirection
+  /** 纵向多选 / 横向单选的时间点 */
+  timePoints: string[]
+  /** 输入，可缺省 */
+  input: string
+  /** 输出 */
+  output: string
+  enabled: boolean
+  accuracy: number
+  updatedAt: string
+}
+
+/** 技能 */
+export interface SkillItem {
+  id: string
+  name: string
+  type: '工具调用' | '提示词' | '工作流'
+  calls: number
+  agent: string
+  enabled: boolean
+}
+
+/** 知识库 */
+export interface KnowledgeItem {
+  id: string
+  name: string
+  docs: number
+  size: string
+  updatedAt: string
+  enabled: boolean
+}
+
+/** MCP 服务（仅允许下载） */
+export interface McpItem {
+  id: string
+  name: string
+  protocol: 'stdio' | 'sse' | 'http'
+  version: string
+  tools: number
+  description: string
+}
+
+/** LLM 模型与 Token 余额 */
+export interface LlmItem {
+  id: string
+  name: string
+  vendor: string
+  balance: number
+  used: number
+  unit: string
+  status: '正常' | '余额预警' | '已停用'
+}
+
+/** 智能体 */
+export interface AgentItem {
+  id: string
+  name: string
+  role: string
+  skills: string[]
+  /** 内置智能体不可删除 */
+  builtin: boolean
+  enabled: boolean
+}
+
+/** 研究指标 */
+export interface ResearchItem {
+  id: string
+  name: string
+  owner: string
+  center: string
+  groupBy: string[]
+  indicators: string[]
+  members: number
+  shared: boolean
+  shareLevel: '平台' | '中心' | '课题组'
+  status: '进行中' | '已结题'
+  updatedAt: string
+}
+
+/** 研究 Agent 对话消息 */
+export interface ResearchChatMessage {
+  id: string
+  from: 'agent' | 'user'
+  content: string
+  time: string
+}
+
+/** 助理 / 护士 */
+export interface StaffItem {
+  id: string
+  name: string
+  role: '助理' | '护士'
+  doctor: string
+  phone: string
+  patients: number
+  status: '在职' | '停用'
+}
+
+/** 自动化配置项 */
+export interface AutomationItem {
+  key: string
+  label: string
   description: string
   enabled: boolean
 }
 
-/** 随访任务实例 */
-export interface FollowupTask {
+/** 组织（中心 / 课题组） */
+export interface OrgItem {
   id: string
-  planId: string
-  patientId: string
-  patientName: string
-  itemName: string
-  dueDate: string
-  status: 'pending' | 'done' | 'overdue'
-  result?: string
+  name: string
+  parent: string
+  leader: string
+  members: number
+  status: '运行中' | '已停用'
+  createdAt: string
 }
 
-/** 随访计划 */
-export interface FollowupPlan {
+/** 平台列表项（系统管理） */
+export interface PlatformItem {
   id: string
-  patientId: string
-  patientName: string
-  templateName: string
-  startTime: string
-  endTime: string
-  status: 'draft' | 'published' | 'recycling' | 'finished'
-  progress: number
-  tasks: FollowupTask[]
+  name: string
+  centers: number
+  users: number
+  status: '运行中' | '已暂停'
+  createdAt: string
 }
 
-/** 审核发布 - 待确认建议 */
-export interface PendingReview {
+/** 用户类型（各级用户管理） */
+export type UserType =
+  | '平台负责人'
+  | '中心负责人'
+  | '课题组负责人'
+  | '医生'
+  | '医生助理'
+  | '护士'
+  | '患者'
+  | '患者家属'
+
+/** 课题组医生（课题组管理端） */
+export interface GroupDoctor {
   id: string
-  patientId: string
-  patientName: string
-  phase: AssessPhase
-  content: string
-  modelVersion: string
-  submitTime: string
+  name: string
+  title: string
+  org: string
+  patients: number
+  status: '在职' | '停用'
+}
+
+/** 管理端用户 */
+export interface WebUserItem {
+  id: string
+  name: string
+  type: UserType
+  org: string
+  phone: string
+  status: '正常' | '待激活' | '已停用'
+  createdAt: string
 }
 
 /** 工作台统计 */
 export interface WorkbenchStats {
   patientTotal: number
-  pendingAlertCount: number
-  todayFollowupCount: number
-  modelVersion: string
-  modelStatus: string
-  /** 风险分层分布 */
-  riskDistribution: Array<{ level: RiskLevel; label: string; count: number }>
+  examTotal: number
+  sampleTotal: number
+  /** 检测数据量（TB） */
+  dataVolume: number
+  /** 早筛预警 */
+  earlyScreen: { count: number; total: number; accuracy: number }
+  /** 早诊预警 */
+  earlyDiagnosis: { count: number; total: number; accuracy: number }
+  /** 转归预测，按窗口拆分 */
+  outcome: Array<{ window: string; count: number; total: number; accuracy: number }>
+  modelCount: number
+  agentCount: number
+  researchCount: number
+  publicationCount: number
+  citations: number
+  influence: number
+  /** 角色附加指标 */
+  platformCount?: number
+  centerCount?: number
+  groupCount?: number
+  doctorCount?: number
+  /** 中心地图分布（平台 / 系统管理端） */
+  centerMap?: Array<{ name: string; value: number }>
+  /** 近 7 日趋势 */
+  trend: Array<{ date: string; patients: number; alerts: number }>
 }

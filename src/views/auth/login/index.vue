@@ -77,9 +77,7 @@
               <ElCheckbox v-model="formData.rememberPassword">{{
                 $t('login.rememberPwd')
               }}</ElCheckbox>
-              <RouterLink class="text-theme" :to="{ name: 'ForgetPassword' }">{{
-                $t('login.forgetPwd')
-              }}</RouterLink>
+              <span class="text-xs text-g-500">演示账号密码均为 123456</span>
             </div>
 
             <div style="margin-top: 30px">
@@ -92,13 +90,6 @@
               >
                 {{ $t('login.btnText') }}
               </ElButton>
-            </div>
-
-            <div class="mt-5 text-sm text-gray-600">
-              <span>{{ $t('login.noAccount') }}</span>
-              <RouterLink class="text-theme" :to="{ name: 'Register' }">{{
-                $t('login.register')
-              }}</RouterLink>
             </div>
           </ElForm>
         </div>
@@ -128,7 +119,7 @@
     formKey.value++
   })
 
-  type AccountKey = 'doctor' | 'assistant' | 'nurse' | 'admin'
+  type AccountKey = 'doctor' | 'assistant' | 'nurse' | 'platform' | 'center' | 'group' | 'sys'
 
   export interface Account {
     key: AccountKey
@@ -138,7 +129,7 @@
     roles: string[]
   }
 
-  // 按《DLI 疾病管理系统项目建设蓝图》提供的四类角色账号
+  // 按《疾病智能管理平台系统.md》提供的七类 Web 角色账号
   const accounts = computed<Account[]>(() => [
     {
       key: 'doctor',
@@ -162,11 +153,32 @@
       roles: ['R_NURSE']
     },
     {
-      key: 'admin',
-      label: t('login.roles.admin'),
-      userName: 'admin',
+      key: 'platform',
+      label: t('login.roles.platform'),
+      userName: 'platform',
       password: '123456',
-      roles: ['R_ADMIN']
+      roles: ['R_PLATFORM']
+    },
+    {
+      key: 'center',
+      label: t('login.roles.center'),
+      userName: 'center',
+      password: '123456',
+      roles: ['R_CENTER']
+    },
+    {
+      key: 'group',
+      label: t('login.roles.group'),
+      userName: 'group',
+      password: '123456',
+      roles: ['R_GROUP']
+    },
+    {
+      key: 'sys',
+      label: t('login.roles.sys'),
+      userName: 'sys',
+      password: '123456',
+      roles: ['R_SYS']
     }
   ])
 

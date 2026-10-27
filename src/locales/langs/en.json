@@ -138,7 +138,10 @@
       "doctor": "Doctor",
       "assistant": "Doctor Assistant",
       "nurse": "Nurse",
-      "admin": "Administrator",
+      "platform": "Platform Admin",
+      "center": "Center Admin",
+      "group": "Group Admin",
+      "sys": "System Admin",
       "super": "Super Admin",
       "user": "User"
     },
@@ -231,17 +234,36 @@
       "ecommerce": "Ecommerce"
     },
     "dli": {
-      "title": "DLI Clinic",
-      "home": "Home",
-      "patient": {
-        "title": "Patient Mgmt",
-        "list": "Patient List",
-        "detail": "Patient Detail"
+      "workbench": "Workbench",
+      "patient": "Patients",
+      "model": "Models",
+      "intelligence": {
+        "title": "Intelligence",
+        "skill": "Skills",
+        "knowledge": "Knowledge",
+        "mcp": "MCP",
+        "llm": "LLM",
+        "agent": "Agents"
       },
-      "cdss": "CDSS",
-      "alert": "Alerts",
-      "followup": "Follow-up",
-      "review": "Review & Publish"
+      "exam": "Examinations",
+      "sample": {
+        "title": "Biosamples",
+        "record": "Samples",
+        "test": "Tests"
+      },
+      "research": "Research",
+      "profile": "Profile",
+      "status": "Automation",
+      "staff": "Staff",
+      "platform": "Platform Admin",
+      "center": "Center Admin",
+      "group": "Group Admin",
+      "system": {
+        "title": "System Admin",
+        "config": "Configuration",
+        "platform": "Platforms",
+        "user": "Users"
+      }
     },
     "widgets": {
       "title": "Components",

@@ -1,85 +1,62 @@
 /**
- * DLI Mock 服务层 - 模拟后端接口（延迟 + 筛选 + 分页）
+ * DLI 疾病智能管理平台 - Mock 服务层
  *
- * 全部页面数据通过本模块获取；函数签名对齐项目 API 规范（fetchXxx），
+ * 全部页面数据经本模块获取；函数签名对齐项目 API 规范（fetchXxx），
  * 列表接口返回 Api.Common.PaginatedResponse 结构，可直接对接 useTable。
+ *
+ * 说明：Mock 仅做内存态变更，刷新页面后恢复初始数据。
  */
-import { ALERT_LIST, PATIENT_REPORTS } from './alerts'
-import { RISK_ASSESSMENTS } from './assessments'
 import {
-  FOLLOWUP_PLANS,
-  FOLLOWUP_TEMPLATES,
-  PENDING_PUBLICATIONS,
-  PENDING_REVIEWS,
-  TODAY_FOLLOWUP_TASKS
-} from './followups'
-import {
-  IMAGING_STUDIES,
-  LAB_TRENDS,
+  AGENTS,
+  CENTER_MAP_DATA,
+  CENTERS_DATA,
+  EXAM_AUTOMATION,
+  EXAMS,
+  FOLLOWUP_AUTOMATION,
+  GROUP_DOCTORS,
+  GROUPS_DATA,
+  KNOWLEDGE,
+  LLMS,
+  MCPS,
+  MODELS,
+  PATIENTS,
+  PATIENT_AUTOMATION,
   PATIENT_DETAILS,
-  PATIENT_LIST,
-  PATHOLOGY_REPORTS,
-  TIMELINE_EVENTS
-} from './patients'
+  PLATFORMS_DATA,
+  RESEARCHES,
+  SAMPLES,
+  SAMPLE_TESTS,
+  SKILLS,
+  STAFFS,
+  TREND_DATA,
+  USERS_DATA
+} from './data'
 import type {
-  AssessPhase,
-  DliAlert,
-  DliPatient,
-  DliPatientDetail,
-  FollowupPlan,
-  FollowupTemplate,
-  ImagingStudy,
-  LabTrendSeries,
-  PathologyReport,
-  PatientReport,
-  RiskAssessment,
-  TimelineEvent,
+  AiModel,
+  ExamCategory,
+  ExamRecord,
+  GroupDoctor,
+  OrgItem,
+  PlatformItem,
+  ResearchItem,
+  SampleRecord,
+  SampleTestRecord,
+  SkillItem,
+  StaffItem,
+  UserType,
+  WarnLevel,
+  WebPatient,
+  WebPatientDetail,
+  WebRoleCode,
+  WebUserItem,
   WorkbenchStats
 } from './types'
 
 /** 模拟网络延迟 */
-const delay = (ms = 300) => new Promise((resolve) => setTimeout(resolve, ms))
+const delay = (ms = 260) => new Promise((resolve) => setTimeout(resolve, ms))
 
-/** 医生确认留痕记录（审核发布） */
-export const CONFIRM_RECORDS: Array<{
-  reviewId: string
-  action: 'agree' | 'modify' | 'reject'
-  opinion: string
-  doctor: string
-  time: string
-}> = []
-
-/** 风险分层展示文案 */
-const RISK_LABELS: Record<string, string> = {
-  L1: 'L1 极高',
-  L2: 'L2 高',
-  L3: 'L3 中',
-  L4: 'L4 低'
-}
-
-/** 患者列表查询参数 */
-export interface PatientListParams {
-  current: number
-  size: number
-  keyword?: string
-  entryType?: string
-  riskLevel?: string
-  medStatus?: string
-  groupType?: string
-}
-
-/** 预警列表查询参数 */
-export interface AlertListParams {
-  current: number
-  size: number
-  keyword?: string
-  level?: string
-  status?: string
-  source?: string
-}
-
-/** 分页工具 */
-function paginate<T>(list: T[], current: number, size: number) {
+/** 通用分页 */
+function paginate<T>(list: T[], current = 1, size = 10): Api.Common.PaginatedResponse<T> {
   const start = (current - 1) * size
   return {
     records: list.slice(start, start + size),
@@ -89,326 +66,468 @@ function paginate<T>(list: T[], current: number, size: number) {
   }
 }
 
-/** 获取工作台统计 */
-export async function fetchGetWorkbenchStats(): Promise<WorkbenchStats> {
+/** 患者列表查询参数 */
+export interface PatientQueryParams {
+  current?: number
+  size?: number
+  keyword?: string
+  status?: WebPatient['status'] | ''
+  warnLevel?: WarnLevel | ''
+}
+
+/** 检查列表查询参数 */
+export interface ExamQueryParams {
+  current?: number
+  size?: number
+  keyword?: string
+  category?: ExamCategory | ''
+}
+
+/** 人员列表查询参数 */
+export interface StaffQueryParams {
+  current?: number
+  size?: number
+  keyword?: string
+  role?: StaffItem['role']
+}
+
+/** 工作台：按角色返回附加指标 */
+export async function fetchGetWorkbench(role: WebRoleCode): Promise<WorkbenchStats> {
   await delay(200)
-  const distribution = (['L1', 'L2', 'L3', 'L4'] as const).map((level) => ({
-    level,
-    label: RISK_LABELS[level],
-    count: PATIENT_LIST.filter((p) => p.riskLevel === level).length
-  }))
-  return {
-    patientTotal: PATIENT_LIST.length,
-    pendingAlertCount: ALERT_LIST.filter((a) => a.status === 'pending').length,
-    todayFollowupCount: TODAY_FOLLOWUP_TASKS.length,
-    modelVersion: 'DLI-CDSS v2.3.1',
-    modelStatus: '运行中（AUC 0.87）',
-    riskDistribution: distribution
+
+  const stats: WorkbenchStats = {
+    patientTotal: 231,
+    examTotal: 1864,
+    sampleTotal: 742,
+    dataVolume: 126.8,
+    earlyScreen: { count: 46, total: 231, accuracy: 0.912 },
+    earlyDiagnosis: { count: 28, total: 64, accuracy: 0.883 },
+    outcome: [
+      { window: '3 个月', count: 38, total: 96, accuracy: 0.861 },
+      { window: '6 个月', count: 27, total: 82, accuracy: 0.842 },
+      { window: '12 个月', count: 19, total: 53, accuracy: 0.817 }
+    ],
+    modelCount: MODELS.length,
+    agentCount: AGENTS.length,
+    researchCount: RESEARCHES.length,
+    publicationCount: 26,
+    citations: 418,
+    influence: 87.6,
+    trend: TREND_DATA
   }
+
+  if (role === 'R_PLATFORM') {
+    stats.platformCount = PLATFORMS_DATA.length
+    stats.centerCount = CENTERS_DATA.length
+    stats.doctorCount = USERS_DATA.filter((user) => user.type === '医生').length * 13
+    stats.centerMap = CENTER_MAP_DATA
+  }
+  if (role === 'R_CENTER') {
+    stats.groupCount = GROUPS_DATA.length
+    stats.doctorCount = USERS_DATA.filter((user) => user.type === '医生').length * 4
+  }
+  if (role === 'R_GROUP') {
+    stats.doctorCount = USERS_DATA.filter((user) => user.type === '医生').length
+  }
+  if (role === 'R_SYS') {
+    stats.platformCount = PLATFORMS_DATA.length
+    stats.centerCount = CENTERS_DATA.length * PLATFORMS_DATA.length
+    stats.doctorCount = USERS_DATA.filter((user) => user.type === '医生').length * 21
+    stats.centerMap = CENTER_MAP_DATA
+  }
+  return stats
 }
 
-/** 获取最新预警（工作台） */
-export async function fetchGetLatestAlerts(limit = 5): Promise<DliAlert[]> {
-  await delay(200)
-  return [...ALERT_LIST].sort((a, b) => b.occurTime.localeCompare(a.occurTime)).slice(0, limit)
-}
-
-/** 获取今日随访任务（工作台） */
-export async function fetchGetTodayFollowups() {
-  await delay(200)
-  return TODAY_FOLLOWUP_TASKS
-}
-
-/** 获取患者列表（分页 + 筛选） */
+/** 患者列表（分页 + 筛选） */
 export async function fetchGetPatientList(
-  params: PatientListParams
-): Promise<Api.Common.PaginatedResponse<DliPatient>> {
+  params: PatientQueryParams
+): Promise<Api.Common.PaginatedResponse<WebPatient>> {
   await delay()
-  let list = [...PATIENT_LIST]
+  let list = [...PATIENTS]
   if (params.keyword) {
-    const kw = params.keyword.toLowerCase()
+    const keyword = params.keyword.trim().toLowerCase()
     list = list.filter(
-      (p) => p.name.includes(kw) || p.id.toLowerCase().includes(kw) || p.doctor.includes(kw)
+      (item) =>
+        item.name.includes(keyword) ||
+        item.id.toLowerCase().includes(keyword) ||
+        item.doctor.includes(keyword)
     )
   }
-  if (params.entryType) list = list.filter((p) => p.entryType === params.entryType)
-  if (params.riskLevel) list = list.filter((p) => p.riskLevel === params.riskLevel)
-  if (params.medStatus) list = list.filter((p) => p.medStatus === params.medStatus)
-  if (params.groupType) list = list.filter((p) => p.groupType === params.groupType)
+  if (params.status) list = list.filter((item) => item.status === params.status)
+  if (params.warnLevel) {
+    list = list.filter(
+      (item) =>
+        item.earlyScreen.level === params.warnLevel ||
+        item.earlyDiagnosis.level === params.warnLevel
+    )
+  }
   return paginate(list, params.current, params.size)
 }
 
-/** 获取患者详情 */
-export async function fetchGetPatientDetail(id: string): Promise<DliPatientDetail> {
+/** 患者详情（含对话与诊疗历程） */
+export async function fetchGetPatientDetail(id: string): Promise<WebPatientDetail> {
   await delay()
   const detail = PATIENT_DETAILS[id]
-  if (detail) return detail
-  const base = PATIENT_LIST.find((p) => p.id === id)
-  if (!base) throw new Error('患者不存在')
-  return {
-    ...base,
-    phone: '138****0000',
-    idNoMasked: '————',
-    enrollDate: '2026-09-01',
-    diagnosis: '高危药物治疗随访中',
-    medicationCourses: []
-  }
+  if (!detail) throw new Error('患者不存在')
+  return detail
 }
 
-/** 新增 / 编辑患者（内存 mock，刷新后恢复） */
-export async function fetchSavePatient(data: Partial<DliPatient>): Promise<void> {
-  await delay(400)
-  const idx = PATIENT_LIST.findIndex((p) => p.id === data.id)
-  if (idx >= 0) {
-    PATIENT_LIST[idx] = { ...PATIENT_LIST[idx], ...data } as DliPatient
-  } else {
-    PATIENT_LIST.unshift({
-      id: data.id || `DLI-2026-${String(PATIENT_LIST.length + 1).padStart(4, '0')}`,
-      name: data.name || '新**',
-      sex: data.sex || 'male',
-      age: data.age || 50,
-      center: data.center || '同济医院',
-      entryType: data.entryType || 'premed',
-      groupType: data.groupType || 'ai',
-      medStatus: data.medStatus || 'before',
-      riskLevel: data.riskLevel || 'L3',
-      drugs: data.drugs || [],
-      lastAssessTime: '—',
-      unreadReports: 0,
-      consentStatus: data.consentStatus || 'unsigned',
-      doctor: data.doctor || '陈明远'
-    })
-  }
-}
-
-/** 删除患者（内存 mock） */
-export async function fetchDeletePatient(id: string): Promise<void> {
-  await delay(400)
-  const idx = PATIENT_LIST.findIndex((p) => p.id === id)
-  if (idx >= 0) PATIENT_LIST.splice(idx, 1)
-}
-
-/** 获取患者时间轴 */
-export async function fetchGetPatientTimeline(id: string): Promise<TimelineEvent[]> {
+/** 检查列表（按分类） */
+export async function fetchGetExamList(
+  params: ExamQueryParams
+): Promise<Api.Common.PaginatedResponse<ExamRecord>> {
   await delay()
-  return TIMELINE_EVENTS.filter((e) => e.patientId === id).sort((a, b) =>
-    b.time.localeCompare(a.time)
-  )
-}
-
-/** 获取检验指标趋势 */
-export async function fetchGetLabTrends(id: string): Promise<LabTrendSeries[]> {
-  await delay()
-  return LAB_TRENDS[id] || []
-}
-
-/** 获取影像报告 */
-export async function fetchGetImagingStudies(id: string): Promise<ImagingStudy[]> {
-  await delay()
-  return IMAGING_STUDIES.filter((i) => i.patientId === id)
-}
-
-/** 获取病理报告 */
-export async function fetchGetPathologyReports(id: string): Promise<PathologyReport[]> {
-  await delay()
-  return PATHOLOGY_REPORTS.filter((p) => p.patientId === id)
-}
-
-/** 获取风险评估历史（可按患者过滤） */
-export async function fetchGetRiskAssessments(patientId?: string): Promise<RiskAssessment[]> {
-  await delay()
-  let list = [...RISK_ASSESSMENTS]
-  if (patientId) list = list.filter((r) => r.patientId === patientId)
-  return list.sort((a, b) => b.assessTime.localeCompare(a.assessTime))
-}
-
-/** 手动发起评估（医生按需，模型与自动评估一致） */
-export async function fetchCreateManualAssessment(params: {
-  patientId: string
-  phase: AssessPhase
-  reason?: string
-}): Promise<RiskAssessment> {
-  await delay(600)
-  const patient = PATIENT_LIST.find((p) => p.id === params.patientId)
-  if (!patient) throw new Error('患者不存在')
-
-  const scoreMap: Record<DliPatient['riskLevel'], number> = { L1: 86, L2: 68, L3: 48, L4: 28 }
-  const now = new Date()
-  const pad = (value: number) => String(value).padStart(2, '0')
-  const assessTime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
-  const record: RiskAssessment = {
-    id: `RA-${new Date().getFullYear()}-${String(4100 + RISK_ASSESSMENTS.length)}`,
-    patientId: patient.id,
-    patientName: `${patient.name}（${patient.id}）`,
-    phase: params.phase,
-    modelVersion: 'DLI-CDSS v2.3.1',
-    triggerMode: 'manual',
-    score: scoreMap[patient.riskLevel],
-    riskLevel: patient.riskLevel,
-    riskFactors: patient.drugs.length
-      ? patient.drugs.map((drug) => ({ factor: `高危药物：${drug}`, weight: '中' }))
-      : [{ factor: '暂无结构化高危因素，按基线资料评估', weight: '低' }],
-    suggestions: [
-      { type: '评估说明', content: params.reason?.trim() || '医生按需发起评估' },
-      { type: '监测建议', content: '结合近期症状、体征与检验检查结果动态复评' }
-    ],
-    traceability: [
-      {
-        sourceType: 'guideline',
-        title: '《药物相关性肺损伤诊治专家共识（2024）》',
-        excerpt: '医生可根据临床需要随时发起风险评估，评估依据与自动评估一致。'
-      },
-      {
-        sourceType: 'model',
-        title: '模型特征贡献度',
-        excerpt: '基于患者基线资料与近期监测数据生成。'
-      }
-    ],
-    assessTime,
-    doctorConfirm: null
-  }
-  RISK_ASSESSMENTS.unshift(record)
-  return record
-}
-
-/** 医生确认评估建议（采纳 / 修改 / 不采纳，留痕） */
-export async function fetchConfirmAssessment(
-  assessmentId: string,
-  action: 'agree' | 'modify' | 'reject',
-  opinion: string
-): Promise<void> {
-  await delay(400)
-  const item = RISK_ASSESSMENTS.find((r) => r.id === assessmentId)
-  if (!item) throw new Error('评估报告不存在')
-  item.doctorConfirm = {
-    action,
-    opinion,
-    doctor: '当前登录医生',
-    time: new Date().toLocaleString('zh-CN', { hour12: false })
-  }
-}
-
-/** 获取患者上报动态（可按患者过滤） */
-export async function fetchGetPatientReports(patientId?: string): Promise<PatientReport[]> {
-  await delay()
-  let list = [...PATIENT_REPORTS]
-  if (patientId) list = list.filter((r) => r.patientId === patientId)
-  return list.sort((a, b) => b.reportTime.localeCompare(a.reportTime))
-}
-
-/** 获取预警列表（分页 + 筛选） */
-export async function fetchGetAlertList(
-  params: AlertListParams
-): Promise<Api.Common.PaginatedResponse<DliAlert>> {
-  await delay()
-  let list = [...ALERT_LIST]
+  let list = EXAMS.filter((item) => !params.category || item.category === params.category)
   if (params.keyword) {
-    const kw = params.keyword.toLowerCase()
+    const keyword = params.keyword.trim().toLowerCase()
     list = list.filter(
-      (a) =>
-        a.patientName.includes(kw) || a.ruleName.includes(kw) || a.id.toLowerCase().includes(kw)
+      (item) =>
+        item.patientName.includes(keyword) ||
+        item.id.toLowerCase().includes(keyword) ||
+        item.item.includes(keyword)
     )
   }
-  if (params.level) list = list.filter((a) => a.level === params.level)
-  if (params.status) list = list.filter((a) => a.status === params.status)
-  if (params.source) list = list.filter((a) => a.source === params.source)
-  list.sort((a, b) => b.occurTime.localeCompare(a.occurTime))
   return paginate(list, params.current, params.size)
 }
 
-/** 预警处置（标记处理 / 升级 / 转随访） */
-export async function fetchHandleAlert(
-  alertId: string,
-  action: 'mark' | 'escalate' | 'followup',
-  opinion: string
-): Promise<void> {
-  await delay(400)
-  const alert = ALERT_LIST.find((a) => a.id === alertId)
-  if (!alert) throw new Error('预警不存在')
-  const statusMap = { mark: 'handled', escalate: 'escalated', followup: 'handled' } as const
-  alert.status = statusMap[action]
-  alert.handleRecord = {
-    action,
-    opinion,
-    handler: '当前登录医生',
-    handleTime: new Date().toLocaleString('zh-CN', { hour12: false })
-  }
-}
-
-/** 获取随访模板 */
-export async function fetchGetFollowupTemplates(): Promise<FollowupTemplate[]> {
-  await delay(200)
-  return FOLLOWUP_TEMPLATES
-}
-
-/** 随访计划查询参数 */
-export interface FollowupPlanListParams {
-  current: number
-  size: number
+/** 生物样本列表 */
+export async function fetchGetSampleList(params: {
+  current?: number
+  size?: number
   keyword?: string
-  status?: string
-}
-
-/** 获取随访计划列表（分页） */
-export async function fetchGetFollowupPlans(
-  params: FollowupPlanListParams
-): Promise<Api.Common.PaginatedResponse<FollowupPlan>> {
+}): Promise<Api.Common.PaginatedResponse<SampleRecord>> {
   await delay()
-  let list = [...FOLLOWUP_PLANS]
+  let list = [...SAMPLES]
   if (params.keyword) {
-    const kw = params.keyword.toLowerCase()
+    const keyword = params.keyword.trim()
     list = list.filter(
-      (p) =>
-        p.patientName.includes(kw) || p.templateName.includes(kw) || p.id.toLowerCase().includes(kw)
+      (item) => item.patientName.includes(keyword) || item.id.toLowerCase().includes(keyword)
     )
   }
-  if (params.status) list = list.filter((p) => p.status === params.status)
   return paginate(list, params.current, params.size)
 }
 
-/** 下发随访计划（发布至患者端） */
-export async function fetchPublishFollowupPlan(planId: string): Promise<void> {
-  await delay(400)
-  const plan = FOLLOWUP_PLANS.find((p) => p.id === planId)
-  if (!plan) throw new Error('计划不存在')
-  plan.status = 'published'
+/** 样本检测列表 */
+export async function fetchGetSampleTestList(params: {
+  current?: number
+  size?: number
+  keyword?: string
+}): Promise<Api.Common.PaginatedResponse<SampleTestRecord>> {
+  await delay()
+  let list = [...SAMPLE_TESTS]
+  if (params.keyword) {
+    const keyword = params.keyword.trim()
+    list = list.filter(
+      (item) => item.patientName.includes(keyword) || item.sampleId.toLowerCase().includes(keyword)
+    )
+  }
+  return paginate(list, params.current, params.size)
 }
 
-/** 获取待确认建议（审核发布） */
-export async function fetchGetPendingReviews() {
+/** 模型列表 */
+export async function fetchGetModels(): Promise<AiModel[]> {
+  await delay(180)
+  return [...MODELS]
+}
+
+/** 启停模型 */
+export async function fetchToggleModel(id: string, enabled: boolean): Promise<void> {
+  await delay(150)
+  const model = MODELS.find((item) => item.id === id)
+  if (model) model.enabled = enabled
+}
+
+/** 保存模型 */
+export async function fetchSaveModel(payload: AiModel): Promise<void> {
+  await delay(300)
+  const index = MODELS.findIndex((item) => item.id === payload.id)
+  if (index > -1) {
+    MODELS[index] = payload
+    return
+  }
+  MODELS.unshift(payload)
+}
+
+/** 智能管理聚合数据 */
+export async function fetchGetIntelligence() {
   await delay(200)
-  return PENDING_REVIEWS
-}
-
-/** 医生确认建议（采纳 / 修改 / 不采纳），确认记录留痕 */
-export async function fetchConfirmReview(
-  reviewId: string,
-  action: 'agree' | 'modify' | 'reject',
-  opinion: string
-): Promise<void> {
-  await delay(400)
-  const idx = PENDING_REVIEWS.findIndex((r) => r.id === reviewId)
-  if (idx >= 0) {
-    CONFIRM_RECORDS.push({
-      reviewId,
-      action,
-      opinion,
-      doctor: '当前登录医生',
-      time: new Date().toLocaleString('zh-CN', { hour12: false })
-    })
-    PENDING_REVIEWS.splice(idx, 1)
+  return {
+    skills: [...SKILLS] as SkillItem[],
+    knowledge: [...KNOWLEDGE],
+    mcps: [...MCPS],
+    llms: [...LLMS],
+    agents: [...AGENTS]
   }
 }
 
-/** 获取待发布项（审核发布） */
-export async function fetchGetPendingPublications() {
-  await delay(200)
-  return PENDING_PUBLICATIONS
+/** 启停智能体 */
+export async function fetchToggleAgent(id: string, enabled: boolean): Promise<void> {
+  await delay(150)
+  const agent = AGENTS.find((item) => item.id === id)
+  if (agent && agent.builtin) agent.enabled = enabled
 }
 
-/** 发布确认（推送至患者端） */
-export async function fetchPublishItem(publishId: string): Promise<void> {
+/** 删除自定义智能体（内置不可删） */
+export async function fetchDeleteAgent(id: string): Promise<void> {
+  await delay(200)
+  const index = AGENTS.findIndex((item) => item.id === id)
+  if (index > -1 && !AGENTS[index].builtin) AGENTS.splice(index, 1)
+}
+
+/** 研究项目列表 */
+export async function fetchGetResearchList(params: {
+  current?: number
+  size?: number
+  keyword?: string
+  /** 仅查看共享项目（管理端） */
+  onlyShared?: boolean
+}): Promise<Api.Common.PaginatedResponse<ResearchItem>> {
+  await delay()
+  let list = [...RESEARCHES]
+  if (params.onlyShared) list = list.filter((item) => item.shared)
+  if (params.keyword) {
+    const keyword = params.keyword.trim()
+    list = list.filter(
+      (item) =>
+        item.name.includes(keyword) || item.owner.includes(keyword) || item.id.includes(keyword)
+    )
+  }
+  return paginate(list, params.current, params.size)
+}
+
+/** 新建研究项目 */
+export async function fetchCreateResearch(
+  payload: Pick<
+    ResearchItem,
+    'name' | 'groupBy' | 'indicators' | 'shared' | 'shareLevel' | 'owner' | 'center'
+  >
+): Promise<void> {
   await delay(400)
-  const idx = PENDING_PUBLICATIONS.findIndex((p) => p.id === publishId)
-  if (idx >= 0) PENDING_PUBLICATIONS.splice(idx, 1)
+  RESEARCHES.unshift({
+    ...payload,
+    id: `R-2026-${String(RESEARCHES.length + 4).padStart(3, '0')}`,
+    members: 1,
+    status: '进行中',
+    updatedAt: new Date().toISOString().slice(0, 10)
+  })
+}
+
+/** 更新研究共享设置 */
+export async function fetchUpdateResearchShare(
+  id: string,
+  shared: boolean,
+  shareLevel: ResearchItem['shareLevel']
+): Promise<void> {
+  await delay(200)
+  const research = RESEARCHES.find((item) => item.id === id)
+  if (research) {
+    research.shared = shared
+    research.shareLevel = shareLevel
+    research.updatedAt = new Date().toISOString().slice(0, 10)
+  }
+}
+
+/** 人员列表 */
+export async function fetchGetStaffList(
+  params: StaffQueryParams
+): Promise<Api.Common.PaginatedResponse<StaffItem>> {
+  await delay()
+  let list = STAFFS.filter((item) => item.role === params.role)
+  if (params.keyword) {
+    const keyword = params.keyword.trim()
+    list = list.filter((item) => item.name.includes(keyword) || item.doctor.includes(keyword))
+  }
+  return paginate(list, params.current, params.size)
+}
+
+/** 启停人员 */
+export async function fetchToggleStaff(id: string, status: StaffItem['status']): Promise<void> {
+  await delay(180)
+  const staff = STAFFS.find((item) => item.id === id)
+  if (staff) staff.status = status
+}
+
+/** 新增人员 */
+export async function fetchAddStaff(payload: Omit<StaffItem, 'id'>): Promise<void> {
+  await delay(300)
+  STAFFS.push({ ...payload, id: `U-${1000 + STAFFS.length + 1}` })
+}
+
+/** 自动化配置 */
+export async function fetchGetAutomation() {
+  await delay(180)
+  return {
+    patient: [...PATIENT_AUTOMATION],
+    exam: [...EXAM_AUTOMATION],
+    followup: [...FOLLOWUP_AUTOMATION]
+  }
+}
+
+/* ------------------------------ 管理端：中心 / 课题组 ------------------------------ */
+
+/** 组织保存参数（中心 / 课题组共用） */
+export type OrgPayload = Pick<OrgItem, 'name' | 'leader' | 'parent' | 'status'> & {
+  id?: string
+}
+
+/** 中心列表（平台管理端） */
+export async function fetchGetCenters(): Promise<OrgItem[]> {
+  await delay(180)
+  return [...CENTERS_DATA]
+}
+
+/** 新增 / 编辑中心（平台管理端，可删除） */
+export async function fetchSaveCenter(payload: OrgPayload): Promise<void> {
+  await delay(300)
+  const index = CENTERS_DATA.findIndex((item) => item.id === payload.id)
+  if (index > -1) {
+    CENTERS_DATA[index] = { ...CENTERS_DATA[index], ...payload }
+    return
+  }
+  CENTERS_DATA.push({
+    id: `C-${String(CENTERS_DATA.length + 1).padStart(3, '0')}`,
+    name: payload.name,
+    leader: payload.leader,
+    parent: payload.parent || 'DLI 智能管理平台',
+    members: 0,
+    status: payload.status,
+    createdAt: new Date().toISOString().slice(0, 10)
+  })
+}
+
+/** 删除中心（平台管理端） */
+export async function fetchDeleteCenter(id: string): Promise<void> {
+  await delay(250)
+  const index = CENTERS_DATA.findIndex((item) => item.id === id)
+  if (index > -1) CENTERS_DATA.splice(index, 1)
+}
+
+/** 课题组列表（中心管理端） */
+export async function fetchGetGroups(): Promise<OrgItem[]> {
+  await delay(180)
+  return [...GROUPS_DATA]
+}
+
+/** 新增 / 编辑课题组（中心管理端，不可删除） */
+export async function fetchSaveGroup(payload: OrgPayload): Promise<void> {
+  await delay(300)
+  const index = GROUPS_DATA.findIndex((item) => item.id === payload.id)
+  if (index > -1) {
+    GROUPS_DATA[index] = { ...GROUPS_DATA[index], ...payload }
+    return
+  }
+  GROUPS_DATA.push({
+    id: `G-${String(GROUPS_DATA.length + 1).padStart(3, '0')}`,
+    name: payload.name,
+    leader: payload.leader,
+    parent: payload.parent || '华东中心',
+    members: 0,
+    status: payload.status,
+    createdAt: new Date().toISOString().slice(0, 10)
+  })
+}
+
+/* ------------------------------ 管理端：平台 / 系统 ------------------------------ */
+
+/** 平台列表（系统管理端） */
+export async function fetchGetPlatforms(): Promise<PlatformItem[]> {
+  await delay(180)
+  return [...PLATFORMS_DATA]
+}
+
+/** 暂停 / 恢复平台服务（系统管理端） */
+export async function fetchTogglePlatformService(
+  id: string,
+  status: PlatformItem['status']
+): Promise<void> {
+  await delay(250)
+  const platform = PLATFORMS_DATA.find((item) => item.id === id)
+  if (platform) platform.status = status
+}
+
+/** 保存基础配置（平台 / 系统管理端，演示） */
+export async function fetchSaveBaseConfig(payload: Record<string, unknown>): Promise<void> {
+  await delay(300)
+  void payload
+}
+
+/* ------------------------------ 管理端：用户 ------------------------------ */
+
+/** 用户列表查询参数 */
+export interface UserQueryParams {
+  current?: number
+  size?: number
+  keyword?: string
+  type?: UserType | ''
+  /** 当前管理端可管理的用户类型 */
+  types?: UserType[]
+}
+
+/** 管理端用户列表 */
+export async function fetchGetUserList(
+  params: UserQueryParams
+): Promise<Api.Common.PaginatedResponse<WebUserItem>> {
+  await delay()
+  let list = [...USERS_DATA]
+  if (params.types?.length) list = list.filter((item) => params.types!.includes(item.type))
+  if (params.type) list = list.filter((item) => item.type === params.type)
+  if (params.keyword) {
+    const keyword = params.keyword.trim()
+    list = list.filter(
+      (item) =>
+        item.name.includes(keyword) || item.phone.includes(keyword) || item.org.includes(keyword)
+    )
+  }
+  return paginate(list, params.current, params.size)
+}
+
+/** 新增用户 */
+export async function fetchAddUser(payload: Omit<WebUserItem, 'id' | 'createdAt'>): Promise<void> {
+  await delay(300)
+  USERS_DATA.push({
+    ...payload,
+    id: `MU-${9000 + USERS_DATA.length}`,
+    createdAt: new Date().toISOString().slice(0, 10)
+  })
+}
+
+/** 启用 / 停用用户 */
+export async function fetchToggleUser(id: string, status: WebUserItem['status']): Promise<void> {
+  await delay(200)
+  const user = USERS_DATA.find((item) => item.id === id)
+  if (user) user.status = status
+}
+
+/** 删除用户（仅平台管理端可调用） */
+export async function fetchDeleteUser(id: string): Promise<void> {
+  await delay(250)
+  const index = USERS_DATA.findIndex((item) => item.id === id)
+  if (index > -1) USERS_DATA.splice(index, 1)
+}
+
+/* ------------------------------ 管理端：课题组医生 ------------------------------ */
+
+/** 课题组医生列表 */
+export async function fetchGetGroupDoctors(params: {
+  current?: number
+  size?: number
+  keyword?: string
+}): Promise<Api.Common.PaginatedResponse<GroupDoctor>> {
+  await delay()
+  let list = [...GROUP_DOCTORS]
+  if (params.keyword) {
+    const keyword = params.keyword.trim()
+    list = list.filter((item) => item.name.includes(keyword) || item.org.includes(keyword))
+  }
+  return paginate(list, params.current, params.size)
+}
+
+/** 启停课题组医生 */
+export async function fetchToggleGroupDoctor(
+  id: string,
+  status: GroupDoctor['status']
+): Promise<void> {
+  await delay(200)
+  const doctor = GROUP_DOCTORS.find((item) => item.id === id)
+  if (doctor) doctor.status = status
 }

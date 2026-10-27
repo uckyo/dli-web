@@ -1,6 +1,6 @@
 <!-- 地图图表 -->
 <template>
-  <div class="relative w-full" :style="{ height: 'calc(100vh - 120px)' }">
+  <div class="relative w-full" :style="{ height: props.height }">
     <div v-if="isEmpty" class="h-full flex-cc">
       <ElEmpty description="暂无地图数据" />
     </div>
@@ -23,6 +23,7 @@
   const { isDark } = storeToRefs(settingStore)
 
   const props = withDefaults(defineProps<MapChartProps>(), {
+    height: 'calc(100vh - 120px)',
     mapData: () => [],
     selectedRegion: '',
     showLabels: true,
