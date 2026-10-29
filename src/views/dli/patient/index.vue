@@ -139,17 +139,7 @@
         {
           prop: 'id',
           label: '患者编号',
-          width: 150
-        },
-        {
-          prop: 'name',
-          label: '姓名',
-          width: 150,
-          formatter: (row: WebPatient) =>
-            h('div', { class: 'leading-5' }, [
-              h('span', { class: 'text-g-900' }, row.name),
-              h('span', { class: 'ml-1 text-xs text-g-500' }, `${row.gender} · ${row.age}岁`)
-            ])
+          width: 180
         },
         {
           prop: 'center',
