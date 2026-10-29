@@ -130,35 +130,302 @@ export interface AiModel {
   updatedAt: string
 }
 
+/** 资产可见范围 */
+export type VisibleScope = '全平台' | '本中心' | '课题组'
+
+/* ---------------- 技能 ---------------- */
+
+export type SkillType = '工具调用' | '提示词' | '工作流'
+
+/** 技能参数 */
+export interface SkillParam {
+  name: string
+  type: 'string' | 'number' | 'boolean' | 'object'
+  required: boolean
+  defaultValue: string
+  description: string
+}
+
 /** 技能 */
 export interface SkillItem {
   id: string
   name: string
-  type: '工具调用' | '提示词' | '工作流'
+  type: SkillType
+  /** 近 30 天调用次数 */
   calls: number
+  /** 归属智能体 */
   agent: string
   enabled: boolean
+  description: string
+  /** 成功率（百分比数值） */
+  successRate: number
+  /** 平均延迟（ms） */
+  avgLatency: number
+  version: string
+  updatedAt: string
+  owner: string
+  scope: VisibleScope
+  /** 超时时间（秒） */
+  timeout: number
+  retries: number
+  params: SkillParam[]
+  /** 工具标识，type=工具调用 时使用 */
+  tool?: string
+  /** 提示词模板，type=提示词 时使用 */
+  prompt?: string
+  /** 工作流说明，type=工作流 时使用 */
+  workflow?: string
 }
+
+/** 技能版本记录 */
+export interface SkillVersion {
+  version: string
+  publishedAt: string
+  publisher: string
+  note: string
+  /** 是否为当前生效版本 */
+  active: boolean
+}
+
+/** 技能调用记录 */
+export interface SkillCallLog {
+  id: string
+  skillId: string
+  calledAt: string
+  scene: string
+  agent: string
+  status: '成功' | '失败' | '超时'
+  /** 延迟（ms） */
+  latency: number
+  tokens: number
+  error: string
+}
+
+/** 技能趋势点 */
+export interface SkillTrendPoint {
+  date: string
+  calls: number
+  failures: number
+}
+
+/** 技能页 KPI */
+export interface SkillOverview {
+  total: number
+  enabled: number
+  calls30d: number
+  avgSuccessRate: number
+}
+
+/** 技能详情 */
+export interface SkillDetail extends SkillItem {
+  versions: SkillVersion[]
+  logs: SkillCallLog[]
+  trend: SkillTrendPoint[]
+}
+
+/** 技能新建 / 编辑入参 */
+export interface SkillPayload {
+  name: string
+  type: SkillType
+  description: string
+  agent: string
+  owner: string
+  scope: VisibleScope
+  timeout: number
+  retries: number
+  enabled: boolean
+  params: SkillParam[]
+  tool: string
+  prompt: string
+  workflow: string
+}
+
+/* ---------------- 知识库 ---------------- */
 
 /** 知识库 */
 export interface KnowledgeItem {
   id: string
   name: string
+  /** 文档数 */
   docs: number
+  /** 展示用容量文案 */
   size: string
   updatedAt: string
   enabled: boolean
+  /** 容量（字节） */
+  sizeBytes: number
+  description: string
+  maintainer: string
+  scope: VisibleScope
+  /** 召回命中率（百分比数值） */
+  hitRate: number
+  /** 近 7 天检索次数 */
+  retrievals7d: number
+  /** 向量模型 */
+  embedding: string
+  chunkSize: number
+  chunkOverlap: number
+  topK: number
+  /** 相似度阈值（0-1） */
+  scoreThreshold: number
+  vectorCount: number
 }
 
-/** MCP 服务（仅允许下载） */
+export type KnowledgeDocType = 'pdf' | 'docx' | 'md' | 'txt' | 'xlsx'
+
+/** 知识库文档 */
+export interface KnowledgeDoc {
+  id: string
+  knowledgeId: string
+  name: string
+  type: KnowledgeDocType
+  sizeBytes: number
+  chunks: number
+  status: '已入库' | '解析中' | '解析失败'
+  uploader: string
+  uploadedAt: string
+}
+
+/** 检索命中片段 */
+export interface KnowledgeHit {
+  id: string
+  score: number
+  docName: string
+  snippet: string
+  chunkIndex: number
+}
+
+/** 检索测试结果 */
+export interface KnowledgeTestResult {
+  query: string
+  topK: number
+  /** 耗时（ms） */
+  elapsed: number
+  hits: KnowledgeHit[]
+}
+
+export type KnowledgeAction = '新建知识库' | '上传文档' | '删除文档' | '调整参数' | '启用' | '停用'
+
+/** 知识库更新日志 */
+export interface KnowledgeChangeLog {
+  id: string
+  action: KnowledgeAction
+  target: string
+  operator: string
+  time: string
+  note: string
+}
+
+/** 知识库页 KPI */
+export interface KnowledgeOverview {
+  total: number
+  docs: number
+  sizeGb: number
+  retrievals7d: number
+}
+
+/** 知识库详情 */
+export interface KnowledgeDetail extends KnowledgeItem {
+  documents: KnowledgeDoc[]
+  changeLogs: KnowledgeChangeLog[]
+}
+
+/** 知识库新建 / 编辑入参 */
+export interface KnowledgePayload {
+  name: string
+  description: string
+  maintainer: string
+  scope: VisibleScope
+  embedding: string
+  chunkSize: number
+  chunkOverlap: number
+  topK: number
+  scoreThreshold: number
+  enabled: boolean
+}
+
+/* ---------------- MCP ---------------- */
+
+export type McpStatus = '在线' | '离线' | '异常'
+
+/** MCP 服务（平台统一维护，仅可查看 / 测试 / 下载） */
 export interface McpItem {
   id: string
   name: string
   protocol: 'stdio' | 'sse' | 'http'
   version: string
+  /** 工具数 */
   tools: number
   description: string
+  status: McpStatus
+  /** 连接延迟（ms） */
+  latency: number
+  calls30d: number
+  updatedAt: string
+  maintainer: string
+  endpoint: string
+  authType: '令牌' | 'OAuth 2.0' | '无'
+  lastCheckedAt: string
 }
+
+/** MCP 工具 */
+export interface McpTool {
+  id: string
+  mcpId: string
+  name: string
+  description: string
+  calls: number
+  /** JSON Schema 文本 */
+  schema: string
+}
+
+/** MCP 调用记录 */
+export interface McpCallLog {
+  id: string
+  mcpId: string
+  calledAt: string
+  tool: string
+  caller: string
+  status: '成功' | '失败'
+  latency: number
+}
+
+/** MCP 趋势点 */
+export interface McpTrendPoint {
+  date: string
+  calls: number
+}
+
+/** MCP 页 KPI */
+export interface McpOverview {
+  services: number
+  tools: number
+  online: number
+  calls30d: number
+}
+
+/** MCP 详情（含只读连接配置） */
+export interface McpDetail extends McpItem {
+  toolList: McpTool[]
+  logs: McpCallLog[]
+  trend: McpTrendPoint[]
+  /** 超时（秒） */
+  timeout: number
+  /** 心跳间隔（秒） */
+  heartbeat: number
+  inspectedAt: string
+}
+
+/** 连通性测试结果 */
+export interface ConnectivityResult {
+  ok: boolean
+  status: McpStatus
+  latency: number
+  checkedAt: string
+  message: string
+}
+
+/* ---------------- LLM ---------------- */
 
 /** LLM 模型与 Token 余额 */
 export interface LlmItem {
@@ -169,16 +436,167 @@ export interface LlmItem {
   used: number
   unit: string
   status: '正常' | '余额预警' | '已停用'
+  /** 模型标识 */
+  model: string
+  /** 上下文窗口（K） */
+  contextWindow: number
+  todayCalls: number
+  todayTokens: number
+  /** 本月费用（元） */
+  monthCost: number
+  /** 输入单价（元/千 Token） */
+  priceIn: number
+  /** 输出单价（元/千 Token） */
+  priceOut: number
+  apiKeyMasked: string
+  /** 限流（RPM） */
+  rateLimit: number
+  /** 余额告警阈值（%） */
+  alertThreshold: number
+  connected: boolean
+  avgLatency: number
+  lastCheckedAt: string
 }
 
-/** 智能体 */
+/** LLM 用量趋势点 */
+export interface LlmUsagePoint {
+  date: string
+  calls: number
+  tokensIn: number
+  tokensOut: number
+  cost: number
+}
+
+/** 按智能体拆分的调用量 */
+export interface LlmAgentUsage {
+  agent: string
+  calls: number
+  /** 占比（百分比数值） */
+  share: number
+}
+
+/** 充值记录 */
+export interface LlmRechargeRecord {
+  id: string
+  amount: number
+  tokens: number
+  operator: string
+  time: string
+  note: string
+}
+
+/** LLM 页 KPI */
+export interface LlmOverview {
+  models: number
+  todayCalls: number
+  todayTokens: number
+  monthCost: number
+}
+
+/** LLM 详情 */
+export interface LlmDetail extends LlmItem {
+  trend: LlmUsagePoint[]
+  recharges: LlmRechargeRecord[]
+  agentUsage: LlmAgentUsage[]
+}
+
+/* ---------------- 智能体 ---------------- */
+
+/** 智能体（内置智能体不可删除） */
 export interface AgentItem {
   id: string
   name: string
+  /** 职责 */
   role: string
   skills: string[]
   /** 内置智能体不可删除 */
   builtin: boolean
+  enabled: boolean
+  description: string
+  /** 绑定模型 */
+  model: string
+  /** 绑定知识库 */
+  knowledge: string[]
+  /** 今日会话数 */
+  sessions: number
+  sessions30d: number
+  /** 满意度（百分比数值） */
+  satisfaction: number
+  version: string
+  updatedAt: string
+  temperature: number
+  topP: number
+  maxRounds: number
+  /** 系统提示词 */
+  prompt: string
+  /** 兜底 / 转人工策略 */
+  fallback: string
+  scope: VisibleScope
+}
+
+/** 智能体版本 */
+export interface AgentVersion {
+  version: string
+  publishedAt: string
+  publisher: string
+  note: string
+  /** 该版本的系统提示词快照 */
+  prompt: string
+  active: boolean
+}
+
+/** 智能体会话记录 */
+export interface AgentSession {
+  id: string
+  agentId: string
+  patient: string
+  doctor: string
+  channel: 'APP' | 'Web' | '微信'
+  /** 对话轮次 */
+  rounds: number
+  /** 时长（分钟） */
+  duration: number
+  /** 满意度（百分比数值） */
+  satisfaction: number
+  status: '已结束' | '进行中' | '转人工'
+  startedAt: string
+}
+
+/** 智能体趋势点 */
+export interface AgentTrendPoint {
+  date: string
+  sessions: number
+}
+
+/** 智能体页 KPI */
+export interface AgentOverview {
+  total: number
+  enabled: number
+  todaySessions: number
+  avgSatisfaction: number
+}
+
+/** 智能体详情 */
+export interface AgentDetail extends AgentItem {
+  versions: AgentVersion[]
+  sessionList: AgentSession[]
+  trend: AgentTrendPoint[]
+}
+
+/** 智能体新建 / 编辑入参 */
+export interface AgentPayload {
+  name: string
+  role: string
+  description: string
+  model: string
+  knowledge: string[]
+  skills: string[]
+  scope: VisibleScope
+  temperature: number
+  topP: number
+  maxRounds: number
+  prompt: string
+  fallback: string
   enabled: boolean
 }
 
@@ -303,6 +721,8 @@ export interface WorkbenchStats {
   doctorCount?: number
   /** 中心地图分布（平台 / 系统管理端） */
   centerMap?: Array<{ name: string; value: number }>
+  /** 在管患者状态分布 */
+  patientStatus: Array<{ status: string; count: number }>
   /** 近 7 日趋势 */
   trend: Array<{ date: string; patients: number; alerts: number }>
 }

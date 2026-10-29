@@ -18,6 +18,8 @@
         :duration="2000"
         :decimals="decimals"
         :separator="separator"
+        :prefix="prefix"
+        :suffix="suffix"
       />
       <p
         class="mt-1 text-sm text-g-500 opacity-90"
@@ -50,6 +52,10 @@
     decimals?: number
     /** 分隔符 */
     separator?: string
+    /** 数值前缀 */
+    prefix?: string
+    /** 数值后缀 */
+    suffix?: string
     /** 描述 */
     description: string
     /** 文本颜色 */
