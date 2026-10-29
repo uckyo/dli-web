@@ -1,9 +1,14 @@
 <!-- 中心分布地图：固定深色科技风，不随主题切换 -->
 <template>
   <DashPanel title="中心分布">
+    <template #extra>
+      <button type="button" class="map-reset" aria-label="复位地图" @click="resetMap">
+        <ArtSvgIcon icon="ri:restart-line" />
+      </button>
+    </template>
     <div class="relative h-full min-h-[220px]">
       <div class="absolute inset-0">
-        <DashChart :option="option" />
+        <DashChart ref="chartRef" :option="option" />
       </div>
     </div>
   </DashPanel>
@@ -23,6 +28,9 @@
   }>()
 
   const MAP_NAME = 'dli-dash-china'
+
+  const chartRef = ref<{ reset: () => void } | null>(null)
+  const resetMap = () => chartRef.value?.reset()
 
   let mapRegistered = false
   if (!mapRegistered) {
@@ -68,11 +76,13 @@
       },
       geo: {
         map: MAP_NAME,
-        roam: 'scale',
+        roam: true,
         scaleLimit: { min: 1, max: 2.5 },
         zoom: 1,
-        top: 8,
-        bottom: 8,
+        preserveAspect: true,
+        aspectScale: 0.81,
+        top: 4,
+        bottom: 4,
         left: 6,
         right: 6,
         label: {
@@ -143,3 +153,29 @@
     }
   })
 </script>
+
+<style scoped lang="scss">
+  .map-reset {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+    color: #8fc6e8;
+    cursor: pointer;
+    background: none;
+    border: none;
+    transition:
+      color 0.2s ease,
+      text-shadow 0.2s ease;
+
+    &:hover {
+      color: #e8fbff;
+      text-shadow: 0 0 10px rgb(55 214 255 / 65%);
+    }
+  }
+</style>

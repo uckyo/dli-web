@@ -53,6 +53,10 @@
     chart?.dispose()
     chart = null
   })
+
+  defineExpose({
+    reset: () => chart?.setOption(props.option, true)
+  })
 </script>
 
 <style scoped lang="scss">

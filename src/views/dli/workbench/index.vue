@@ -1,6 +1,7 @@
 <!-- DLI 工作台数据大屏：固定深色科技风，不随明暗主题变化 -->
 <template>
   <div
+    ref="screenRef"
     class="art-full-height dash-screen"
     v-loading="loading"
     element-loading-background="rgba(2, 10, 24, 0.65)"
@@ -28,6 +29,15 @@
           <span class="dash-clock-date">{{ dateText }}</span>
         </div>
         <span class="dash-updated">数据更新至 {{ lastUpdate }}</span>
+        <button
+          v-if="isFullscreenSupported"
+          type="button"
+          class="dash-fs"
+          :title="isFullscreen ? '退出全屏' : '全屏展示大屏'"
+          @click="toggleScreenFullscreen()"
+        >
+          <ArtSvgIcon :icon="isFullscreen ? 'ri:fullscreen-exit-line' : 'ri:fullscreen-line'" />
+        </button>
       </div>
     </header>
 
@@ -45,9 +55,16 @@
           </span>
           <span class="dash-kpi-label">{{ item.label }}</span>
         </div>
-        <p class="dash-kpi-value"
-          >{{ item.value }}<small>{{ item.unit }}</small></p
-        >
+        <p class="dash-kpi-value">
+          <ArtCountTo
+            class="dash-kpi-num"
+            :target="item.target"
+            :decimals="item.decimals"
+            :separator="item.separator"
+            :duration="1500"
+            easing="easeOutQuad"
+          /><small>{{ item.unit }}</small>
+        </p>
       </div>
     </div>
 
@@ -245,6 +262,7 @@
 </template>
 
 <script setup lang="ts">
+  import { useFullscreen } from '@vueuse/core'
   import { fetchGetWorkbench } from '@/mock/dli/api'
   import { getAccountByRole } from '@/mock/dli/users'
   import { useUserStore } from '@/store/modules/user'
@@ -259,6 +277,14 @@
   defineOptions({ name: 'DliWorkbench' })
 
   const userStore = useUserStore()
+
+  /* ---------------- 大屏全屏 ---------------- */
+  const screenRef = ref<HTMLElement>()
+  const {
+    isFullscreen,
+    isSupported: isFullscreenSupported,
+    toggle: toggleScreenFullscreen
+  } = useFullscreen(screenRef)
 
   const loading = ref(true)
   const stats = ref<WorkbenchStats>()
@@ -309,49 +335,63 @@
   const kpis = computed(() => [
     {
       label: '患者数量',
-      value: formatNum(stats.value?.patientTotal),
+      target: stats.value?.patientTotal ?? 0,
+      decimals: 0,
+      separator: ',',
       unit: '人',
       icon: 'ri:group-line',
       color: '#37d6ff'
     },
     {
       label: '检查数量',
-      value: formatNum(stats.value?.examTotal),
+      target: stats.value?.examTotal ?? 0,
+      decimals: 0,
+      separator: ',',
       unit: '次',
       icon: 'ri:file-search-line',
       color: '#5b8cff'
     },
     {
       label: '生物样本数量',
-      value: formatNum(stats.value?.sampleTotal),
+      target: stats.value?.sampleTotal ?? 0,
+      decimals: 0,
+      separator: ',',
       unit: '份',
       icon: 'ri:test-tube-line',
       color: '#2ee6b8'
     },
     {
       label: '检测数据量',
-      value: (stats.value?.dataVolume ?? 0).toFixed(1),
+      target: stats.value?.dataVolume ?? 0,
+      decimals: 1,
+      separator: '',
       unit: 'TB',
       icon: 'ri:database-2-line',
       color: '#ffb347'
     },
     {
       label: '模型数',
-      value: formatNum(stats.value?.modelCount),
+      target: stats.value?.modelCount ?? 0,
+      decimals: 0,
+      separator: ',',
       unit: '个',
       icon: 'ri:cpu-line',
       color: '#a78bfa'
     },
     {
       label: '智能体数',
-      value: formatNum(stats.value?.agentCount),
+      target: stats.value?.agentCount ?? 0,
+      decimals: 0,
+      separator: ',',
       unit: '个',
       icon: 'ri:robot-2-line',
       color: '#4dd6ff'
     },
     {
       label: '研究项目数',
-      value: formatNum(stats.value?.researchCount),
+      target: stats.value?.researchCount ?? 0,
+      decimals: 0,
+      separator: ',',
       unit: '项',
       icon: 'ri:flask-line',
       color: '#f472b6'
@@ -662,6 +702,41 @@
     container-type: inline-size;
   }
 
+  /* 只让大屏本身全屏，保留内部布局与主题 */
+  .dash-screen:fullscreen {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 16px 18px 18px;
+    border-radius: 0;
+  }
+
+  .dash-fs {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    font-size: 15px;
+    color: #8fc6e8;
+    cursor: pointer;
+    background: rgb(10 40 74 / 60%);
+    border: 1px solid rgb(56 180 255 / 22%);
+    border-radius: 7px;
+    transition:
+      color 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+
+    &:hover {
+      color: #e8fbff;
+      border-color: rgb(69 219 255 / 60%);
+      box-shadow: 0 0 12px rgb(55 214 255 / 35%);
+    }
+  }
+
   .dash-grid-bg {
     position: absolute;
     inset: 0;
@@ -828,6 +903,12 @@
     text-shadow: 0 0 14px rgb(55 214 255 / 40%);
     white-space: nowrap;
 
+    /* 数字滚动组件自带 text-g-900，这里跟随大屏配色 */
+    .dash-kpi-num {
+      font: inherit;
+      color: inherit;
+    }
+
     small {
       margin-left: 3px;
       font-size: clamp(12px, 1.15cqw, 17px);
@@ -880,8 +961,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: clamp(64px, calc(8.4cqw - 16px), 112px);
-    height: clamp(64px, calc(8.4cqw - 16px), 112px);
+    width: clamp(62px, calc(7.3cqw - 12px), 106px);
+    height: clamp(62px, calc(7.3cqw - 12px), 106px);
     filter: drop-shadow(0 0 8px rgb(55 214 255 / 25%));
     border-radius: 50%;
   }
@@ -1124,7 +1205,7 @@
     .dash-body {
       display: grid;
       grid-template-rows: minmax(0, 1fr);
-      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.78fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 2.12fr) minmax(0, 0.92fr);
     }
 
     .dash-col {
@@ -1139,7 +1220,7 @@
     }
 
     .dash-center {
-      grid-template-rows: minmax(min-content, 1.95fr) minmax(min-content, 1fr);
+      grid-template-rows: minmax(min-content, 2.3fr) minmax(min-content, 0.95fr);
     }
 
     .dash-right {
