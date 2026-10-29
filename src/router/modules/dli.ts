@@ -185,17 +185,6 @@ export const dliRoutes: AppRouteRecord[] = [
     }
   },
   {
-    path: '/dli/profile',
-    name: 'DliProfile',
-    component: '/dli/profile',
-    meta: {
-      title: 'menus.dli.profile',
-      icon: 'ri:user-settings-line',
-      keepAlive: true,
-      roles: ALL_ROLES
-    }
-  },
-  {
     path: '/dli/status',
     name: 'DliStatus',
     component: '/dli/status',
@@ -291,5 +280,16 @@ export const dliRoutes: AppRouteRecord[] = [
         }
       }
     ]
+  },
+  {
+    path: '/dli/profile',
+    name: 'DliProfile',
+    component: '/dli/profile',
+    meta: {
+      title: 'menus.dli.profile',
+      icon: 'ri:user-settings-line',
+      keepAlive: true,
+      roles: ALL_ROLES
+    }
   }
 ]

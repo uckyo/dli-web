@@ -1,34 +1,20 @@
 <!-- DLI 检查管理：影像 / 病理 / 检验 / 病历 / 其他 -->
 <template>
-  <div class="art-full-height">
+  <div class="art-full-height overflow-y-auto pb-5">
+    <ArtSearchBar
+      v-model="searchParams"
+      :items="searchItems"
+      @search="handleSearch"
+      @reset="handleReset"
+    />
+
     <ElCard class="art-table-card">
       <ElTabs v-model="searchParams.category" class="mb-3" @tab-change="handleCategoryChange">
         <ElTabPane label="全部" name="" />
         <ElTabPane v-for="item in CATEGORY_OPTIONS" :key="item" :label="item" :name="item" />
       </ElTabs>
 
-      <ElForm :inline="true" @submit.prevent>
-        <ElFormItem label="关键词">
-          <ElInput
-            v-model="searchParams.keyword"
-            placeholder="检查编号 / 患者姓名 / 检查项目"
-            clearable
-            style="width: 280px"
-            @keyup.enter="handleSearch"
-          />
-        </ElFormItem>
-        <ElFormItem>
-          <ElButton type="primary" @click="handleSearch">查询</ElButton>
-          <ElButton @click="handleReset">重置</ElButton>
-        </ElFormItem>
-        <ElFormItem>
-          <ArtTableHeader
-            v-model:columns="columnChecks"
-            :loading="loading"
-            @refresh="refreshData"
-          />
-        </ElFormItem>
-      </ElForm>
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData" />
 
       <ArtTable
         :loading="loading"
@@ -52,6 +38,16 @@
 
   /** 检查分类 */
   const CATEGORY_OPTIONS: ExamCategory[] = ['影像', '病理', '检验', '病历', '其他']
+
+  const searchItems = [
+    {
+      key: 'keyword',
+      label: '关键词',
+      type: 'input',
+      placeholder: '检查编号 / 患者姓名 / 检查项目',
+      span: 6
+    }
+  ]
 
   /** 解析状态标签 */
   const STATUS_TAG: Record<ExamRecord['status'], 'success' | 'primary' | 'warning'> = {
@@ -83,16 +79,6 @@
       },
       columnsFactory: () => [
         { prop: 'id', label: '检查编号', width: 130 },
-        {
-          prop: 'patientName',
-          label: '患者',
-          width: 150,
-          formatter: (row: ExamRecord) =>
-            h('div', { class: 'leading-5' }, [
-              h('div', { class: 'text-g-900' }, row.patientName),
-              h('div', { class: 'text-xs text-g-500' }, row.patientId)
-            ])
-        },
         {
           prop: 'category',
           label: '类型',

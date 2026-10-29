@@ -1,17 +1,6 @@
 <!-- DLI 人员管理：医生维护助理与护士（仅临床角色） -->
 <template>
   <div class="art-full-height">
-    <div class="art-card mb-5 px-5 py-4">
-      <div class="flex-cb flex-wrap gap-3">
-        <div>
-          <h3 class="text-lg font-medium text-g-900">人员管理</h3>
-        </div>
-        <ElButton type="primary" @click="openAdd">
-          <ArtSvgIcon icon="ri:user-add-line" class="mr-1" />新增人员
-        </ElButton>
-      </div>
-    </div>
-
     <ElCard class="art-table-card">
       <ElTabs v-model="searchParams.role" class="mb-3" @tab-change="handleTabChange">
         <ElTabPane label="医生助理" name="助理" />
@@ -32,14 +21,20 @@
           <ElButton type="primary" @click="handleSearch">查询</ElButton>
           <ElButton @click="handleReset">重置</ElButton>
         </ElFormItem>
-        <ElFormItem>
-          <ArtTableHeader
-            v-model:columns="columnChecks"
-            :loading="loading"
-            @refresh="refreshData"
-          />
-        </ElFormItem>
       </ElForm>
+
+      <ArtTableHeader
+        v-model:columns="columnChecks"
+        :loading="loading"
+        class="mb-2"
+        @refresh="refreshData"
+      >
+        <template #left>
+          <ElButton type="primary" @click="openAdd">
+            <ArtSvgIcon icon="ri:user-add-line" class="mr-1" />新增人员
+          </ElButton>
+        </template>
+      </ArtTableHeader>
 
       <ArtTable
         :loading="loading"

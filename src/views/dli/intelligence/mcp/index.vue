@@ -5,28 +5,24 @@
       <ArtStatsCard
         title="MCP 服务"
         :count="overview.services"
-        description="覆盖 HIS / PACS / LIS / 病理 / 消息"
         icon="ri:plug-line"
         icon-style="bg-primary"
       />
       <ArtStatsCard
         title="注册工具"
         :count="overview.tools"
-        description="可被智能体调用的工具总数"
         icon="ri:tools-line"
         icon-style="bg-success"
       />
       <ArtStatsCard
         title="在线服务"
         :count="overview.online"
-        :description="`共 ${overview.services} 个服务，异常 / 离线需关注`"
         icon="ri:signal-tower-line"
         icon-style="bg-warning"
       />
       <ArtStatsCard
         title="近 30 天调用"
         :count="overview.calls30d"
-        description="全部 MCP 工具累计调用"
         icon="ri:exchange-line"
         icon-style="bg-danger"
       />
@@ -35,20 +31,12 @@
     <ArtSearchBar
       v-model="searchParams"
       :items="searchItems"
-      class="mb-5"
       @search="handleSearch"
       @reset="handleReset"
     />
 
     <ElCard class="art-table-card">
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <div class="flex-c flex-wrap gap-3">
-            <ElTag effect="plain">共 {{ pagination.total }} 个服务</ElTag>
-            <span class="text-xs text-g-500">MCP 由平台统一维护，可查看、测试与下载</span>
-          </div>
-        </template>
-      </ArtTableHeader>
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData" />
 
       <ArtTable
         :loading="loading"

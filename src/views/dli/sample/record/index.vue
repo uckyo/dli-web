@@ -1,29 +1,15 @@
 <!-- DLI 生物样本 · 样本管理 -->
 <template>
-  <div class="art-full-height">
+  <div class="art-full-height overflow-y-auto pb-5">
+    <ArtSearchBar
+      v-model="searchParams"
+      :items="searchItems"
+      @search="handleSearch"
+      @reset="handleReset"
+    />
+
     <ElCard class="art-table-card">
-      <ElForm :inline="true" @submit.prevent>
-        <ElFormItem label="关键词">
-          <ElInput
-            v-model="searchParams.keyword"
-            placeholder="样本编号 / 患者姓名"
-            clearable
-            style="width: 260px"
-            @keyup.enter="getData()"
-          />
-        </ElFormItem>
-        <ElFormItem>
-          <ElButton type="primary" @click="getData()">查询</ElButton>
-          <ElButton @click="resetSearchParams()">重置</ElButton>
-        </ElFormItem>
-        <ElFormItem>
-          <ArtTableHeader
-            v-model:columns="columnChecks"
-            :loading="loading"
-            @refresh="refreshData"
-          />
-        </ElFormItem>
-      </ElForm>
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData" />
 
       <ArtTable
         :loading="loading"
@@ -44,6 +30,16 @@
   import type { SampleRecord } from '@/mock/dli/types'
 
   defineOptions({ name: 'DliSampleRecord' })
+
+  const searchItems = [
+    {
+      key: 'keyword',
+      label: '关键词',
+      type: 'input',
+      placeholder: '样本编号 / 患者姓名',
+      span: 6
+    }
+  ]
 
   /** 样本状态标签 */
   const SAMPLE_STATUS_TAG: Record<SampleRecord['status'], 'success' | 'warning' | 'info'> = {
@@ -70,16 +66,6 @@
       apiParams: { current: 1, size: 10, keyword: '' },
       columnsFactory: () => [
         { prop: 'id', label: '样本编号', width: 130 },
-        {
-          prop: 'patientName',
-          label: '患者',
-          width: 150,
-          formatter: (row: SampleRecord) =>
-            h('div', { class: 'leading-5' }, [
-              h('div', { class: 'text-g-900' }, row.patientName),
-              h('div', { class: 'text-xs text-g-500' }, row.patientId)
-            ])
-        },
         {
           prop: 'type',
           label: '样本类型',
@@ -115,5 +101,13 @@
   /** 查看样本流转（演示） */
   function viewSampleFlow(row: SampleRecord) {
     ElMessage.info(`样本 ${row.id}：${row.location} · ${row.status}（演示）`)
+  }
+
+  function handleSearch() {
+    getData()
+  }
+
+  function handleReset() {
+    resetSearchParams()
   }
 </script>

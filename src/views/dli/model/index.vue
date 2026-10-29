@@ -1,10 +1,7 @@
 <!-- DLI 模型管理：纵向（多时间点）/ 横向（单时间点）、输入输出配置与启动开关 -->
 <template>
   <div class="art-full-height overflow-y-auto pb-5" v-loading="loading">
-    <div class="art-card mb-5 flex-cb flex-wrap gap-3 px-5 py-4">
-      <div>
-        <h3 class="text-lg font-medium text-g-900">AI 模型管理</h3>
-      </div>
+    <div class="mb-4 flex-c flex-wrap gap-3">
       <ElButton type="primary" @click="openCreate">新建模型</ElButton>
     </div>
 

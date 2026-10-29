@@ -1,34 +1,22 @@
 <!-- DLI 技能管理：资产台账、调用质量、配置与版本 -->
 <template>
   <div class="art-full-height overflow-y-auto pb-5">
-    <div v-if="isAdmin" class="art-card mb-5 flex-cb flex-wrap gap-3 px-5 py-4">
-      <div>
-        <h3 class="text-lg font-medium text-g-900">技能管理</h3>
-      </div>
-      <ElButton type="primary" @click="openCreate">
-        <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建技能
-      </ElButton>
-    </div>
-
     <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <ArtStatsCard
         title="技能总数"
         :count="overview.total"
-        description="覆盖工具调用 / 提示词 / 工作流"
         icon="ri:flashlight-line"
         icon-style="bg-primary"
       />
       <ArtStatsCard
         title="已启用"
         :count="overview.enabled"
-        description="停用后智能体不可调用"
         icon="ri:play-circle-line"
         icon-style="bg-success"
       />
       <ArtStatsCard
         title="近 30 天调用"
         :count="overview.calls30d"
-        description="全部技能累计调用次数"
         icon="ri:loop-left-line"
         icon-style="bg-warning"
       />
@@ -37,7 +25,6 @@
         :count="overview.avgSuccessRate"
         :decimals="1"
         suffix="%"
-        description="低于 95% 需关注失败原因"
         icon="ri:shield-check-line"
         icon-style="bg-danger"
       />
@@ -46,7 +33,7 @@
     <ArtSearchBar
       v-model="searchParams"
       :items="searchItems"
-      class="mb-5"
+      label-width="90px"
       @search="handleSearch"
       @reset="handleReset"
     />
@@ -54,10 +41,9 @@
     <ElCard class="art-table-card">
       <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
         <template #left>
-          <div class="flex-c flex-wrap gap-3">
-            <ElTag effect="plain">共 {{ pagination.total }} 个技能</ElTag>
-            <span class="text-xs text-g-500">近 7 日失败次数可在详情中查看</span>
-          </div>
+          <ElButton v-if="isAdmin" type="primary" @click="openCreate">
+            <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建技能
+          </ElButton>
         </template>
       </ArtTableHeader>
 

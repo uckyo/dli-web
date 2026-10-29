@@ -12,7 +12,7 @@
         {{ title }}
       </p>
       <ArtCountTo
-        class="m-0 text-2xl font-medium"
+        class="m-0 text-3xl font-medium"
         v-if="count !== undefined"
         :target="count"
         :duration="2000"
@@ -57,7 +57,7 @@
     /** 数值后缀 */
     suffix?: string
     /** 描述 */
-    description: string
+    description?: string
     /** 文本颜色 */
     textColor?: string
     /** 是否显示箭头 */

@@ -1,27 +1,16 @@
 <!-- DLI 知识库管理：文档资产、检索测试与召回参数 -->
 <template>
   <div class="art-full-height overflow-y-auto pb-5">
-    <div v-if="isAdmin" class="art-card mb-5 flex-cb flex-wrap gap-3 px-5 py-4">
-      <div>
-        <h3 class="text-lg font-medium text-g-900">知识库管理</h3>
-      </div>
-      <ElButton type="primary" @click="openCreate">
-        <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建知识库
-      </ElButton>
-    </div>
-
     <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <ArtStatsCard
         title="知识库数"
         :count="overview.total"
-        description="覆盖指南、药品、病例与科普"
         icon="ri:book-2-line"
         icon-style="bg-primary"
       />
       <ArtStatsCard
         title="文档总数"
         :count="overview.docs"
-        description="已完成切片与向量化"
         icon="ri:file-text-line"
         icon-style="bg-success"
       />
@@ -30,14 +19,12 @@
         :count="overview.sizeGb"
         :decimals="2"
         suffix="GB"
-        description="原始文档存储占用"
         icon="ri:hard-drive-2-line"
         icon-style="bg-warning"
       />
       <ArtStatsCard
         title="近 7 天检索"
         :count="overview.retrievals7d"
-        description="智能体召回调用次数"
         icon="ri:search-eye-line"
         icon-style="bg-danger"
       />
@@ -46,7 +33,6 @@
     <ArtSearchBar
       v-model="searchParams"
       :items="searchItems"
-      class="mb-5"
       @search="handleSearch"
       @reset="handleReset"
     />
@@ -54,10 +40,9 @@
     <ElCard class="art-table-card">
       <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
         <template #left>
-          <div class="flex-c flex-wrap gap-3">
-            <ElTag effect="plain">共 {{ pagination.total }} 个知识库</ElTag>
-            <span class="text-xs text-g-500">容量、向量数与文档明细实时同步</span>
-          </div>
+          <ElButton v-if="isAdmin" type="primary" @click="openCreate">
+            <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建知识库
+          </ElButton>
         </template>
       </ArtTableHeader>
 

@@ -2,7 +2,7 @@
 <template>
   <div class="art-full-height">
     <!-- 搜索区 -->
-    <div class="art-card mb-5 px-5 py-4">
+    <div class="art-card px-5 pt-4 pb-0">
       <ElForm :inline="true" @submit.prevent>
         <ElFormItem label="关键词">
           <ElInput
@@ -41,9 +41,6 @@
           <ElButton @click="handleReset">重置</ElButton>
         </ElFormItem>
       </ElForm>
-      <p class="text-xs text-g-500">
-        数据范围：{{ scopeText }} · 对话与诊疗历程为只读视图，涉及处置请前往对应业务模块
-      </p>
     </div>
 
     <!-- 表格 -->
@@ -104,20 +101,6 @@
 
   /** 临床角色可回复对话，管理端只读 */
   const canReply = computed(() => ['R_DOCTOR', 'R_ASSISTANT', 'R_NURSE'].includes(role.value))
-
-  /** 数据范围文案 */
-  const scopeText = computed(() => {
-    const map: Record<string, string> = {
-      R_DOCTOR: '本课题组在管患者',
-      R_ASSISTANT: '所协助医生名下患者',
-      R_NURSE: '所负责患者',
-      R_PLATFORM: '平台全部患者',
-      R_CENTER: '本中心患者',
-      R_GROUP: '本课题组患者',
-      R_SYS: '全系统患者'
-    }
-    return map[role.value] ?? '平台患者'
-  })
 
   const chatVisible = ref(false)
   const historyVisible = ref(false)

@@ -1,40 +1,26 @@
 <!-- DLI 研究管理：临床角色按分组与指标开展 Agent 研究并设置共享；管理端只读查看共享项目 -->
 <template>
-  <div class="art-full-height">
-    <div v-if="isClinical" class="art-card mb-5 px-5 py-4">
-      <div class="flex-cb flex-wrap gap-3">
-        <div>
-          <h3 class="text-lg font-medium text-g-900">研究管理</h3>
-        </div>
-        <ElButton type="primary" @click="openCreate">
-          <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建研究
-        </ElButton>
-      </div>
-    </div>
+  <div class="art-full-height overflow-y-auto pb-5">
+    <ArtSearchBar
+      v-model="searchParams"
+      :items="searchItems"
+      @search="handleSearch"
+      @reset="handleReset"
+    />
 
     <ElCard class="art-table-card">
-      <ElForm :inline="true" @submit.prevent>
-        <ElFormItem label="关键词">
-          <ElInput
-            v-model="searchParams.keyword"
-            placeholder="研究编号 / 名称 / 负责人"
-            clearable
-            style="width: 260px"
-            @keyup.enter="handleSearch"
-          />
-        </ElFormItem>
-        <ElFormItem>
-          <ElButton type="primary" @click="handleSearch">查询</ElButton>
-          <ElButton @click="handleReset">重置</ElButton>
-        </ElFormItem>
-        <ElFormItem>
-          <ArtTableHeader
-            v-model:columns="columnChecks"
-            :loading="loading"
-            @refresh="refreshData"
-          />
-        </ElFormItem>
-      </ElForm>
+      <ArtTableHeader
+        v-model:columns="columnChecks"
+        :loading="loading"
+        class="mb-2"
+        @refresh="refreshData"
+      >
+        <template #left>
+          <ElButton v-if="isClinical" type="primary" @click="openCreate">
+            <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建研究
+          </ElButton>
+        </template>
+      </ArtTableHeader>
 
       <ArtTable
         :loading="loading"
@@ -137,6 +123,16 @@
   import ResearchChat from './modules/research-chat.vue'
 
   defineOptions({ name: 'DliResearch' })
+
+  const searchItems = [
+    {
+      key: 'keyword',
+      label: '关键词',
+      type: 'input',
+      placeholder: '研究编号 / 名称 / 负责人',
+      span: 6
+    }
+  ]
 
   const userStore = useUserStore()
 

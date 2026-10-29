@@ -256,7 +256,7 @@ export async function fetchGetSampleList(params: {
   await delay()
   let list = [...SAMPLES]
   if (params.keyword) {
-    const keyword = params.keyword.trim()
+    const keyword = params.keyword.trim().toLowerCase()
     list = list.filter(
       (item) => item.patientName.includes(keyword) || item.id.toLowerCase().includes(keyword)
     )
@@ -273,9 +273,12 @@ export async function fetchGetSampleTestList(params: {
   await delay()
   let list = [...SAMPLE_TESTS]
   if (params.keyword) {
-    const keyword = params.keyword.trim()
+    const keyword = params.keyword.trim().toLowerCase()
     list = list.filter(
-      (item) => item.patientName.includes(keyword) || item.sampleId.toLowerCase().includes(keyword)
+      (item) =>
+        item.patientName.includes(keyword) ||
+        item.id.toLowerCase().includes(keyword) ||
+        item.sampleId.toLowerCase().includes(keyword)
     )
   }
   return paginate(list, params.current, params.size)

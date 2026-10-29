@@ -5,14 +5,12 @@
       <ArtStatsCard
         title="接入模型"
         :count="overview.models"
-        description="覆盖通义、DeepSeek、智谱等厂商"
         icon="ri:cloud-line"
         icon-style="bg-primary"
       />
       <ArtStatsCard
         title="今日调用"
         :count="overview.todayCalls"
-        description="全部模型今日累计请求"
         icon="ri:loop-left-line"
         icon-style="bg-success"
       />
@@ -21,7 +19,6 @@
         :count="overview.todayTokens / 10000"
         :decimals="1"
         suffix=" 万"
-        description="输入与输出 Token 合计"
         icon="ri:database-2-line"
         icon-style="bg-warning"
       />
@@ -30,7 +27,6 @@
         :count="overview.monthCost"
         :decimals="2"
         prefix="¥"
-        description="按供应商单价估算"
         icon="ri:money-cny-circle-line"
         icon-style="bg-danger"
       />
@@ -55,12 +51,11 @@
     <ArtSearchBar
       v-model="searchParams"
       :items="searchItems"
-      class="mb-5"
       @search="handleSearch"
       @reset="handleReset"
     />
 
-    <div v-loading="loading" class="min-h-[200px]">
+    <div v-loading="loading" class="mt-3 min-h-[200px]">
       <div v-if="models.length" class="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
         <div
           v-for="item in models"

@@ -1,34 +1,22 @@
 <!-- DLI 智能体管理：台账、配置、版本发布与回滚、会话记录 -->
 <template>
   <div class="art-full-height overflow-y-auto pb-5">
-    <div v-if="isAdmin" class="art-card mb-5 flex-cb flex-wrap gap-3 px-5 py-4">
-      <div>
-        <h3 class="text-lg font-medium text-g-900">智能体管理</h3>
-      </div>
-      <ElButton type="primary" @click="openCreate">
-        <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建智能体
-      </ElButton>
-    </div>
-
     <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <ArtStatsCard
         title="智能体总数"
         :count="overview.total"
-        description="内置 5 个 · 自建可扩展"
         icon="ri:robot-2-line"
         icon-style="bg-primary"
       />
       <ArtStatsCard
         title="已启用"
         :count="overview.enabled"
-        description="停用后不再接收新会话"
         icon="ri:play-circle-line"
         icon-style="bg-success"
       />
       <ArtStatsCard
         title="今日会话"
         :count="overview.todaySessions"
-        description="全部智能体今日累计会话"
         icon="ri:chat-3-line"
         icon-style="bg-warning"
       />
@@ -37,7 +25,6 @@
         :count="overview.avgSatisfaction"
         :decimals="1"
         suffix="%"
-        description="低于 90% 需检查提示词与兜底"
         icon="ri:emotion-happy-line"
         icon-style="bg-danger"
       />
@@ -46,7 +33,6 @@
     <ArtSearchBar
       v-model="searchParams"
       :items="searchItems"
-      class="mb-5"
       @search="handleSearch"
       @reset="handleReset"
     />
@@ -54,10 +40,9 @@
     <ElCard class="art-table-card">
       <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
         <template #left>
-          <div class="flex-c flex-wrap gap-3">
-            <ElTag effect="plain">共 {{ pagination.total }} 个智能体</ElTag>
-            <span class="text-xs text-g-500">内置智能体不可删除，可调整配置与发布新版本</span>
-          </div>
+          <ElButton v-if="isAdmin" type="primary" @click="openCreate">
+            <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建智能体
+          </ElButton>
         </template>
       </ArtTableHeader>
 
@@ -280,7 +265,7 @@
                       { key: 'publish', label: '发布版本', icon: 'ri:upload-cloud-2-line' },
                       {
                         key: 'delete',
-                        label: row.builtin ? '删除智能体（内置不可删）' : '删除智能体',
+                        label: '删除智能体',
                         icon: 'ri:delete-bin-4-line',
                         disabled: row.builtin,
                         color: row.builtin ? undefined : '#f56c6c'
@@ -367,10 +352,6 @@
       return
     }
     if (item.key === 'delete') {
-      if (row.builtin) {
-        ElMessage.warning('内置智能体不可删除')
-        return
-      }
       const confirmed = await ElMessageBox.confirm(
         `删除后「${row.name}」的会话记录与版本将一并移除，确定删除？`,
         '删除智能体',
@@ -381,7 +362,7 @@
       if (!confirmed) return
       const deleted = await fetchDeleteAgent(row.id)
       if (!deleted) {
-        ElMessage.warning('删除失败：内置智能体不可删除')
+        ElMessage.warning('删除失败')
         return
       }
       ElMessage.success('智能体已删除')
