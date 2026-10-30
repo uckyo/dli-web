@@ -89,44 +89,106 @@ export interface ExamRecord {
   status: '已归档' | '待解析' | '解析中'
 }
 
-/** 生物样本 */
+/** 生物样本库 · 样本 */
+export type SampleType = '全血' | '血浆' | '血清' | '组织' | '尿液'
+export type SampleStatus = '已入库' | '待入库' | '已出库'
+
+/** 样本处理环节（取样 / 处理 / 保存）SOP */
+export interface SopStep {
+  stage: string
+  content: string
+}
+
+/** 样本流转记录 */
+export interface SampleFlowLog {
+  time: string
+  action: string
+  operator: string
+  remark: string
+}
+
+/** 生物样本（数据来自样本库，DLI 只读展示） */
 export interface SampleRecord {
+  /** 样本编号：生物库-中心-患者编号-样本编号 */
   id: string
+  name: string
   patientId: string
-  patientName: string
-  type: '全血' | '血浆' | '血清' | '组织' | '尿液'
+  center: string
+  type: SampleType
   collectedAt: string
+  /** 剩余样本量 */
+  remaining: number
+  /** 剩余量单位 */
+  unit: string
+  status: SampleStatus
+  /** 保存位置 */
   location: string
-  status: '已入库' | '待入库' | '已出库'
+  /** 样本库中的共享范围 */
+  shareLevel: VisibleScope
+  /** 入库时间 */
+  storedAt: string
+  operator: string
+  /** 设备及位置 */
+  device: string
+  sop: SopStep[]
+  flow: SampleFlowLog[]
 }
 
-/** 样本检测记录 */
+/** 检测类型 */
+export type SampleTestType = '蛋白组' | '转录组' | '代谢组' | '基因组'
+export type SampleTestStatus = '已完成' | '检测中' | '异常'
+export type QcConclusion = '合格' | '不合格' | '待质控'
+
+/** 生物样本 · 检测记录 */
 export interface SampleTestRecord {
+  /** 检测编号：生物库-中心-患者编号-检测编号 */
   id: string
-  sampleId: string
-  patientName: string
+  type: SampleTestType
   item: string
-  result: string
+  batch: string
+  sampleId: string
+  patientId: string
+  center: string
+  /** 关联样本采集时点 */
+  collectedAt: string
   testedAt: string
-  status: '已完成' | '检测中' | '异常'
+  status: SampleTestStatus
+  qc: QcConclusion
+  shareLevel: VisibleScope
+  operator: string
+  /** 结果录入时间 */
+  recordedAt: string
+  sop: SopStep[]
+  qcReport: string
+  /** 原始数据 */
+  dataFile: string
+  /** 表达谱 */
+  expression: string
 }
 
-/** 模型方向：纵向 = 多时间点，横向 = 单时间点 */
-export type ModelDirection = '纵向' | '横向'
+/** 模型所属方向 */
+export type ModelField = '早筛预警' | '早诊预警' | '转归预测'
+
+/** 模型方式：纵向 = 多时间点，横向 = 单时间点；空表示待配置 */
+export type ModelMode = '纵向' | '横向'
 
 /** AI 模型 */
 export interface AiModel {
   id: string
   name: string
-  direction: ModelDirection
+  /** 所属方向 */
+  field: ModelField
+  /** 模型方式，未确定时为空 */
+  mode: ModelMode | ''
   /** 纵向多选 / 横向单选的时间点 */
   timePoints: string[]
   /** 输入，可缺省 */
   input: string
   /** 输出 */
   output: string
+  /** 是否已接入模型服务 */
+  connected: boolean
   enabled: boolean
-  accuracy: number
   updatedAt: string
 }
 

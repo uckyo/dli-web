@@ -255,9 +255,22 @@
       "profile": "个人中心",
       "status": "状态管理",
       "staff": "人员管理",
-      "platform": "平台管理",
-      "center": "中心管理",
-      "group": "课题组管理",
+      "platform": {
+        "title": "平台管理",
+        "config": "基础配置",
+        "center": "中心管理",
+        "user": "用户管理"
+      },
+      "center": {
+        "title": "中心管理",
+        "group": "课题组管理",
+        "user": "用户管理"
+      },
+      "group": {
+        "title": "课题组管理",
+        "doctor": "医生管理",
+        "user": "用户管理"
+      },
       "system": {
         "title": "系统管理",
         "config": "基础配置",

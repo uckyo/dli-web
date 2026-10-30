@@ -1,47 +1,31 @@
 <!-- DLI 用户管理：各级管理端按范围维护用户，平台管理端可删除 -->
 <template>
-  <div>
-    <div class="mb-4 flex-cb flex-wrap gap-3">
-      <div>
-        <h4 class="font-medium text-g-900">用户管理</h4>
-      </div>
-      <ElButton type="primary" @click="openAdd">
-        <ArtSvgIcon icon="ri:user-add-line" class="mr-1" />新增用户
-      </ElButton>
-    </div>
-
-    <ElForm :inline="true" @submit.prevent>
-      <ElFormItem label="关键词">
-        <ElInput
-          v-model="searchParams.keyword"
-          placeholder="姓名 / 手机号 / 所属组织"
-          clearable
-          style="width: 240px"
-          @keyup.enter="handleSearch"
-        />
-      </ElFormItem>
-      <ElFormItem label="用户类型">
-        <ElSelect v-model="searchParams.type" placeholder="全部类型" clearable style="width: 150px">
-          <ElOption v-for="item in allowedTypes" :key="item" :label="item" :value="item" />
-        </ElSelect>
-      </ElFormItem>
-      <ElFormItem>
-        <ElButton type="primary" @click="handleSearch">查询</ElButton>
-        <ElButton @click="handleReset">重置</ElButton>
-      </ElFormItem>
-      <ElFormItem>
-        <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData" />
-      </ElFormItem>
-    </ElForm>
-
-    <ArtTable
-      :loading="loading"
-      :data="data"
-      :columns="columns"
-      :pagination="pagination"
-      @pagination:size-change="handleSizeChange"
-      @pagination:current-change="handleCurrentChange"
+  <div class="art-full-height overflow-y-auto pb-5">
+    <ArtSearchBar
+      v-model="searchParams"
+      :items="searchItems"
+      @search="handleSearch"
+      @reset="handleReset"
     />
+
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
+        <template #left>
+          <ElButton type="primary" @click="openAdd">
+            <ArtSvgIcon icon="ri:user-add-line" class="mr-1" />新增用户
+          </ElButton>
+        </template>
+      </ArtTableHeader>
+
+      <ArtTable
+        :loading="loading"
+        :data="data"
+        :columns="columns"
+        :pagination="pagination"
+        @pagination:size-change="handleSizeChange"
+        @pagination:current-change="handleCurrentChange"
+      />
+    </ElCard>
 
     <!-- 新增用户 -->
     <ElDialog v-model="addVisible" title="新增用户" width="540px" destroy-on-close>
@@ -101,6 +85,24 @@
 
   const allowedTypes = computed(() => SCOPE_TYPES[props.scope])
   const deletable = computed(() => props.scope === 'platform')
+
+  const searchItems = computed(() => [
+    {
+      key: 'keyword',
+      label: '关键词',
+      type: 'input',
+      placeholder: '姓名 / 手机号 / 所属组织',
+      span: 6
+    },
+    {
+      key: 'type',
+      label: '用户类型',
+      type: 'select',
+      placeholder: '全部类型',
+      span: 6,
+      props: { options: allowedTypes.value.map((item) => ({ label: item, value: item })) }
+    }
+  ])
 
   /** 用户类型标签色 */
   const TYPE_TAG: Record<UserType, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {

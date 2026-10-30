@@ -1,71 +1,52 @@
 <!-- DLI 组织管理：中心（平台端，可删除）/ 课题组（中心端，不可删除）/ 平台（系统端，可暂停服务） -->
 <template>
-  <div v-loading="loading">
-    <div class="mb-4 flex-cb flex-wrap gap-3">
-      <div>
-        <h4 class="font-medium text-g-900">{{ TITLE[kind] }}</h4>
-      </div>
-      <ElButton v-if="kind !== 'platform'" type="primary" @click="openEdit()">
-        <ArtSvgIcon icon="ri:add-line" class="mr-1" />{{
-          kind === 'center' ? '新增中心' : '新增课题组'
-        }}
-      </ElButton>
-    </div>
+  <div class="art-full-height overflow-y-auto pb-5">
+    <ArtSearchBar
+      v-model="searchParams"
+      :items="searchItems"
+      @search="handleSearch"
+      @reset="handleReset"
+    />
 
-    <!-- 中心 / 课题组 -->
-    <ElTable v-if="kind !== 'platform'" :data="orgList" border stripe>
-      <ElTableColumn prop="id" label="编号" width="110" />
-      <ElTableColumn prop="name" label="名称" min-width="170" />
-      <ElTableColumn prop="parent" label="上级组织" min-width="150" />
-      <ElTableColumn prop="leader" label="负责人" width="110" />
-      <ElTableColumn prop="members" label="成员数" width="90" align="center" />
-      <ElTableColumn label="状态" width="100">
-        <template #default="{ row }">
+    <ElCard class="art-table-card">
+      <ArtTableHeader :loading="loading" layout="refresh,fullscreen,settings" @refresh="loadData">
+        <template v-if="kind !== 'platform'" #left>
+          <ElButton type="primary" @click="openEdit()">
+            <ArtSvgIcon icon="ri:add-line" class="mr-1" />{{
+              kind === 'center' ? '新增中心' : '新增课题组'
+            }}
+          </ElButton>
+        </template>
+      </ArtTableHeader>
+
+      <ArtTable :loading="loading" :data="tableData" :columns="columns">
+        <template #status="{ row }">
           <ElTag :type="row.status === '运行中' ? 'success' : 'info'" effect="light">
             {{ row.status }}
           </ElTag>
         </template>
-      </ElTableColumn>
-      <ElTableColumn prop="createdAt" label="创建日期" width="120" />
-      <ElTableColumn label="操作" width="150" align="center">
-        <template #default="{ row }">
-          <ElButton link type="primary" @click="openEdit(row)">编辑</ElButton>
-          <ElButton v-if="kind === 'center'" link type="danger" @click="removeOrg(row)">
-            删除
-          </ElButton>
-          <ElTooltip v-else content="课题组管理端不可删除课题组" placement="top">
-            <span><ElButton link disabled>删除</ElButton></span>
-          </ElTooltip>
+        <template #operation="{ row }">
+          <template v-if="kind === 'platform'">
+            <ElButton
+              link
+              :type="row.status === '运行中' ? 'danger' : 'primary'"
+              @click="toggleService(row)"
+            >
+              {{ row.status === '运行中' ? '暂停服务' : '恢复服务' }}
+            </ElButton>
+          </template>
+          <template v-else>
+            <ElButton link type="primary" @click="openEdit(row)">编辑</ElButton>
+            <ElButton v-if="kind === 'center'" link type="danger" @click="removeOrg(row)">
+              删除
+            </ElButton>
+            <ElTooltip v-else content="中心管理端不可删除课题组" placement="top">
+              <span><ElButton link disabled>删除</ElButton></span>
+            </ElTooltip>
+          </template>
         </template>
-      </ElTableColumn>
-    </ElTable>
-
-    <!-- 平台（系统管理端） -->
-    <ElTable v-else :data="platformList" border stripe>
-      <ElTableColumn prop="id" label="平台编号" width="110" />
-      <ElTableColumn prop="name" label="平台名称" min-width="200" />
-      <ElTableColumn prop="centers" label="中心数" width="100" align="center" />
-      <ElTableColumn prop="users" label="用户数" width="100" align="center" />
-      <ElTableColumn label="服务状态" width="110">
-        <template #default="{ row }">
-          <ElTag :type="row.status === '运行中' ? 'success' : 'info'" effect="light">
-            {{ row.status }}
-          </ElTag>
-        </template>
-      </ElTableColumn>
-      <ElTableColumn prop="createdAt" label="创建日期" width="120" />
-      <ElTableColumn label="操作" width="150" align="center">
-        <template #default="{ row }">
-          <ElButton
-            link
-            :type="row.status === '运行中' ? 'danger' : 'primary'"
-            @click="toggleService(row)"
-          >
-            {{ row.status === '运行中' ? '暂停服务' : '恢复服务' }}
-          </ElButton>
-        </template>
-      </ElTableColumn>
-    </ElTable>
+      </ArtTable>
+    </ElCard>
 
     <!-- 新增 / 编辑组织 -->
     <ElDialog
@@ -117,11 +98,65 @@
 
   const props = defineProps<{ kind: 'center' | 'group' | 'platform' }>()
 
-  const TITLE = {
-    center: '中心管理',
-    group: '课题组管理',
-    platform: '平台管理'
-  } as const
+  const searchParams = reactive({ keyword: '' })
+  const appliedKeyword = ref('')
+
+  const searchItems = computed(() => [
+    {
+      key: 'keyword',
+      label: '关键词',
+      type: 'input',
+      placeholder: props.kind === 'platform' ? '平台编号 / 平台名称' : '编号 / 名称 / 负责人',
+      span: 6
+    }
+  ])
+
+  function handleSearch() {
+    appliedKeyword.value = searchParams.keyword.trim().toLowerCase()
+  }
+
+  function handleReset() {
+    searchParams.keyword = ''
+    appliedKeyword.value = ''
+  }
+
+  function matchKeyword(values: string[]) {
+    const keyword = appliedKeyword.value
+    if (!keyword) return true
+    return values.join(' ').toLowerCase().includes(keyword)
+  }
+
+  const tableData = computed(() => {
+    if (props.kind === 'platform') {
+      return platformList.value.filter((item) => matchKeyword([item.id, item.name, item.createdAt]))
+    }
+    return orgList.value.filter((item) =>
+      matchKeyword([item.id, item.name, item.parent, item.leader])
+    )
+  })
+
+  const columns = computed(() =>
+    props.kind === 'platform'
+      ? [
+          { prop: 'id', label: '平台编号', width: 120 },
+          { prop: 'name', label: '平台名称', minWidth: 200 },
+          { prop: 'centers', label: '中心数', width: 100, align: 'center' as const },
+          { prop: 'users', label: '用户数', width: 100, align: 'center' as const },
+          { prop: 'status', label: '服务状态', width: 110, useSlot: true },
+          { prop: 'createdAt', label: '创建日期', width: 120 },
+          { prop: 'operation', label: '操作', width: 150, align: 'center' as const, useSlot: true }
+        ]
+      : [
+          { prop: 'id', label: '编号', width: 110 },
+          { prop: 'name', label: '名称', minWidth: 170 },
+          { prop: 'parent', label: '上级组织', minWidth: 150 },
+          { prop: 'leader', label: '负责人', width: 110 },
+          { prop: 'members', label: '成员数', width: 90, align: 'center' as const },
+          { prop: 'status', label: '状态', width: 100, useSlot: true },
+          { prop: 'createdAt', label: '创建日期', width: 120 },
+          { prop: 'operation', label: '操作', width: 150, align: 'center' as const, useSlot: true }
+        ]
+  )
 
   const loading = ref(true)
   const orgList = ref<OrgItem[]>([])

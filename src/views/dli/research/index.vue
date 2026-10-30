@@ -70,11 +70,13 @@
           <div class="w-full">
             <ElSwitch v-model="form.shared" />
             <span class="ml-2 text-sm text-g-600">共享后管理端可查看该项目（只读）</span>
-            <ElRadioGroup v-if="form.shared" v-model="form.shareLevel" class="mt-2 block">
-              <ElRadio value="课题组">课题组</ElRadio>
-              <ElRadio value="中心">中心</ElRadio>
-              <ElRadio value="平台">平台</ElRadio>
-            </ElRadioGroup>
+            <div v-if="form.shared" class="mt-2">
+              <ElRadioGroup v-model="form.shareLevel">
+                <ElRadio value="课题组">课题组</ElRadio>
+                <ElRadio value="中心">中心</ElRadio>
+                <ElRadio value="平台">平台</ElRadio>
+              </ElRadioGroup>
+            </div>
           </div>
         </ElFormItem>
       </ElForm>
@@ -90,15 +92,13 @@
         <p class="mb-2 text-sm font-medium text-g-900">{{ activeResearch.name }}</p>
         <p class="mb-3 text-xs text-g-500">{{ activeResearch.id }} · {{ activeResearch.owner }}</p>
         <ElSwitch v-model="shareForm.shared" active-text="开启共享" />
-        <ElRadioGroup v-if="shareForm.shared" v-model="shareForm.shareLevel" class="mt-3 block">
-          <ElRadio value="课题组">课题组</ElRadio>
-          <ElRadio value="中心">中心</ElRadio>
-          <ElRadio value="平台">平台</ElRadio>
-        </ElRadioGroup>
-        <p class="mt-3 rounded-lg bg-g-100 px-3 py-2 text-xs text-g-600">
-          共享级别决定哪些管理端可见：课题组 → 本课题组管理端；中心 → 本中心及上级；平台 →
-          平台与系统管理端。
-        </p>
+        <div v-if="shareForm.shared" class="mt-3">
+          <ElRadioGroup v-model="shareForm.shareLevel">
+            <ElRadio value="课题组">课题组</ElRadio>
+            <ElRadio value="中心">中心</ElRadio>
+            <ElRadio value="平台">平台</ElRadio>
+          </ElRadioGroup>
+        </div>
       </template>
       <template #footer>
         <ElButton @click="shareVisible = false">取消</ElButton>

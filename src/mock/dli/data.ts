@@ -32,6 +32,7 @@ import type {
   OrgItem,
   PlatformItem,
   ResearchItem,
+  SampleFlowLog,
   SampleRecord,
   SampleTestRecord,
   SkillCallLog,
@@ -40,6 +41,7 @@ import type {
   SkillVersion,
   StaffItem,
   UserType,
+  VisibleScope,
   WarnLevel,
   WebPatient,
   WebPatientDetail,
@@ -224,166 +226,182 @@ export const EXAMS: ExamRecord[] = PATIENTS.slice(0, 16).flatMap((patient, index
 })
 
 /** 生物样本 */
-export const SAMPLES: SampleRecord[] = PATIENTS.slice(0, 14).map((patient, index) => {
-  const types: SampleRecord['type'][] = ['全血', '血浆', '血清', '组织', '尿液']
+const CENTER_CODE: Record<string, string> = {
+  华东中心: 'HD',
+  华北中心: 'HB',
+  华南中心: 'HN',
+  西南中心: 'XN'
+}
+
+const SAMPLE_TYPES: SampleRecord['type'][] = ['全血', '血浆', '血清', '组织', '尿液']
+
+export const SAMPLES: SampleRecord[] = Array.from({ length: 14 }, (_, index) => {
+  const patient = PATIENTS[Math.floor(index / 2)]
+  const type = SAMPLE_TYPES[index % SAMPLE_TYPES.length]
+  const collectDate = day(index % 15)
+  const collectTime = `${String(8 + (index % 8)).padStart(2, '0')}:${index % 2 === 0 ? '20' : '45'}`
+  const storedAt = `${collectDate} ${String(11 + (index % 6)).padStart(2, '0')}:10`
+  const isTissue = type === '组织'
+  const status: SampleRecord['status'] =
+    index % 6 === 0 ? '待入库' : index % 9 === 0 ? '已出库' : '已入库'
+  const location = `${patient.center} B${(index % 3) + 1}-${String((index % 20) + 1).padStart(2, '0')}`
+  const operator = DOCTORS[index % DOCTORS.length]
+  const flow: SampleFlowLog[] = [
+    {
+      time: `${collectDate} ${collectTime}`,
+      action: '样本采集',
+      operator,
+      remark: `${patient.center} · ${type}采集`
+    },
+    {
+      time: `${collectDate} 10:05`,
+      action: '样本处理',
+      operator,
+      remark: isTissue ? '组织切块后编号保存' : '离心分装并标记管号'
+    }
+  ]
+  if (status !== '待入库') {
+    flow.push({ time: storedAt, action: '样本入库', operator, remark: `存入 ${location}` })
+  }
+  if (status === '已出库') {
+    flow.push({
+      time: `${day(index % 8)} 09:40`,
+      action: '样本出库',
+      operator,
+      remark: '出库用于检测'
+    })
+  }
   return {
-    id: `SP-${String(index + 1).padStart(4, '0')}`,
+    id: `BIO-${CENTER_CODE[patient.center]}-${patient.id}-${String((index % 2) + 1).padStart(3, '0')}`,
+    name: `${type}样本`,
     patientId: patient.id,
-    patientName: patient.name,
-    type: types[index % types.length],
-    collectedAt: day(index % 15),
-    location: `${patient.center} B${(index % 3) + 1}-${String((index % 20) + 1).padStart(2, '0')}`,
-    status: index % 6 === 0 ? '待入库' : index % 9 === 0 ? '已出库' : '已入库'
+    center: patient.center,
+    type,
+    collectedAt: `${collectDate} ${collectTime}`,
+    remaining: isTissue ? 1 + (index % 2) : Number((1.5 + (index % 4) * 0.5).toFixed(1)),
+    unit: isTissue ? '块' : 'mL',
+    status,
+    location,
+    shareLevel: (['全平台', '本中心', '课题组'] as VisibleScope[])[index % 3],
+    storedAt,
+    operator,
+    device: isTissue
+      ? `液氮罐 LN-${(index % 4) + 1} · ${location}`
+      : `超低温冰箱 -80℃ · ${location}`,
+    sop: [
+      {
+        stage: '取样',
+        content: isTissue
+          ? '手术/活检取材后 30 分钟内置于冻存管'
+          : `按 ${type} 采集 SOP 采集，采集量 4 mL`
+      },
+      {
+        stage: '处理',
+        content: isTissue ? 'OCT 包埋后速冻' : '3000 rpm 离心 10 分钟，分装 2 管'
+      },
+      {
+        stage: '保存',
+        content: isTissue ? '-196℃ 液氮保存' : '-80℃ 超低温冰箱保存'
+      }
+    ],
+    flow
   }
 })
+
+const TEST_TYPES: SampleTestRecord['type'][] = ['蛋白组', '转录组', '代谢组', '基因组']
+
+const TEST_ITEMS: Record<SampleTestRecord['type'], string> = {
+  蛋白组: '炎症因子谱',
+  转录组: '转录组测序',
+  代谢组: '血药浓度监测',
+  基因组: '甲基化检测'
+}
+
+const TEST_DATA_EXT: Record<SampleTestRecord['type'], string> = {
+  蛋白组: 'mzML',
+  转录组: 'fastq.gz',
+  代谢组: 'mzML',
+  基因组: 'idat'
+}
 
 /** 样本检测记录 */
 export const SAMPLE_TESTS: SampleTestRecord[] = SAMPLES.slice(0, 12).map((sample, index) => {
-  const items = ['炎症因子谱', '自身抗体检测', '转录组测序', '血药浓度监测']
+  const type = TEST_TYPES[index % TEST_TYPES.length]
+  const item = TEST_ITEMS[type]
+  const status: SampleTestRecord['status'] =
+    index % 5 === 0 ? '检测中' : index % 7 === 0 ? '异常' : '已完成'
+  const testDate = day(index % 10)
+  const testedAt = `${testDate} ${String(9 + (index % 8)).padStart(2, '0')}:${index % 2 === 0 ? '15' : '40'}`
+  const id = `BIO-${CENTER_CODE[sample.center]}-${sample.patientId}-D${String(index + 1).padStart(3, '0')}`
   return {
-    id: `TS-${String(index + 1).padStart(4, '0')}`,
+    id,
+    type,
+    item,
+    batch: `B2026-${String(Math.floor(index / 4) + 1).padStart(2, '0')}`,
     sampleId: sample.id,
-    patientName: sample.patientName,
-    item: items[index % items.length],
-    result: index % 4 === 1 ? 'IL-6 升高' : index % 4 === 2 ? '未见异常' : '—',
-    testedAt: day(index % 10),
-    status: index % 5 === 0 ? '检测中' : index % 7 === 0 ? '异常' : '已完成'
+    patientId: sample.patientId,
+    center: sample.center,
+    collectedAt: sample.collectedAt,
+    testedAt,
+    status,
+    qc: status === '异常' ? '不合格' : status === '检测中' ? '待质控' : '合格',
+    shareLevel: sample.shareLevel,
+    operator: DOCTORS[(index + 1) % DOCTORS.length],
+    recordedAt: `${testDate} ${String(15 + (index % 4)).padStart(2, '0')}:30`,
+    sop: [
+      {
+        stage: '前处理',
+        content: type === '转录组' ? '总 RNA 提取并构建文库' : '样本裂解并提取蛋白/代谢物'
+      },
+      {
+        stage: '上机',
+        content: type === '基因组' ? '甲基化芯片扫描' : '质谱/测序平台上机检测'
+      },
+      { stage: '分析', content: '质控过滤后进行定量与差异分析' }
+    ],
+    qcReport: `QC-${String(index + 1).padStart(4, '0')}`,
+    dataFile: `${id}_raw.${TEST_DATA_EXT[type]}`,
+    expression: `${item}表达谱 · ${12 + index} 个特征 × 24 个样本`
   }
 })
 
-/** AI 模型 */
+/** AI 模型：按早筛预警 / 早诊预警 / 转归预测三个方向占位，接入情况以模型服务为准 */
 export const MODELS: AiModel[] = [
   {
     id: 'M-001',
-    name: '早筛风险预测模型',
-    direction: '纵向',
-    timePoints: ['T0 基线', 'T1 用药 1 月', 'T2 用药 3 月'],
-    input: '结构化病历 + 检验 + 影像组学',
-    output: '早筛风险概率、关键风险因素',
-    enabled: true,
-    accuracy: 0.91,
-    updatedAt: '2026-10-20'
+    name: '早筛预警模型',
+    field: '早筛预警',
+    mode: '',
+    timePoints: [],
+    input: '',
+    output: '',
+    connected: false,
+    enabled: false,
+    updatedAt: '2026-10-26'
   },
   {
     id: 'M-002',
-    name: '早诊辅助诊断模型',
-    direction: '横向',
-    timePoints: ['T1 首次异常'],
-    input: '胸部 HRCT + 炎症指标',
-    output: 'DLI 可能性、鉴别诊断提示',
-    enabled: true,
-    accuracy: 0.88,
-    updatedAt: '2026-10-18'
+    name: '早诊预警模型',
+    field: '早诊预警',
+    mode: '',
+    timePoints: [],
+    input: '',
+    output: '',
+    connected: false,
+    enabled: false,
+    updatedAt: '2026-10-26'
   },
   {
     id: 'M-003',
     name: '转归预测模型',
-    direction: '纵向',
-    timePoints: ['T0 基线', 'T2 用药 3 月', 'T3 用药 6 月'],
-    input: '时序检验 + 用药依从性',
-    output: '3/6/12 个月转归分层',
-    enabled: true,
-    accuracy: 0.84,
-    updatedAt: '2026-10-15'
-  },
-  {
-    id: 'M-004',
-    name: '随访风险分层模型',
-    direction: '横向',
-    timePoints: ['T3 用药 6 月'],
+    field: '转归预测',
+    mode: '',
+    timePoints: [],
     input: '',
-    output: '随访频次建议',
+    output: '',
+    connected: false,
     enabled: false,
-    accuracy: 0.79,
-    updatedAt: '2026-09-30'
-  },
-  {
-    id: 'M-005',
-    name: '影像质控评估模型',
-    direction: '横向',
-    timePoints: ['T0 基线'],
-    input: '胸部 HRCT 影像序列',
-    output: '影像质量评分、重拍建议',
-    enabled: true,
-    accuracy: 0.93,
-    updatedAt: '2026-10-19'
-  },
-  {
-    id: 'M-006',
-    name: '急性加重预警模型',
-    direction: '纵向',
-    timePoints: ['T1 用药 1 月', 'T2 用药 3 月'],
-    input: '时序检验 + 症状日志 + 用药依从性',
-    output: '14 日内急性加重概率',
-    enabled: true,
-    accuracy: 0.86,
-    updatedAt: '2026-10-17'
-  },
-  {
-    id: 'M-007',
-    name: '用药依从性预测模型',
-    direction: '纵向',
-    timePoints: ['T1 用药 1 月', 'T3 用药 6 月'],
-    input: '随访记录 + 处方数据',
-    output: '依从性分级、干预提示',
-    enabled: true,
-    accuracy: 0.82,
-    updatedAt: '2026-10-09'
-  },
-  {
-    id: 'M-008',
-    name: '多模态融合风险模型',
-    direction: '横向',
-    timePoints: ['T1 首次异常'],
-    input: 'HRCT + 检验 + 结构化病历',
-    output: '综合风险等级',
-    enabled: true,
-    accuracy: 0.89,
-    updatedAt: '2026-10-11'
-  },
-  {
-    id: 'M-009',
-    name: '病理分级辅助模型',
-    direction: '横向',
-    timePoints: ['T2 病理评估'],
-    input: '病理切片图像',
-    output: '病理分型建议、置信度',
-    enabled: true,
-    accuracy: 0.87,
-    updatedAt: '2026-09-27'
-  },
-  {
-    id: 'M-010',
-    name: '肺功能恶化预测模型',
-    direction: '纵向',
-    timePoints: ['T0 基线', 'T2 用药 3 月', 'T3 用药 6 月'],
-    input: '肺功能序列 + 影像指标',
-    output: 'FVC 下降速率预测',
-    enabled: true,
-    accuracy: 0.81,
-    updatedAt: '2026-09-22'
-  },
-  {
-    id: 'M-011',
-    name: '免疫指标异常识别模型',
-    direction: '横向',
-    timePoints: ['T1 用药 1 月'],
-    input: '炎症因子谱 + 血常规',
-    output: '异常指标清单、复查建议',
-    enabled: false,
-    accuracy: 0.78,
-    updatedAt: '2026-09-18'
-  },
-  {
-    id: 'M-012',
-    name: '复发风险预测模型',
-    direction: '纵向',
-    timePoints: ['T2 用药 3 月', 'T3 用药 6 月', 'T4 用药 12 月'],
-    input: '随访影像 + 检验 + 用药方案',
-    output: '12 个月复发概率',
-    enabled: true,
-    accuracy: 0.85,
-    updatedAt: '2026-10-22'
+    updatedAt: '2026-10-26'
   }
 ]
 

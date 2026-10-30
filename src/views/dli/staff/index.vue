@@ -1,34 +1,20 @@
 <!-- DLI 人员管理：医生维护助理与护士（仅临床角色） -->
 <template>
-  <div class="art-full-height">
+  <div class="art-full-height overflow-y-auto pb-5">
+    <ArtSearchBar
+      v-model="searchParams"
+      :items="searchItems"
+      @search="handleSearch"
+      @reset="handleReset"
+    />
+
     <ElCard class="art-table-card">
       <ElTabs v-model="searchParams.role" class="mb-3" @tab-change="handleTabChange">
         <ElTabPane label="医生助理" name="助理" />
         <ElTabPane label="护士" name="护士" />
       </ElTabs>
 
-      <ElForm :inline="true" @submit.prevent>
-        <ElFormItem label="关键词">
-          <ElInput
-            v-model="searchParams.keyword"
-            placeholder="姓名 / 归属医生"
-            clearable
-            style="width: 240px"
-            @keyup.enter="handleSearch"
-          />
-        </ElFormItem>
-        <ElFormItem>
-          <ElButton type="primary" @click="handleSearch">查询</ElButton>
-          <ElButton @click="handleReset">重置</ElButton>
-        </ElFormItem>
-      </ElForm>
-
-      <ArtTableHeader
-        v-model:columns="columnChecks"
-        :loading="loading"
-        class="mb-2"
-        @refresh="refreshData"
-      >
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
         <template #left>
           <ElButton type="primary" @click="openAdd">
             <ArtSvgIcon icon="ri:user-add-line" class="mr-1" />新增人员
@@ -86,6 +72,16 @@
 
   /** 归属医生候选（演示） */
   const DOCTOR_OPTIONS = ['陈明远', '周雅琴', '刘志远', '孙可欣']
+
+  const searchItems = [
+    {
+      key: 'keyword',
+      label: '关键词',
+      type: 'input',
+      placeholder: '姓名 / 归属医生',
+      span: 6
+    }
+  ]
 
   const {
     columns,

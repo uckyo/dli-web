@@ -209,35 +209,108 @@ export const dliRoutes: AppRouteRecord[] = [
   {
     path: '/dli/platform',
     name: 'DliPlatform',
-    component: '/dli/platform',
+    component: '/index/index',
     meta: {
-      title: 'menus.dli.platform',
+      title: 'menus.dli.platform.title',
       icon: 'ri:building-2-line',
-      keepAlive: true,
       roles: ['R_PLATFORM']
-    }
+    },
+    children: [
+      {
+        path: 'config',
+        name: 'DliPlatformConfig',
+        component: '/dli/platform/config',
+        meta: {
+          title: 'menus.dli.platform.config',
+          icon: 'ri:settings-4-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'center',
+        name: 'DliPlatformCenter',
+        component: '/dli/platform/center',
+        meta: {
+          title: 'menus.dli.platform.center',
+          icon: 'ri:hospital-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'user',
+        name: 'DliPlatformUser',
+        component: '/dli/platform/user',
+        meta: {
+          title: 'menus.dli.platform.user',
+          icon: 'ri:user-settings-line',
+          keepAlive: true
+        }
+      }
+    ]
   },
   {
     path: '/dli/center',
     name: 'DliCenter',
-    component: '/dli/center',
+    component: '/index/index',
     meta: {
-      title: 'menus.dli.center',
+      title: 'menus.dli.center.title',
       icon: 'ri:hospital-line',
-      keepAlive: true,
       roles: ['R_CENTER']
-    }
+    },
+    children: [
+      {
+        path: 'group',
+        name: 'DliCenterGroup',
+        component: '/dli/center/group',
+        meta: {
+          title: 'menus.dli.center.group',
+          icon: 'ri:organization-chart',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'user',
+        name: 'DliCenterUser',
+        component: '/dli/center/user',
+        meta: {
+          title: 'menus.dli.center.user',
+          icon: 'ri:user-settings-line',
+          keepAlive: true
+        }
+      }
+    ]
   },
   {
     path: '/dli/group',
     name: 'DliGroup',
-    component: '/dli/group',
+    component: '/index/index',
     meta: {
-      title: 'menus.dli.group',
+      title: 'menus.dli.group.title',
       icon: 'ri:organization-chart',
-      keepAlive: true,
       roles: ['R_GROUP']
-    }
+    },
+    children: [
+      {
+        path: 'doctor',
+        name: 'DliGroupDoctor',
+        component: '/dli/group/doctor',
+        meta: {
+          title: 'menus.dli.group.doctor',
+          icon: 'ri:stethoscope-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'user',
+        name: 'DliGroupUser',
+        component: '/dli/group/user',
+        meta: {
+          title: 'menus.dli.group.user',
+          icon: 'ri:user-settings-line',
+          keepAlive: true
+        }
+      }
+    ]
   },
   {
     path: '/dli/system',

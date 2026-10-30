@@ -258,10 +258,19 @@ export async function fetchGetSampleList(params: {
   if (params.keyword) {
     const keyword = params.keyword.trim().toLowerCase()
     list = list.filter(
-      (item) => item.patientName.includes(keyword) || item.id.toLowerCase().includes(keyword)
+      (item) =>
+        item.id.toLowerCase().includes(keyword) ||
+        item.name.includes(keyword) ||
+        item.patientId.toLowerCase().includes(keyword)
     )
   }
   return paginate(list, params.current, params.size)
+}
+
+/** 按编号读取样本（检测详情关联样本） */
+export async function fetchGetSampleById(id: string): Promise<SampleRecord | undefined> {
+  await delay(120)
+  return SAMPLES.find((item) => item.id === id)
 }
 
 /** 样本检测列表 */
@@ -276,9 +285,10 @@ export async function fetchGetSampleTestList(params: {
     const keyword = params.keyword.trim().toLowerCase()
     list = list.filter(
       (item) =>
-        item.patientName.includes(keyword) ||
         item.id.toLowerCase().includes(keyword) ||
-        item.sampleId.toLowerCase().includes(keyword)
+        item.item.includes(keyword) ||
+        item.sampleId.toLowerCase().includes(keyword) ||
+        item.patientId.toLowerCase().includes(keyword)
     )
   }
   return paginate(list, params.current, params.size)
@@ -1436,4 +1446,19 @@ export async function fetchToggleGroupDoctor(
   await delay(200)
   const doctor = GROUP_DOCTORS.find((item) => item.id === id)
   if (doctor) doctor.status = status
+}
+
+/** 新增课题组医生 */
+export async function fetchAddGroupDoctor(
+  payload: Pick<GroupDoctor, 'name' | 'title' | 'org'>
+): Promise<void> {
+  await delay(300)
+  const nextId =
+    GROUP_DOCTORS.reduce((max, item) => Math.max(max, Number(item.id.split('-')[1]) || 0), 0) + 1
+  GROUP_DOCTORS.unshift({
+    ...payload,
+    id: `GD-${String(nextId).padStart(3, '0')}`,
+    patients: 0,
+    status: '在职'
+  })
 }

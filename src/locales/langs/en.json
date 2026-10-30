@@ -255,9 +255,22 @@
       "profile": "Profile",
       "status": "Automation",
       "staff": "Staff",
-      "platform": "Platform Admin",
-      "center": "Center Admin",
-      "group": "Group Admin",
+      "platform": {
+        "title": "Platform Admin",
+        "config": "Configuration",
+        "center": "Centers",
+        "user": "Users"
+      },
+      "center": {
+        "title": "Center Admin",
+        "group": "Groups",
+        "user": "Users"
+      },
+      "group": {
+        "title": "Group Admin",
+        "doctor": "Doctors",
+        "user": "Users"
+      },
       "system": {
         "title": "System Admin",
         "config": "Configuration",
