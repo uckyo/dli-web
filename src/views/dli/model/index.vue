@@ -1,6 +1,13 @@
 <!-- DLI 模型管理：早筛预警 / 早诊预警 / 转归预测三个方向占位，模型接入后对接 -->
 <template>
   <div v-loading="loading" class="art-full-height overflow-y-auto pb-5">
+    <!-- 页面操作区 -->
+    <div class="mb-4 flex">
+      <ElButton type="primary" @click="openCreate">
+        <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建模型
+      </ElButton>
+    </div>
+
     <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
       <div v-for="model in models" :key="model.id" class="art-card flex flex-col p-5">
         <div class="flex-cb items-start gap-3">
@@ -80,8 +87,13 @@
       </ElDescriptions>
     </ElDialog>
 
-    <!-- 编辑配置 -->
-    <ElDialog v-model="editVisible" title="编辑配置" width="620px">
+    <!-- 新建 / 编辑配置 -->
+    <ElDialog
+      v-model="editVisible"
+      :title="isCreate ? '新建模型' : '编辑配置'"
+      width="620px"
+      destroy-on-close
+    >
       <ElForm ref="formRef" :model="form" :rules="rules" label-width="96px">
         <ElFormItem label="模型名称" prop="name">
           <ElInput v-model="form.name" maxlength="40" placeholder="请输入模型名称" />
@@ -162,7 +174,12 @@
 
 <script setup lang="ts">
   import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-  import { fetchGetModels, fetchSaveModel, fetchToggleModel } from '@/mock/dli/api'
+  import {
+    fetchCreateModel,
+    fetchGetModels,
+    fetchSaveModel,
+    fetchToggleModel
+  } from '@/mock/dli/api'
   import type { AiModel, ModelField } from '@/mock/dli/types'
 
   defineOptions({ name: 'DliModel' })
@@ -185,6 +202,8 @@
   const detailVisible = ref(false)
   const activeModel = ref<AiModel>()
   const editVisible = ref(false)
+  /** 弹窗是否为新建模式 */
+  const isCreate = ref(false)
   const formRef = ref<FormInstance>()
 
   function emptyModel(): AiModel {
@@ -223,9 +242,16 @@
     detailVisible.value = true
   }
 
+  function openCreate() {
+    Object.assign(form, emptyModel())
+    isCreate.value = true
+    editVisible.value = true
+  }
+
   function openEdit(model: AiModel) {
     activeModel.value = model
     Object.assign(form, { ...model, timePoints: [...model.timePoints] })
+    isCreate.value = false
     editVisible.value = true
   }
 
@@ -249,12 +275,18 @@
 
     saving.value = true
     try {
-      await fetchSaveModel({
+      const payload = {
         ...form,
         timePoints: [...form.timePoints],
         updatedAt: new Date().toISOString().slice(0, 10)
-      })
-      ElMessage.success('模型配置已更新')
+      }
+      if (isCreate.value) {
+        await fetchCreateModel(payload)
+        ElMessage.success('模型已新建')
+      } else {
+        await fetchSaveModel(payload)
+        ElMessage.success('模型配置已更新')
+      }
       editVisible.value = false
       await loadModels()
     } finally {

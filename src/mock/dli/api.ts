@@ -307,6 +307,18 @@ export async function fetchToggleModel(id: string, enabled: boolean): Promise<vo
   if (model) model.enabled = enabled
 }
 
+/** 新建模型 */
+export async function fetchCreateModel(payload: Omit<AiModel, 'id' | 'updatedAt'>): Promise<void> {
+  await delay(300)
+  const nextId =
+    MODELS.reduce((max, item) => Math.max(max, Number(item.id.split('-')[1]) || 0), 0) + 1
+  MODELS.unshift({
+    ...payload,
+    id: `M-${String(nextId).padStart(3, '0')}`,
+    updatedAt: new Date().toISOString().slice(0, 10)
+  })
+}
+
 /** 保存模型 */
 export async function fetchSaveModel(payload: AiModel): Promise<void> {
   await delay(300)
