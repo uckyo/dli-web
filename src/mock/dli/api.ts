@@ -34,6 +34,7 @@ import {
   PATIENTS,
   PATIENT_AUTOMATION,
   PATIENT_DETAILS,
+  PATIENT_REPORTS,
   PLATFORMS_DATA,
   RESEARCHES,
   SAMPLES,
@@ -54,6 +55,7 @@ import type {
   AgentSession,
   AiModel,
   ConnectivityResult,
+  EnrollEntry,
   ExamCategory,
   ExamRecord,
   GroupDoctor,
@@ -73,7 +75,9 @@ import type {
   McpOverview,
   OrgItem,
   PlatformItem,
+  PatientReport,
   ResearchItem,
+  SafetyEvent,
   SampleRecord,
   SampleTestRecord,
   SkillDetail,
@@ -111,6 +115,9 @@ export interface PatientQueryParams {
   keyword?: string
   status?: WebPatient['status'] | ''
   warnLevel?: WarnLevel | ''
+  enrollEntry?: EnrollEntry | ''
+  researchGroup?: WebPatient['group'] | ''
+  enrolled?: '' | 'yes' | 'no'
 }
 
 /** 检查列表查询参数 */
@@ -119,6 +126,8 @@ export interface ExamQueryParams {
   size?: number
   keyword?: string
   category?: ExamCategory | ''
+  /** 患者详情页嵌入模式：只返回该患者的检查资料 */
+  patientId?: string
 }
 
 /** 人员列表查询参数 */
@@ -195,7 +204,7 @@ export async function fetchGetWorkbench(role: WebRoleCode): Promise<WorkbenchSta
   return stats
 }
 
-/** 患者列表（分页 + 筛选） */
+/** 患者列表（分页 + 筛选，仅按编号类字段检索，G1 脱敏） */
 export async function fetchGetPatientList(
   params: PatientQueryParams
 ): Promise<Api.Common.PaginatedResponse<WebPatient>> {
@@ -205,8 +214,8 @@ export async function fetchGetPatientList(
     const keyword = params.keyword.trim().toLowerCase()
     list = list.filter(
       (item) =>
-        item.name.includes(keyword) ||
         item.id.toLowerCase().includes(keyword) ||
+        item.researchNo.toLowerCase().includes(keyword) ||
         item.doctor.includes(keyword)
     )
   }
@@ -218,6 +227,10 @@ export async function fetchGetPatientList(
         item.earlyDiagnosis.level === params.warnLevel
     )
   }
+  if (params.enrollEntry) list = list.filter((item) => item.enrollEntry === params.enrollEntry)
+  if (params.researchGroup) list = list.filter((item) => item.group === params.researchGroup)
+  if (params.enrolled === 'yes') list = list.filter((item) => item.enrolled)
+  if (params.enrolled === 'no') list = list.filter((item) => !item.enrolled)
   return paginate(list, params.current, params.size)
 }
 
@@ -229,12 +242,357 @@ export async function fetchGetPatientDetail(id: string): Promise<WebPatientDetai
   return detail
 }
 
+/** 按编号读取患者档案（患者详情独立页面） */
+export async function fetchGetPatientById(id: string): Promise<WebPatient> {
+  await delay()
+  const patient = PATIENTS.find((item) => item.id === id)
+  if (!patient) throw new Error('患者档案不存在')
+  return patient
+}
+
+/* -------------------------------------------------------------------------- */
+/* 患者管理：建档 / 入组 / 知情同意 / 上报核对 / 安全事件 / 导入                  */
+/* -------------------------------------------------------------------------- */
+
+function requirePatient(id: string): WebPatient {
+  const patient = PATIENTS.find((item) => item.id === id)
+  if (!patient) throw new Error('患者档案不存在')
+  return patient
+}
+
+/** 构造一条新档案：只建档，不产生研究入组、不采集身份信息 */
+function buildArchive(input: {
+  id?: string
+  center: string
+  doctor: string
+  status: WebPatient['status']
+  group: WebPatient['group']
+}): WebPatient {
+  return {
+    id: input.id ?? `DLI-2026-${String(PATIENTS.length + 1).padStart(4, '0')}`,
+    name: '',
+    gender: '男',
+    age: 0,
+    center: input.center,
+    group: input.group,
+    status: input.status,
+    earlyScreen: { level: 'none', score: 0 },
+    earlyDiagnosis: { level: 'none', score: 0 },
+    outcome: { window: '3个月', probability: 0, label: '待评估' },
+    lastUpdate: todayStr(),
+    doctor: input.doctor,
+    researchNo: '',
+    enrollEntry: '',
+    enrollDate: '',
+    enrolled: false,
+    consent: { signed: false, version: '', date: '' },
+    safetyEvents: []
+  }
+}
+
+function attachDetail(patient: WebPatient): void {
+  PATIENT_DETAILS[patient.id] = {
+    ...patient,
+    phone: '',
+    chiefComplaint: '',
+    medication: [],
+    conversations: [],
+    history: []
+  }
+}
+
+/** 新建患者档案（建档与研究入组分离） */
+export async function fetchCreatePatientArchive(input: {
+  center: string
+  doctor: string
+  status: WebPatient['status']
+  group: WebPatient['group']
+}): Promise<WebPatient> {
+  await delay()
+  if (!input.center.trim() || !input.doctor.trim()) throw new Error('所属中心与主管医生不能为空')
+  const patient = buildArchive(input)
+  PATIENTS.unshift(patient)
+  attachDetail(patient)
+  return patient
+}
+
+/** 入组条件核对项 */
+export interface EnrollCheckItem {
+  label: string
+  passed: boolean
+  detail: string
+}
+
+/** 同步核对逻辑（供核对与确认入组共用） */
+function checkEnrollment(id: string, entry: EnrollEntry): EnrollCheckItem[] {
+  const patient = requirePatient(id)
+  const baseline = EXAMS.filter((item) => item.patientId === id && item.status === '已归档').length
+  return [
+    { label: '患者档案已建立', passed: Boolean(patient.id), detail: patient.id },
+    {
+      label: '入组入口符合方案',
+      passed: entry === '拟接受高危药物治疗' || entry === '已确诊 DLI',
+      detail: entry
+    },
+    {
+      label: '知情同意已签署',
+      passed: patient.consent.signed,
+      detail: patient.consent.signed
+        ? `${patient.consent.version} · ${patient.consent.date}`
+        : '未签署'
+    },
+    {
+      label: '未重复入组',
+      passed: !patient.enrolled,
+      detail: patient.enrolled ? `已入组 ${patient.researchNo}` : '未入组'
+    },
+    {
+      label: '主管医生与中心已登记',
+      passed: Boolean(patient.doctor && patient.center),
+      detail: `${patient.center} · ${patient.doctor}`
+    },
+    {
+      label: '基线检查资料已归档',
+      passed: baseline > 0,
+      detail: baseline > 0 ? `${baseline} 份已归档` : '缺少已归档资料'
+    }
+  ]
+}
+
+/** 核对入组条件 */
+export async function fetchCheckEnrollEligibility(
+  id: string,
+  entry: EnrollEntry
+): Promise<EnrollCheckItem[]> {
+  await delay()
+  return checkEnrollment(id, entry)
+}
+
+/** 补录基线检查资料（核对不通过时可在入组弹窗内补齐） */
+export async function fetchAddBaselineExam(patientId: string): Promise<ExamRecord> {
+  await delay()
+  const patient = requirePatient(patientId)
+  const record: ExamRecord = {
+    id: `EX-${Date.now()}`,
+    patientId,
+    patientName: '',
+    category: '检验',
+    item: '基线血常规',
+    center: patient.center,
+    date: todayStr(),
+    status: '已归档'
+  }
+  EXAMS.unshift(record)
+  return record
+}
+
+/** 签署知情同意 */
+export async function fetchSignConsent(id: string, version: string): Promise<WebPatient> {
+  await delay()
+  const patient = requirePatient(id)
+  patient.consent = { signed: true, version, date: todayStr() }
+  return patient
+}
+
+/** 确认研究入组：条件全部通过才写入，生成研究受试者编号 */
+export async function fetchConfirmEnrollment(input: {
+  id: string
+  entry: EnrollEntry
+  group: WebPatient['group']
+}): Promise<WebPatient> {
+  await delay()
+  const patient = requirePatient(input.id)
+  const failed = checkEnrollment(input.id, input.entry).filter((item) => !item.passed)
+  if (failed.length)
+    throw new Error(`入组条件未通过：${failed.map((item) => item.label).join('、')}`)
+  const seq = PATIENTS.filter((item) => item.researchNo).length + 1
+  patient.enrolled = true
+  patient.enrollEntry = input.entry
+  patient.enrollDate = todayStr()
+  patient.group = input.group
+  patient.researchNo = `RS-2026-${String(seq).padStart(4, '0')}`
+  patient.lastUpdate = todayStr()
+  return patient
+}
+
+/** 待核对上报列表 */
+export async function fetchGetPatientReports(patientId: string): Promise<PatientReport[]> {
+  await delay()
+  return PATIENT_REPORTS.filter((item) => item.patientId === patientId).map((item) => ({ ...item }))
+}
+
+/** 核对 / 退回患者端上报 */
+export async function fetchReviewPatientReport(
+  reportId: string,
+  action: '已核对' | '已退回',
+  reviewer: string
+): Promise<PatientReport> {
+  await delay()
+  const report = PATIENT_REPORTS.find((item) => item.id === reportId)
+  if (!report) throw new Error('上报记录不存在')
+  if (report.status !== '待核对') throw new Error('该上报已处理，不能重复核对')
+  report.status = action
+  report.reviewer = reviewer
+  return { ...report }
+}
+
+/** 关联检查记录 */
+export async function fetchGetPatientLinkedRecords(patientId: string): Promise<ExamRecord[]> {
+  await delay()
+  return EXAMS.filter((item) => item.patientId === patientId).map((item) => ({ ...item }))
+}
+
+/** 关联样本记录（与 P07 生物样本库同源，按患者编号匹配） */
+export async function fetchGetPatientSamples(patientId: string): Promise<SampleRecord[]> {
+  await delay()
+  return SAMPLES.filter((item) => item.patientId === patientId).map((item) => ({ ...item }))
+}
+
+/** 关联检测记录（与 P07 检测管理同源，按患者编号匹配） */
+export async function fetchGetPatientSampleTests(patientId: string): Promise<SampleTestRecord[]> {
+  await delay()
+  return SAMPLE_TESTS.filter((item) => item.patientId === patientId).map((item) => ({ ...item }))
+}
+
+/** 核对关联记录：更新原记录状态，不重复建档 */
+export async function fetchVerifyLinkedRecord(recordId: string): Promise<ExamRecord> {
+  await delay()
+  const record = EXAMS.find((item) => item.id === recordId)
+  if (!record) throw new Error('关联记录不存在')
+  if (record.status === '已归档') throw new Error('该记录已归档，无需重复核对')
+  record.status = '已归档'
+  return { ...record }
+}
+
+/** 登记安全事件（普通预警不自动转为不良事件，须医生确认） */
+export async function fetchAddSafetyEvent(
+  patientId: string,
+  input: { type: string; level: SafetyEvent['level'] }
+): Promise<SafetyEvent> {
+  await delay()
+  const patient = requirePatient(patientId)
+  if (!input.type.trim()) throw new Error('请选择安全事件类型')
+  const event: SafetyEvent = {
+    id: `SE-${Date.now()}`,
+    patientId,
+    type: input.type,
+    level: input.level,
+    date: todayStr(),
+    confirmed: false,
+    confirmedBy: ''
+  }
+  patient.safetyEvents.unshift(event)
+  return event
+}
+
+/** 医生确认安全事件 */
+export async function fetchConfirmSafetyEvent(
+  patientId: string,
+  eventId: string,
+  doctor: string
+): Promise<SafetyEvent> {
+  await delay()
+  const patient = requirePatient(patientId)
+  const event = patient.safetyEvents.find((item) => item.id === eventId)
+  if (!event) throw new Error('安全事件不存在')
+  if (event.confirmed) throw new Error('该事件已确认')
+  event.confirmed = true
+  event.confirmedBy = doctor
+  return { ...event }
+}
+
+/** 安全事件列表 */
+export async function fetchGetPatientSafetyEvents(patientId: string): Promise<SafetyEvent[]> {
+  await delay()
+  return requirePatient(patientId).safetyEvents.map((item) => ({ ...item }))
+}
+
+/** 导入行与预览结果 */
+export interface PatientImportRow {
+  id: string
+  researchNo: string
+  center: string
+  doctor: string
+  status: string
+  enrollEntry: string
+}
+export interface PatientImportPreview extends PatientImportRow {
+  result: '新增' | '重复' | '错误'
+  reason: string
+}
+
+/** 导入预览：格式校验 + 按患者编号匹配去重 */
+export async function fetchPreviewPatientImport(
+  rows: PatientImportRow[]
+): Promise<PatientImportPreview[]> {
+  await delay()
+  const seen = new Set<string>()
+  const validStatus: string[] = ['待评估', '用药中', '随访中', '已结案']
+  return rows.map((row) => {
+    const id = row.id.trim()
+    if (!/^DLI-\d{4}-\d{4}$/.test(id)) {
+      return { ...row, id, result: '错误', reason: '患者编号格式应为 DLI-YYYY-NNNN' }
+    }
+    if (seen.has(id)) return { ...row, id, result: '重复', reason: '本次导入内编号重复' }
+    if (PATIENTS.some((item) => item.id === id)) {
+      return { ...row, id, result: '重复', reason: '系统已存在该患者编号' }
+    }
+    if (!row.center.trim() || !row.doctor.trim()) {
+      return { ...row, id, result: '错误', reason: '所属中心或主管医生为空' }
+    }
+    if (!validStatus.includes(row.status)) {
+      return { ...row, id, result: '错误', reason: '状态不在可选范围内' }
+    }
+    seen.add(id)
+    return { ...row, id, result: '新增', reason: '可导入' }
+  })
+}
+
+/** 提交导入：新增可导出行；重复行仅在勾选覆盖时更新 */
+export async function fetchSubmitPatientImport(
+  rows: PatientImportPreview[],
+  overwrite: boolean
+): Promise<{ created: number; updated: number; skipped: number }> {
+  await delay()
+  let created = 0
+  let updated = 0
+  let skipped = 0
+  for (const row of rows) {
+    if (row.result === '新增') {
+      const patient = buildArchive({
+        id: row.id,
+        center: row.center,
+        doctor: row.doctor,
+        status: row.status as WebPatient['status'],
+        group: 'AI 组'
+      })
+      PATIENTS.unshift(patient)
+      attachDetail(patient)
+      created += 1
+    } else if (row.result === '重复' && overwrite) {
+      const patient = PATIENTS.find((item) => item.id === row.id)
+      if (patient) {
+        patient.center = row.center || patient.center
+        patient.doctor = row.doctor || patient.doctor
+        patient.lastUpdate = todayStr()
+        updated += 1
+      } else {
+        skipped += 1
+      }
+    } else {
+      skipped += 1
+    }
+  }
+  return { created, updated, skipped }
+}
+
 /** 检查列表（按分类） */
 export async function fetchGetExamList(
   params: ExamQueryParams
 ): Promise<Api.Common.PaginatedResponse<ExamRecord>> {
   await delay()
   let list = EXAMS.filter((item) => !params.category || item.category === params.category)
+  if (params.patientId) list = list.filter((item) => item.patientId === params.patientId)
   if (params.keyword) {
     const keyword = params.keyword.trim().toLowerCase()
     list = list.filter(
@@ -252,9 +610,12 @@ export async function fetchGetSampleList(params: {
   current?: number
   size?: number
   keyword?: string
+  /** 患者详情页嵌入模式：只返回该患者的样本 */
+  patientId?: string
 }): Promise<Api.Common.PaginatedResponse<SampleRecord>> {
   await delay()
   let list = [...SAMPLES]
+  if (params.patientId) list = list.filter((item) => item.patientId === params.patientId)
   if (params.keyword) {
     const keyword = params.keyword.trim().toLowerCase()
     list = list.filter(
@@ -278,9 +639,12 @@ export async function fetchGetSampleTestList(params: {
   current?: number
   size?: number
   keyword?: string
+  /** 患者详情页嵌入模式：只返回该患者的检测 */
+  patientId?: string
 }): Promise<Api.Common.PaginatedResponse<SampleTestRecord>> {
   await delay()
   let list = [...SAMPLE_TESTS]
+  if (params.patientId) list = list.filter((item) => item.patientId === params.patientId)
   if (params.keyword) {
     const keyword = params.keyword.trim().toLowerCase()
     list = list.filter(

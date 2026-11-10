@@ -58,6 +58,18 @@ export const dliRoutes: AppRouteRecord[] = [
     }
   },
   {
+    path: '/dli/patient/detail/:id',
+    name: 'DliPatientDetail',
+    component: '/dli/patient/detail',
+    meta: {
+      title: 'menus.dli.patientDetail',
+      isHide: true,
+      keepAlive: false,
+      activePath: '/dli/patient',
+      roles: ALL_ROLES
+    }
+  },
+  {
     path: '/dli/model',
     name: 'DliModel',
     component: '/dli/model',
@@ -131,6 +143,17 @@ export const dliRoutes: AppRouteRecord[] = [
     ]
   },
   {
+    path: '/dli/assessment',
+    name: 'DliAssessment',
+    component: '/dli/assessment',
+    meta: {
+      title: 'menus.dli.assessment',
+      icon: 'ri:alarm-warning-line',
+      keepAlive: true,
+      roles: CLINICAL_ROLES
+    }
+  },
+  {
     path: '/dli/exam',
     name: 'DliExam',
     component: '/dli/exam',
@@ -196,6 +219,17 @@ export const dliRoutes: AppRouteRecord[] = [
     }
   },
   {
+    path: '/dli/followup',
+    name: 'DliFollowup',
+    component: '/dli/followup',
+    meta: {
+      title: 'menus.dli.followup',
+      icon: 'ri:calendar-check-line',
+      keepAlive: true,
+      roles: CLINICAL_ROLES
+    }
+  },
+  {
     path: '/dli/staff',
     name: 'DliStaff',
     component: '/dli/staff',
@@ -227,6 +261,36 @@ export const dliRoutes: AppRouteRecord[] = [
         }
       },
       {
+        path: 'consent',
+        name: 'DliPlatformConsent',
+        component: '/dli/config/consent',
+        meta: {
+          title: 'menus.dli.platform.consent',
+          icon: 'ri:file-shield-2-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'fields',
+        name: 'DliPlatformFields',
+        component: '/dli/config/fields',
+        meta: {
+          title: 'menus.dli.platform.fields',
+          icon: 'ri:list-settings-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'code',
+        name: 'DliPlatformCode',
+        component: '/dli/config/code',
+        meta: {
+          title: 'menus.dli.platform.code',
+          icon: 'ri:barcode-box-line',
+          keepAlive: true
+        }
+      },
+      {
         path: 'center',
         name: 'DliPlatformCenter',
         component: '/dli/platform/center',
@@ -243,6 +307,16 @@ export const dliRoutes: AppRouteRecord[] = [
         meta: {
           title: 'menus.dli.platform.user',
           icon: 'ri:user-settings-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'log',
+        name: 'DliPlatformLog',
+        component: '/dli/log',
+        meta: {
+          title: 'menus.dli.log',
+          icon: 'ri:file-list-3-line',
           keepAlive: true
         }
       }
@@ -277,6 +351,26 @@ export const dliRoutes: AppRouteRecord[] = [
           icon: 'ri:user-settings-line',
           keepAlive: true
         }
+      },
+      {
+        path: 'fields',
+        name: 'DliCenterFields',
+        component: '/dli/config/fields',
+        meta: {
+          title: 'menus.dli.center.fields',
+          icon: 'ri:list-settings-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'log',
+        name: 'DliCenterLog',
+        component: '/dli/log',
+        meta: {
+          title: 'menus.dli.log',
+          icon: 'ri:file-list-3-line',
+          keepAlive: true
+        }
       }
     ]
   },
@@ -307,6 +401,26 @@ export const dliRoutes: AppRouteRecord[] = [
         meta: {
           title: 'menus.dli.group.user',
           icon: 'ri:user-settings-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'fields',
+        name: 'DliGroupFields',
+        component: '/dli/config/fields',
+        meta: {
+          title: 'menus.dli.group.fields',
+          icon: 'ri:list-settings-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'log',
+        name: 'DliGroupLog',
+        component: '/dli/log',
+        meta: {
+          title: 'menus.dli.log',
+          icon: 'ri:file-list-3-line',
           keepAlive: true
         }
       }
@@ -349,6 +463,26 @@ export const dliRoutes: AppRouteRecord[] = [
         meta: {
           title: 'menus.dli.system.user',
           icon: 'ri:user-settings-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'backup',
+        name: 'DliSystemBackup',
+        component: '/dli/backup',
+        meta: {
+          title: 'menus.dli.system.backup',
+          icon: 'ri:database-2-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'log',
+        name: 'DliSystemLog',
+        component: '/dli/log',
+        meta: {
+          title: 'menus.dli.log',
+          icon: 'ri:file-list-3-line',
           keepAlive: true
         }
       }

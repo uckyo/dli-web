@@ -236,6 +236,7 @@
     "dli": {
       "workbench": "工作台",
       "patient": "患者管理",
+      "patientDetail": "患者详情",
       "model": "模型管理",
       "intelligence": {
         "title": "智能管理",
@@ -245,6 +246,7 @@
         "llm": "LLM 管理",
         "agent": "Agent 管理"
       },
+      "assessment": "评估预警",
       "exam": "检查管理",
       "sample": {
         "title": "生物样本",
@@ -254,28 +256,40 @@
       "research": "研究管理",
       "profile": "个人中心",
       "status": "状态管理",
+      "followup": "随访管理",
       "staff": "人员管理",
+      "log": "系统日志",
       "platform": {
         "title": "平台管理",
         "config": "基础配置",
+        "consent": "知情同意模板",
+        "fields": "患者字段配置",
+        "code": "编码规则配置",
         "center": "中心管理",
-        "user": "用户管理"
+        "user": "用户管理",
+        "log": "系统日志"
       },
       "center": {
         "title": "中心管理",
         "group": "课题组管理",
-        "user": "用户管理"
+        "user": "用户管理",
+        "fields": "患者字段配置（按授权）",
+        "log": "系统日志"
       },
       "group": {
         "title": "课题组管理",
         "doctor": "医生管理",
-        "user": "用户管理"
+        "user": "用户管理",
+        "fields": "患者字段配置（按授权）",
+        "log": "系统日志"
       },
       "system": {
         "title": "系统管理",
         "config": "基础配置",
         "platform": "平台管理",
-        "user": "用户管理"
+        "user": "用户管理",
+        "backup": "备份恢复",
+        "log": "系统日志"
       }
     },
     "widgets": {

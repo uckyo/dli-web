@@ -15,9 +15,11 @@ import type {
   AgentVersion,
   AiModel,
   AutomationItem,
+  EnrollEntry,
   ExamCategory,
   ExamRecord,
   GroupDoctor,
+  PatientReport,
   KnowledgeChangeLog,
   KnowledgeDoc,
   KnowledgeItem,
@@ -97,6 +99,13 @@ export const PATIENTS: WebPatient[] = NAMES.map((name, index) => {
   const diagnosisLevel = WARN_LEVELS[(index + 1) % 4]
   const statusList: WebPatient['status'][] = ['用药中', '随访中', '待评估', '已结案']
   const windows: Array<'3个月' | '6个月' | '12个月'> = ['3个月', '6个月', '12个月']
+  const enrolled = index % 4 !== 0
+  const enrollEntry: EnrollEntry | '' = enrolled
+    ? index % 2 === 0
+      ? '已确诊 DLI'
+      : '拟接受高危药物治疗'
+    : ''
+  const enrollDate = enrolled ? day(5 + (index % 20)) : ''
   return {
     id: patientId(index),
     name,
@@ -119,9 +128,46 @@ export const PATIENTS: WebPatient[] = NAMES.map((name, index) => {
       label: index % 3 === 0 ? '好转' : index % 3 === 1 ? '稳定' : '进展风险'
     },
     lastUpdate: day(index % 12),
-    doctor: DOCTORS[index % DOCTORS.length]
+    doctor: DOCTORS[index % DOCTORS.length],
+    researchNo: enrolled ? `RS-2026-${String(index + 1).padStart(4, '0')}` : '',
+    enrollEntry,
+    enrollDate,
+    enrolled,
+    consent: {
+      signed: enrolled,
+      version: enrolled ? 'v2.1' : '',
+      date: enrollDate
+    },
+    safetyEvents:
+      index % 7 === 0
+        ? [
+            {
+              id: `SE-${index}-1`,
+              patientId: patientId(index),
+              type: '药物相关肝酶升高',
+              level: '中度' as const,
+              date: day(index % 9),
+              confirmed: index % 14 === 0,
+              confirmedBy: index % 14 === 0 ? DOCTORS[index % DOCTORS.length] : ''
+            }
+          ]
+        : []
   }
 })
+
+/** 患者端上报：待医护核对 */
+const REPORT_TYPES = ['症状上报', '用药记录', '检查资料回传']
+export const PATIENT_REPORTS: PatientReport[] = PATIENTS.slice(0, 16).flatMap((patient, index) =>
+  REPORT_TYPES.map((type, j) => ({
+    id: `PR-${index}-${j}`,
+    patientId: patient.id,
+    type,
+    content: `${type}：${patient.id} 第 ${j + 1} 批次回传数据`,
+    date: day(j + (index % 5)),
+    status: (index % 4 === 0 && j === 2 ? '已核对' : '待核对') as PatientReport['status'],
+    reviewer: index % 4 === 0 && j === 2 ? patient.doctor : ''
+  }))
+)
 
 /** 组装患者详情（对话 + 诊疗历程） */
 const buildDetail = (patient: WebPatient, index: number): WebPatientDetail => ({
@@ -235,7 +281,8 @@ const CENTER_CODE: Record<string, string> = {
 
 const SAMPLE_TYPES: SampleRecord['type'][] = ['全血', '血浆', '血清', '组织', '尿液']
 
-export const SAMPLES: SampleRecord[] = Array.from({ length: 14 }, (_, index) => {
+/** 每位患者 2 条样本，覆盖全部患者，供患者详情关联展示 */
+export const SAMPLES: SampleRecord[] = Array.from({ length: PATIENTS.length * 2 }, (_, index) => {
   const patient = PATIENTS[Math.floor(index / 2)]
   const type = SAMPLE_TYPES[index % SAMPLE_TYPES.length]
   const collectDate = day(index % 15)
@@ -325,7 +372,7 @@ const TEST_DATA_EXT: Record<SampleTestRecord['type'], string> = {
 }
 
 /** 样本检测记录 */
-export const SAMPLE_TESTS: SampleTestRecord[] = SAMPLES.slice(0, 12).map((sample, index) => {
+export const SAMPLE_TESTS: SampleTestRecord[] = SAMPLES.map((sample, index) => {
   const type = TEST_TYPES[index % TEST_TYPES.length]
   const item = TEST_ITEMS[type]
   const status: SampleTestRecord['status'] =

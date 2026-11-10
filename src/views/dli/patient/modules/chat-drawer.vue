@@ -2,12 +2,12 @@
 <template>
   <ChatDialog
     v-model="visible"
-    :title="`医患对话 · ${patient?.name ?? ''}`"
+    :title="`医患对话 · ${patient?.id ?? ''}`"
     :subtitle="`患者编号 ${detail?.id ?? patient?.id ?? '—'} · 主管医生 ${patient?.doctor ?? '—'}`"
     avatar-icon="ri:user-heart-line"
     :badge-text="readonly ? '只读查看' : '可回复'"
     :badge-type="readonly ? 'info' : 'success'"
-    :peer-name="patient?.name ?? '患者'"
+    :peer-name="patient?.id ?? '患者'"
     :peer-subtitle="peerSubtitle"
     peer-icon="ri:user-line"
     :messages="chatMessages"
@@ -15,7 +15,7 @@
     readonly-tip="当前角色仅可查看医患对话，回复与处置需由医生 / 医生助理 / 护士完成。"
     placeholder="输入回复内容，仅作为沟通记录，不替代医嘱"
     :maxlength="200"
-    :context-title="patient?.name ?? '患者'"
+    :context-title="patient?.id ?? '患者'"
     :context-subtitle="patient?.id"
     context-icon="ri:user-heart-line"
     :context-tags="contextTags"

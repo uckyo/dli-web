@@ -46,9 +46,42 @@ export interface HistoryEvent {
   detail: string
 }
 
+/** 研究入组入口 */
+export type EnrollEntry = '拟接受高危药物治疗' | '已确诊 DLI'
+
+/** 知情同意签署状态 */
+export interface ConsentState {
+  signed: boolean
+  version: string
+  date: string
+}
+
+/** 患者端上报（待医护核对） */
+export interface PatientReport {
+  id: string
+  patientId: string
+  type: string
+  content: string
+  date: string
+  status: '待核对' | '已核对' | '已退回'
+  reviewer: string
+}
+
+/** 安全事件（须医生确认，普通预警不自动转为不良事件） */
+export interface SafetyEvent {
+  id: string
+  patientId: string
+  type: string
+  level: '轻度' | '中度' | '重度'
+  date: string
+  confirmed: boolean
+  confirmedBy: string
+}
+
 /** 患者列表项 */
 export interface WebPatient {
   id: string
+  /** 身份字段仅存于数据层，页面 / 导出 / 日志不展示（G1） */
   name: string
   gender: '男' | '女'
   age: number
@@ -63,6 +96,18 @@ export interface WebPatient {
   outcome: { window: OutcomeWindow; probability: number; label: string }
   lastUpdate: string
   doctor: string
+  /** 研究受试者编号（确认入组后生成） */
+  researchNo: string
+  /** 入组入口 */
+  enrollEntry: EnrollEntry | ''
+  /** 入组日期 */
+  enrollDate: string
+  /** 是否已确认研究入组（建档与入组分离） */
+  enrolled: boolean
+  /** 知情同意 */
+  consent: ConsentState
+  /** 安全事件 */
+  safetyEvents: SafetyEvent[]
 }
 
 /** 患者 360° 详情 */

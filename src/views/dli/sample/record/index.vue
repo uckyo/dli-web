@@ -2,6 +2,7 @@
 <template>
   <div class="art-full-height overflow-y-auto pb-5">
     <ArtSearchBar
+      v-if="!props.patientId"
       v-model="searchParams"
       :items="searchItems"
       @search="handleSearch"
@@ -35,6 +36,9 @@
 
   defineOptions({ name: 'DliSampleRecord' })
 
+  /** 患者详情页嵌入模式：传入患者编号后仅展示该患者样本 */
+  const props = defineProps<{ patientId?: string }>()
+
   const searchItems = [
     {
       key: 'keyword',
@@ -64,7 +68,7 @@
   } = useTable({
     core: {
       apiFn: fetchGetSampleList,
-      apiParams: { current: 1, size: 10, keyword: '' },
+      apiParams: { current: 1, size: 10, keyword: '', patientId: props.patientId ?? '' },
       columnsFactory: () => [
         { prop: 'id', label: '样本编号', minWidth: 205 },
         { prop: 'name', label: '样本名称', width: 88 },

@@ -236,6 +236,7 @@
     "dli": {
       "workbench": "Workbench",
       "patient": "Patients",
+      "patientDetail": "Patient Detail",
       "model": "Models",
       "intelligence": {
         "title": "Intelligence",
@@ -245,6 +246,7 @@
         "llm": "LLM",
         "agent": "Agents"
       },
+      "assessment": "Assessment & Alerts",
       "exam": "Examinations",
       "sample": {
         "title": "Biosamples",
@@ -254,28 +256,40 @@
       "research": "Research",
       "profile": "Profile",
       "status": "Automation",
+      "followup": "Follow-up",
       "staff": "Staff",
+      "log": "System Logs",
       "platform": {
         "title": "Platform Admin",
         "config": "Configuration",
+        "consent": "Consent Templates",
+        "fields": "Patient Fields",
+        "code": "Coding Rules",
         "center": "Centers",
-        "user": "Users"
+        "user": "Users",
+        "log": "System Logs"
       },
       "center": {
         "title": "Center Admin",
         "group": "Groups",
-        "user": "Users"
+        "user": "Users",
+        "fields": "Patient Fields (Authorized)",
+        "log": "System Logs"
       },
       "group": {
         "title": "Group Admin",
         "doctor": "Doctors",
-        "user": "Users"
+        "user": "Users",
+        "fields": "Patient Fields (Authorized)",
+        "log": "System Logs"
       },
       "system": {
         "title": "System Admin",
         "config": "Configuration",
         "platform": "Platforms",
-        "user": "Users"
+        "user": "Users",
+        "backup": "Backup & Restore",
+        "log": "System Logs"
       }
     },
     "widgets": {

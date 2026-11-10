@@ -1,6 +1,6 @@
 <!-- 诊疗历程抽屉：按时间倒序展示现病史 / 用药 / 检查 / 诊断等事件 -->
 <template>
-  <ElDrawer v-model="visible" :title="`诊疗历程 · ${patient?.name ?? ''}`" size="560px">
+  <ElDrawer v-model="visible" :title="`诊疗历程 · ${patient?.id ?? ''}`" size="560px">
     <div v-loading="loading" class="flex h-full flex-col">
       <div class="mb-4 rounded-lg bg-g-100 px-3 py-2 text-xs text-g-600">
         现病史置顶，其余事件按发生时间倒序排列 · 当前状态：{{ patient?.status ?? '—' }}
@@ -24,13 +24,6 @@
             </div>
           </ElTimelineItem>
         </ElTimeline>
-      </div>
-
-      <div class="mt-3 border-t border-full-d pt-3">
-        <p class="text-xs text-g-500">诊疗历程由系统自动汇总，编辑需在对应业务模块中完成。</p>
-        <div class="mt-2 flex justify-end">
-          <ElButton @click="visible = false">关闭</ElButton>
-        </div>
       </div>
     </div>
   </ElDrawer>
