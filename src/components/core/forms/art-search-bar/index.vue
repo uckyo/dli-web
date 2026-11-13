@@ -9,19 +9,18 @@
       :label-position="labelPosition"
       v-bind="{ ...$attrs }"
     >
-      <ElRow :gutter="gutter">
-        <ElCol
-          v-for="item in visibleFormItems"
-          :key="item.key"
-          :xs="getColSpan(item.span, 'xs')"
-          :sm="getColSpan(item.span, 'sm')"
-          :md="getColSpan(item.span, 'md')"
-          :lg="getColSpan(item.span, 'lg')"
-          :xl="getColSpan(item.span, 'xl')"
+      <div class="art-search-body">
+        <div
+          ref="itemsRef"
+          class="art-search-items"
+          :class="{ 'is-collapsed': !isExpand && !isExpanded && hiddenCount > 0 }"
+          :style="{ '--art-row-h': `${rowHeight}px` }"
         >
           <ElFormItem
+            v-for="item in formItems"
+            :key="item.key"
             :prop="item.key"
-            :label-width="item.label ? item.labelWidth || labelWidth : undefined"
+            :label-width="item.label ? getLabelWidth(item) : undefined"
           >
             <template #label v-if="item.label">
               <component v-if="typeof item.label !== 'string'" :is="item.label" />
@@ -33,6 +32,7 @@
                 :model-value="getFieldValue(item.key)"
                 @update:model-value="setFieldValue(item.key, $event)"
                 v-bind="getProps(item)"
+                :style="getItemWidth(item)"
               >
                 <!-- 下拉选择 -->
                 <template v-if="item.type === 'select' && getProps(item)?.options">
@@ -68,36 +68,35 @@
               </component>
             </slot>
           </ElFormItem>
-        </ElCol>
-        <ElCol :xs="24" :sm="24" :md="span" :lg="span" :xl="span" class="action-column">
-          <div class="action-buttons-wrapper" :style="actionButtonsStyle">
-            <div class="form-buttons">
-              <ElButton v-if="showReset" class="reset-button" @click="handleReset" v-ripple>
-                {{ t('table.searchBar.reset') }}
-              </ElButton>
-              <ElButton
-                v-if="showSearch"
-                type="primary"
-                class="search-button"
-                @click="handleSearch"
-                v-ripple
-                :disabled="disabledSearch"
-              >
-                {{ t('table.searchBar.search') }}
-              </ElButton>
-            </div>
-            <div v-if="shouldShowExpandToggle" class="filter-toggle" @click="toggleExpand">
-              <span>{{ expandToggleText }}</span>
-              <div class="icon-wrapper">
-                <ElIcon>
-                  <ArrowUpBold v-if="isExpanded" />
-                  <ArrowDownBold v-else />
-                </ElIcon>
-              </div>
+        </div>
+
+        <div class="action-buttons-wrapper" :style="actionButtonsStyle">
+          <div class="form-buttons">
+            <ElButton v-if="showReset" class="reset-button" @click="handleReset" v-ripple>
+              {{ t('table.searchBar.reset') }}
+            </ElButton>
+            <ElButton
+              v-if="showSearch"
+              type="primary"
+              class="search-button"
+              @click="handleSearch"
+              v-ripple
+              :disabled="disabledSearch"
+            >
+              {{ t('table.searchBar.search') }}
+            </ElButton>
+          </div>
+          <div v-if="shouldShowExpandToggle" class="filter-toggle" @click="toggleExpand">
+            <span>{{ expandToggleText }}</span>
+            <div class="icon-wrapper">
+              <ElIcon>
+                <ArrowUpBold v-if="isExpanded" />
+                <ArrowDownBold v-else />
+              </ElIcon>
             </div>
           </div>
-        </ElCol>
-      </ElRow>
+        </div>
+      </div>
     </ElForm>
   </section>
 </template>
@@ -106,7 +105,7 @@
   import { ArrowUpBold, ArrowDownBold } from '@element-plus/icons-vue'
   import { useWindowSize } from '@vueuse/core'
   import { useI18n } from 'vue-i18n'
-  import { toRaw, type Component } from 'vue'
+  import { nextTick, onMounted, onUnmounted, toRaw, type Component } from 'vue'
   import {
     ElCascader,
     ElCheckbox,
@@ -125,7 +124,6 @@
     ElTreeSelect,
     type FormInstance
   } from 'element-plus'
-  import { calculateResponsiveSpan, type ResponsiveBreakpoint } from '@/utils/form/responsive'
 
   defineOptions({ name: 'ArtSearchBar' })
 
@@ -172,6 +170,8 @@
     hidden?: boolean
     /** 表单项占据的列宽，基于24格栅格系统 */
     span?: number
+    /** 单字段控件宽度覆盖：默认按控件类型取内置宽度，个别字段（如超长 placeholder）可单独放宽 */
+    width?: string | number
     /** 选项数据，用于 select、checkbox-group、radio-group 等 */
     options?: Record<string, any>
     /** 传递给表单项组件的属性 */
@@ -284,7 +284,7 @@
    */
   const isExpanded = ref(props.defaultExpanded)
 
-  const rootProps = ['label', 'labelWidth', 'key', 'type', 'hidden', 'span', 'slots']
+  const rootProps = ['label', 'labelWidth', 'key', 'type', 'hidden', 'span', 'width', 'slots']
   // 搜索参数默认更激进地去掉空值，减少无效 query 参数。
   const sanitizeOutputOptions = computed<SanitizeOutputOptions>(() => ({
     removeEmptyString: true,
@@ -313,14 +313,6 @@
       }
     })
     return validSlots
-  }
-
-  /**
-   * 获取列宽 span 值
-   * 根据屏幕尺寸智能降级，避免小屏幕上表单项被压缩过小
-   */
-  const getColSpan = (itemSpan: number | undefined, breakpoint: ResponsiveBreakpoint): number => {
-    return calculateResponsiveSpan(itemSpan, span.value, breakpoint)
   }
 
   // 搜索表单清空输入时不保留空字符串，避免后续请求携带空字段。
@@ -421,27 +413,96 @@
   }
 
   /**
-   * 可见的表单项
+   * label 宽度按各自文案计算。
+   * 不再统一取最长项——统一宽度会让「来源」这类短 label 在容器里靠右、前面空出一大截，
+   * 视觉上把相邻两个控件推得很远；按各自内容撑开既不掉行也更紧凑。
    */
-  const visibleFormItems = computed(() => {
-    const filteredItems = props.items.filter((item) => !item.hidden)
-    const shouldShowLess = !props.isExpand && !isExpanded.value
-    if (shouldShowLess) {
-      const maxItemsPerRow = Math.floor(24 / props.span) - 1
-      return filteredItems.slice(0, maxItemsPerRow)
-    }
-    return filteredItems
+  function getLabelWidth(item: SearchFormItem): string | number {
+    if (item.labelWidth) return item.labelWidth
+    if (typeof item.label !== 'string') return props.labelWidth
+    const px = Array.from(item.label).reduce(
+      (sum, ch) => sum + (/[\u4e00-\u9fa5]/.test(ch) ? 14 : 9),
+      0
+    )
+    // 预留冒号与右侧间距；夹在 40-120px，防止极短 label 贴太近、超长 label 挤掉控件
+    return `${Math.min(Math.max(px + 16, 40), 120)}px`
+  }
+
+  /**
+   * 单字段控件宽度覆盖。
+   * 默认宽度按控件类型给（见样式），只有 placeholder 明显偏长这类特例才需要单独放宽，
+   * 避免为了一个字段把所有输入框都撑宽、白白少放几项。
+   * 注意必须返回对象：:style 传字符串会被当成 cssText，'220px' 不是合法样式会整条失效。
+   */
+  function getItemWidth(item: SearchFormItem) {
+    if (!item.width) return undefined
+    return { width: typeof item.width === 'number' ? `${item.width}px` : item.width }
+  }
+
+  /**
+   * 全部可见表单项。收起态也全部渲染，由容器 max-height 裁剪——
+   * 这样一行能放几个由控件实际宽度决定，不再受固定栅格列数限制。
+   */
+  const formItems = computed(() => props.items.filter((item) => !item.hidden))
+
+  const itemsRef = ref<HTMLElement | null>(null)
+  const hiddenCount = ref(0)
+  const rowHeight = ref(0)
+  let rowObserver: ResizeObserver | null = null
+  let lastBodyWidth = 0
+
+  /** 按各表单项的 offsetTop 判断第一行之外的项 */
+  function measureRow() {
+    const box = itemsRef.value
+    if (!box) return
+    const items = Array.from(box.children) as HTMLElement[]
+    if (!items.length) return
+    const top0 = items[0].offsetTop
+    const overflowing = items.filter((el) => el.offsetTop > top0 + 1)
+    hiddenCount.value = overflowing.length
+    rowHeight.value = overflowing.length
+      ? overflowing[0].offsetTop - top0
+      : items[0].offsetHeight + 16
+  }
+
+  function scheduleMeasure() {
+    void nextTick(measureRow)
+  }
+
+  /** 容器宽度变化才重算，避免展开/收起引起的高度变化造成回调循环 */
+  function initRowObserver() {
+    window.addEventListener('resize', scheduleMeasure)
+    const body = itemsRef.value?.parentElement
+    if (!body || typeof ResizeObserver === 'undefined') return
+    lastBodyWidth = Math.round(body.getBoundingClientRect().width)
+    rowObserver = new ResizeObserver((entries) => {
+      const width = Math.round(entries[0].contentRect.width)
+      if (width === lastBodyWidth) return
+      lastBodyWidth = width
+      scheduleMeasure()
+    })
+    rowObserver.observe(body)
+  }
+
+  onMounted(() => {
+    void nextTick(() => {
+      measureRow()
+      initRowObserver()
+      requestAnimationFrame(measureRow)
+    })
+  })
+
+  onUnmounted(() => {
+    rowObserver?.disconnect()
+    window.removeEventListener('resize', scheduleMeasure)
   })
 
   /**
    * 是否应该显示展开/收起按钮
    */
-  const shouldShowExpandToggle = computed(() => {
-    const filteredItems = props.items.filter((item) => !item.hidden)
-    return (
-      !props.isExpand && props.showExpand && filteredItems.length > Math.floor(24 / props.span) - 1
-    )
-  })
+  const shouldShowExpandToggle = computed(
+    () => !props.isExpand && props.showExpand && hiddenCount.value > 0
+  )
 
   /**
    * 展开/收起按钮文本
@@ -502,78 +563,149 @@
   })
 
   // 解构 props 以便在模板中直接使用
-  const { span, gutter, labelPosition, labelWidth } = toRefs(props)
+  const { labelPosition } = toRefs(props)
 </script>
 
 <style lang="scss" scoped>
   .art-search-bar {
     padding: 15px 20px 0;
 
-    .action-column {
-      flex: 1;
-      max-width: 100%;
+    // label 宽度已按文案计算，这里兜底防止字体/缩放差异导致折行
+    :deep(.el-form-item__label) {
+      white-space: nowrap;
+    }
 
-      .action-buttons-wrapper {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: flex-end;
-        margin-bottom: 12px;
+    .art-search-body {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    // 表单项按内容宽度流式排列：一行放几个由控件宽度决定，不再固定列数
+    .art-search-items {
+      position: relative; // 子项 offsetTop 相对本容器，便于判断换行
+      display: flex;
+      flex: 1 1 auto;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      min-width: 0;
+      transition: max-height 0.2s ease;
+
+      &.is-collapsed {
+        max-height: var(--art-row-h, 48px);
+        overflow: hidden;
       }
 
-      .form-buttons {
-        display: flex;
-        gap: 8px;
+      :deep(.el-form-item) {
+        flex: 0 0 auto;
+        margin-right: 16px;
+        margin-bottom: 14px;
       }
 
-      .filter-toggle {
+      // 控件按类型给宽度：选择器短、输入框长、日期范围更长，
+      // 短控件省下来的空间就能多放一项
+      :deep(.el-form-item__content) {
+        min-width: 0;
+
+        > .el-input {
+          width: 195px;
+        }
+
+        > .el-select {
+          width: 145px;
+        }
+
+        > .el-input-number {
+          width: 125px;
+        }
+
+        > .el-cascader {
+          width: 160px;
+        }
+
+        // 单个日期/时间。
+        // 注意：范围选择器的根节点同样带 .el-input__wrapper，
+        // 若这里不加 :not 排除，两条规则会按权重（2 个类 > 1 个类）覆盖掉下面的范围宽度。
+        > .el-date-editor:not(
+            .el-date-editor--datetimerange,
+            .el-date-editor--daterange,
+            .el-date-editor--monthrange
+          ) {
+          width: 175px;
+        }
+
+        // 日期/时间范围要完整显示“开始日期 至 结束日期”，窄了会被截断
+        > .el-date-editor--daterange,
+        > .el-date-editor--datetimerange,
+        > .el-date-editor--monthrange {
+          width: 300px;
+        }
+
+        > .el-checkbox-group,
+        > .el-radio-group {
+          width: auto;
+        }
+      }
+    }
+
+    .action-buttons-wrapper {
+      display: flex;
+      flex: 0 0 auto;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      margin-bottom: 14px;
+    }
+
+    .form-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .filter-toggle {
+      display: flex;
+      align-items: center;
+      margin-left: 10px;
+      line-height: 32px;
+      color: var(--theme-color);
+      cursor: pointer;
+      transition: color 0.2s ease;
+
+      &:hover {
+        color: var(--ElColor-primary);
+      }
+
+      span {
+        font-size: 14px;
+        user-select: none;
+      }
+
+      .icon-wrapper {
         display: flex;
         align-items: center;
-        margin-left: 10px;
-        line-height: 32px;
-        color: var(--theme-color);
-        cursor: pointer;
-        transition: color 0.2s ease;
-
-        &:hover {
-          color: var(--ElColor-primary);
-        }
-
-        span {
-          font-size: 14px;
-          user-select: none;
-        }
-
-        .icon-wrapper {
-          display: flex;
-          align-items: center;
-          margin-left: 4px;
-          font-size: 14px;
-          transition: transform 0.2s ease;
-        }
+        margin-left: 4px;
+        font-size: 14px;
+        transition: transform 0.2s ease;
       }
     }
   }
 
-  // 响应式优化
+  // 响应式优化：窄屏下按钮独占一行，避免和筛选项抢宽度
   @media (width <= 768px) {
     .art-search-bar {
       padding: 16px 16px 0;
 
-      .action-column {
-        .action-buttons-wrapper {
-          flex-direction: column;
-          gap: 8px;
-          align-items: stretch;
+      .art-search-body {
+        flex-direction: column;
+        gap: 4px;
+      }
 
-          .form-buttons {
-            justify-content: center;
-          }
+      .action-buttons-wrapper {
+        justify-content: center;
+        width: 100%;
 
-          .filter-toggle {
-            justify-content: center;
-            margin-left: 0;
-          }
+        .filter-toggle {
+          margin-left: 0;
         }
       }
     }
