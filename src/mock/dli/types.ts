@@ -131,12 +131,83 @@ export interface ExamRecord {
   item: string
   center: string
   date: string
-  status: '已归档' | '待解析' | '解析中'
+  /** 检查资料处理状态 [批注 06/07] */
+  status: ExamProcessStatus
+  /** 资料来源：院内同步 / 授权上传 [批注 06] */
+  source: ExamSource
+  /** 识别结果是否已核对；核对后才能用于评估 [批注 03-3] */
+  verified: boolean
+  checkedBy: string
+  checkedAt: string
+  uploader: string
+  uploadedAt: string
+  attachment: ExamAttachment
+  /** AI 识别字段（检验/病理/病历类）[批注 06] */
+  recognitionFields: ExamRecognitionField[]
+  /** 核对时的人工修改留痕 [批注 06] */
+  modifyRecords: ExamModifyRecord[]
+  /** 资料流转日志 */
+  logs: ExamLog[]
+}
+
+/** 检查资料处理状态 [批注 06/07] */
+export type ExamProcessStatus = '待识别' | '识别中' | '识别失败' | '待核对' | '已核对归档'
+
+/** 资料来源 [批注 06] */
+export type ExamSource = '院内同步' | '授权上传'
+
+/** 检查附件文件 */
+export interface ExamAttachment {
+  name: string
+  type: string
+  size: string
+}
+
+/** AI 识别字段：原文 / 提取值 / 单位 / 参考范围 [批注 06] */
+export interface ExamRecognitionField {
+  name: string
+  raw: string
+  extracted: string
+  unit: string
+  range: string
+}
+
+/** 核对修改留痕 [批注 06] */
+export interface ExamModifyRecord {
+  id: string
+  field: string
+  before: string
+  after: string
+  operator: string
+  time: string
+}
+
+/** 检查资料流转日志 */
+export interface ExamLog {
+  id: string
+  action: string
+  operator: string
+  time: string
+  detail: string
 }
 
 /** 生物样本库 · 样本 */
 export type SampleType = '全血' | '血浆' | '血清' | '组织' | '尿液'
 export type SampleStatus = '已入库' | '待入库' | '已出库'
+
+/** 源库同步状态 [批注 07] */
+export type SyncStatus = '正常' | '待匹配' | '异常'
+
+/** 同意书状态（批注 03 / 16 / 患者App 共用同一状态）[批注 16] */
+export type ConsentStatus =
+  | '未发放'
+  | '待签署'
+  | '已签待核对'
+  | '核对通过'
+  | '需补充'
+  | '已拒绝'
+  | '撤回处理中'
+  | '已撤回'
 
 /** 样本处理环节（取样 / 处理 / 保存）SOP */
 export interface SopStep {
@@ -144,10 +215,17 @@ export interface SopStep {
   content: string
 }
 
-/** 样本流转记录 */
+/** 样本流转记录（六列：时间/类型/数量及单位/起始位置/目标位置/操作者）[批注 07] */
 export interface SampleFlowLog {
   time: string
   action: string
+  /** 数量及单位 */
+  quantity?: number
+  unit?: string
+  /** 起始位置 */
+  from?: string
+  /** 目标位置 */
+  to?: string
   operator: string
   remark: string
 }
@@ -175,6 +253,17 @@ export interface SampleRecord {
   operator: string
   /** 设备及位置 */
   device: string
+  /** SOP 名称：详情按源库已有值展示，不在页面补造 [批注 07] */
+  sopName: string
+  sopVersion: string
+  /** 源库系统 */
+  sourceSystem: string
+  /** 最近同步时间 */
+  lastSyncedAt: string
+  /** 源库同步状态 [批注 07] */
+  syncStatus: SyncStatus
+  /** 同步异常／待匹配说明 */
+  syncNote: string
   sop: SopStep[]
   flow: SampleFlowLog[]
 }
@@ -203,12 +292,32 @@ export interface SampleTestRecord {
   operator: string
   /** 结果录入时间 */
   recordedAt: string
+  /** 同批次关联样本 [批注 07] */
+  linkedSamples: Array<{
+    sampleId: string
+    patientId: string
+    center: string
+    type: SampleType
+    collectedAt: string
+    role: string
+  }>
+  /** 检测指标结果 */
+  indicators: Array<{ name: string; result: string; unit: string; range: string }>
   sop: SopStep[]
+  /** SOP 名称 / 版本 [批注 07] */
+  sopName: string
+  sopVersion: string
   qcReport: string
   /** 原始数据 */
   dataFile: string
+  /** 原始数据规模（GB）[批注 07] */
+  dataSizeGb: number
   /** 表达谱 */
   expression: string
+  sourceSystem: string
+  lastSyncedAt: string
+  syncStatus: SyncStatus
+  syncNote: string
 }
 
 /** 模型所属方向 */
@@ -218,20 +327,41 @@ export type ModelField = '早筛预警' | '早诊预警' | '转归预测'
 export type ModelMode = '纵向' | '横向'
 
 /** AI 模型 */
+/** 输入映射：模型输入项 / 系统字段 / 是否必需 / 默认映射 [批注 20] */
+export interface ModelInputMapping {
+  item: string
+  systemField: string
+  required: boolean
+  /** 可缺省仅指采用约定默认映射 [批注 20] */
+  defaultMapping: string
+}
+
 export interface AiModel {
   id: string
   name: string
-  /** 所属方向 */
+  /** 所属方向（模型用途：早筛预警/早诊预警/转归预测）[批注 20] */
   field: ModelField
-  /** 模型方式，未确定时为空 */
+  /** 模型版本 [批注 20] */
+  version: string
+  /** 模型方式：分析模式，纵向/横向；未确定时为空 [批注 20] */
   mode: ModelMode | ''
-  /** 纵向多选 / 横向单选的时间点 */
+  /** 评估时间点：纵向多选 / 横向单选，以模型支持范围及方案为准 [批注 20] */
   timePoints: string[]
-  /** 输入，可缺省 */
+  /** 输入要求 [批注 20] */
   input: string
-  /** 输出 */
+  /** 输出项 [批注 20] */
   output: string
-  /** 是否已接入模型服务 */
+  /** 输入映射 [批注 20] */
+  inputMappings: ModelInputMapping[]
+  /** 模型来源 [批注 20] */
+  source: string
+  /** 适用范围（接入后启停提示影响的中心/课题组范围）[批注 20] */
+  scope: string
+  /** 评价结果及来源；未评价不填固定准确率 [批注 20] */
+  evaluation: string
+  /** 配置版本：配置留版本，停用不删历史报告 [批注 20] */
+  configVersion: string
+  /** 是否已接入模型服务（接入状态与启用状态分开）[批注 20] */
   connected: boolean
   enabled: boolean
   updatedAt: string
@@ -455,7 +585,7 @@ export interface KnowledgePayload {
 
 export type McpStatus = '在线' | '离线' | '异常'
 
-/** MCP 服务（平台统一维护，仅可查看 / 测试 / 下载） */
+/** MCP 服务（平台统一维护，仅可查看 / 授权下载） [批注 21] */
 export interface McpItem {
   id: string
   name: string
@@ -464,10 +594,16 @@ export interface McpItem {
   /** 工具数 */
   tools: number
   description: string
+  /** 服务用途（详情概览展示） [批注 21] */
+  purpose: string
+  /** 适用范围（详情概览展示） [批注 21] */
+  scope: string
   status: McpStatus
   /** 连接延迟（ms） */
   latency: number
   calls30d: number
+  /** 最近调用时间（未接入为空串，展示「暂无」） [批注 21] */
+  lastCalledAt: string
   updatedAt: string
   maintainer: string
   endpoint: string
@@ -534,14 +670,19 @@ export interface ConnectivityResult {
 
 /* ---------------- LLM ---------------- */
 
-/** LLM 模型与 Token 余额 */
+/** LLM 服务与额度 [批注 22] */
 export interface LlmItem {
   id: string
   name: string
   vendor: string
   balance: number
   used: number
+  /** 计费 / 额度单位 [批注 22] */
   unit: string
+  /** 额度所属组织 [批注 22] */
+  quotaOrg: string
+  /** 数据更新时间 [批注 22] */
+  updatedAt: string
   status: '正常' | '余额预警' | '已停用'
   /** 模型标识 */
   model: string
@@ -582,13 +723,21 @@ export interface LlmAgentUsage {
   share: number
 }
 
-/** 充值记录 */
-export interface LlmRechargeRecord {
+/** LLM 分配记录（内部分配额度，非真实购买） [批注 22] */
+export interface LlmAllocateRecord {
   id: string
-  amount: number
-  tokens: number
-  operator: string
+  /** 所属模型 */
+  llmId: string
+  /** 操作时间 */
   time: string
+  /** 分配对象（中心 / 课题组） */
+  target: string
+  /** 分配数量 */
+  amount: number
+  /** 额度单位（Token / 万 Token） */
+  unit: 'Token' | '万 Token'
+  operator: string
+  /** 分配说明 */
   note: string
 }
 
@@ -603,7 +752,8 @@ export interface LlmOverview {
 /** LLM 详情 */
 export interface LlmDetail extends LlmItem {
   trend: LlmUsagePoint[]
-  recharges: LlmRechargeRecord[]
+  /** 分配记录 [批注 22] */
+  allocations: LlmAllocateRecord[]
   agentUsage: LlmAgentUsage[]
 }
 
@@ -718,6 +868,13 @@ export interface ResearchItem {
   members: number
   shared: boolean
   shareLevel: '平台' | '中心' | '课题组'
+  /** 共享内容 [批注 08] */
+  shareContents?: ResearchShareContentValue[]
+  shareTargets?: string[]
+  /** 实际可见范围说明 */
+  actualVisibleScope?: string
+  /** 项目详情编号 */
+  detailId?: string
   status: '进行中' | '已结题'
   updatedAt: string
 }
@@ -832,4 +989,140 @@ export interface WorkbenchStats {
   patientStatus: Array<{ status: string; count: number }>
   /** 近 7 日趋势 */
   trend: Array<{ date: string; patients: number; alerts: number }>
+}
+
+/* ---------------- 状态管理 · 自动化执行记录 [批注 09] ---------------- */
+
+export type AutomationTaskType = '资料同步' | '识别解析' | '模型评估' | '随访草稿生成'
+
+export type AutomationTaskStatus = '待执行' | '执行中' | '执行成功' | '执行失败' | '待补资料'
+
+export interface AutomationTask {
+  id: string
+  patientId: string
+  type: AutomationTaskType
+  /** 触发时间 */
+  triggeredAt: string
+  /** 触发来源：自动 / 人工 */
+  triggerSource: '自动' | '人工'
+  status: AutomationTaskStatus
+  /** 失败／缺项说明 */
+  note: string
+  /** 来源记录（关联原检查/患者记录描述） */
+  sourceRecord: string
+  /** 输入资料 */
+  inputs: string[]
+  /** 模型／规则版本 */
+  modelVersion: string
+  /** 关联结果说明 */
+  relatedResult: string
+  /** 可跳转的关联报告编号 */
+  relatedReportId?: string
+}
+
+/* ---------------- 患者管理 V2 · 档案 / 研究入组 [批注 01-04 / 03] ---------------- */
+
+/** 初始入口 [批注 02] */
+export type InitialEntry = '拟接受高危药物治疗' | '正在接受高危药物治疗' | '已确诊DLI'
+
+/** 当前阶段 [批注 02] */
+export type PatientStage = '治疗前' | '治疗中' | '诊断后'
+
+/** 研究入组状态 [批注 03] */
+export type EnrollStatus = '未申请' | '待核对' | '待确认' | '已入组' | '不符合' | '已退出'
+
+/** 入组条件核对结论 [批注 03] */
+export type CriteriaStatus = '符合' | '不符合' | '待核对'
+
+/** 同意书签署方式 [批注 16] */
+export type ConsentSignMethod = 'App签署' | '纸质签署'
+
+/** 研究共享内容 [批注 08] */
+export type ResearchShareContentValue = '项目概况' | '进度汇总' | '已确认研究结果'
+
+/** 入组条件清单条目 [批注 03/15] */
+export interface EnrollCriterion {
+  id: string
+  projectId: string
+  version: string
+  type: '纳入条件' | '排除条件'
+  content: string
+  basis: string
+  required: boolean
+}
+
+/** 入组条件逐项核对 [批注 03] */
+export interface CriterionCheck {
+  criterionId: string
+  met: '是' | '否' | '待确认'
+  note: string
+}
+
+/** 研究项目主数据（与 RESEARCHES 同源）[批注 03/15] */
+export interface ResearchProject {
+  id: string
+  name: string
+  groups: string[]
+  criteriaVersion: string
+}
+
+/** 患者研究入组记录 [批注 03] */
+export interface PatientEnrollment {
+  id: string
+  patientId: string
+  projectId: string
+  criteriaStatus: CriteriaStatus
+  criteriaVersion: string
+  checks: CriterionCheck[]
+  /** 同意书状态（与批注 16 同一枚举值）[批注 03] */
+  consentStatus: ConsentStatus
+  consentTemplateId: string
+  consentTemplateName: string
+  consentVersion: string
+  consentIssuedAt: string
+  consentDate: string
+  consentMethod: ConsentSignMethod | ''
+  consentFileName: string
+  consentCheckedBy: string
+  consentCheckedAt: string
+  consentCheckResult?: '通过' | '需补充'
+  consentNote: string
+  consentWithdrawReason: string
+  status: EnrollStatus
+  group: string
+  researchNo: string
+  enrollDate: string
+  groupDate: string
+  groupBasis: string
+  exitDate: string
+  exitReason: string
+  rejectReason: string
+  updatedAt: string
+}
+
+/** 患者扩展档案 [批注 01-04 / 02] */
+export interface PatientProfile {
+  patientId: string
+  initialEntry: InitialEntry
+  stage: PatientStage
+  stageConfirmed: boolean
+  diagnosisConfirmed: boolean
+  diagnosisDate: string
+  diagnosisBasis: string
+  stageUpdatedAt: string
+  stageNote: string
+  enrollments: PatientEnrollment[]
+}
+
+/** 患者管理 V2 列表行（含档案 / 入组扩展列）[批注 01-04] */
+export interface PatientRow extends WebPatient {
+  initialEntry: InitialEntry
+  stage: PatientStage
+  stageConfirmed: boolean
+  projectCount: number
+  projectSelected: boolean
+  selectedProjectName: string
+  selectedEnrollStatus: EnrollStatus
+  selectedGroup: string
+  selectedResearchNo: string
 }

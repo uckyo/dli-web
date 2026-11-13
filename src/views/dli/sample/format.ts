@@ -1,7 +1,13 @@
 /**
  * 生物样本 · 标签映射
  */
-import type { QcConclusion, SampleStatus, SampleTestStatus, VisibleScope } from '@/mock/dli/types'
+import type {
+  QcConclusion,
+  SampleStatus,
+  SampleTestStatus,
+  SyncStatus,
+  VisibleScope
+} from '@/mock/dli/types'
 
 type TagType = 'primary' | 'success' | 'warning' | 'danger' | 'info'
 
@@ -27,4 +33,11 @@ export const SCOPE_TAG: Record<VisibleScope, TagType> = {
   全平台: 'danger',
   本中心: 'warning',
   课题组: 'info'
+}
+
+/** 源库同步状态：异常 / 待匹配需在列表标识 [批注 07] */
+export const SYNC_STATUS_TAG: Record<SyncStatus, TagType> = {
+  正常: 'success',
+  异常: 'danger',
+  待匹配: 'warning'
 }

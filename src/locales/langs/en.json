@@ -246,7 +246,10 @@
         "llm": "LLM",
         "agent": "Agents"
       },
-      "assessment": "Assessment & Alerts",
+      "assessment": {
+        "title": "Assessment & Alerts",
+        "reportDetail": "Assessment Report Detail"
+      },
       "exam": "Examinations",
       "sample": {
         "title": "Biosamples",
@@ -254,6 +257,7 @@
         "test": "Tests"
       },
       "research": "Research",
+      "researchDetail": "Project Detail",
       "profile": "Profile",
       "status": "Automation",
       "followup": "Follow-up",
@@ -262,7 +266,7 @@
       "platform": {
         "title": "Platform Admin",
         "config": "Configuration",
-        "consent": "Consent Templates",
+        "consent": "Consent Forms",
         "fields": "Patient Fields",
         "code": "Coding Rules",
         "center": "Centers",
@@ -274,6 +278,7 @@
         "group": "Groups",
         "user": "Users",
         "fields": "Patient Fields (Authorized)",
+        "consent": "Consent Forms",
         "log": "System Logs"
       },
       "group": {
@@ -288,7 +293,6 @@
         "config": "Configuration",
         "platform": "Platforms",
         "user": "Users",
-        "backup": "Backup & Restore",
         "log": "System Logs"
       }
     },

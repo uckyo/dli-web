@@ -246,7 +246,10 @@
         "llm": "LLM 管理",
         "agent": "Agent 管理"
       },
-      "assessment": "评估预警",
+      "assessment": {
+        "title": "评估预警",
+        "reportDetail": "评估报告详情"
+      },
       "exam": "检查管理",
       "sample": {
         "title": "生物样本",
@@ -254,6 +257,7 @@
         "test": "检测管理"
       },
       "research": "研究管理",
+      "researchDetail": "项目详情",
       "profile": "个人中心",
       "status": "状态管理",
       "followup": "随访管理",
@@ -262,7 +266,7 @@
       "platform": {
         "title": "平台管理",
         "config": "基础配置",
-        "consent": "知情同意模板",
+        "consent": "知情同意书",
         "fields": "患者字段配置",
         "code": "编码规则配置",
         "center": "中心管理",
@@ -274,6 +278,7 @@
         "group": "课题组管理",
         "user": "用户管理",
         "fields": "患者字段配置（按授权）",
+        "consent": "同意书",
         "log": "系统日志"
       },
       "group": {
@@ -288,7 +293,6 @@
         "config": "基础配置",
         "platform": "平台管理",
         "user": "用户管理",
-        "backup": "备份恢复",
         "log": "系统日志"
       }
     },

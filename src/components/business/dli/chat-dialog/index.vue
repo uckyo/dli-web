@@ -148,6 +148,7 @@
           <p v-if="pending" class="flex items-center gap-2 text-xs text-g-500">
             <span class="i-ri:loader-4-line animate-spin" />{{ pendingText }}
           </p>
+          <slot name="after-messages" />
         </div>
 
         <!-- 输入区 -->

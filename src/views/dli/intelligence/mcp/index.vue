@@ -1,4 +1,4 @@
-<!-- DLI MCP 管理：平台统一维护，只读查看、连通性测试与下载 -->
+<!-- DLI MCP 管理：平台统一维护，只读查看与授权下载，不提供测试/新增/编辑/删除 [批注 21] -->
 <template>
   <div class="art-full-height overflow-y-auto pb-5">
     <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -48,24 +48,22 @@
       />
     </ElCard>
 
-    <McpDetailDrawer v-model="detailVisible" :mcp-id="activeMcpId" @refresh="handleDrawerRefresh" />
+    <McpDetailDrawer v-model="detailVisible" :mcp-id="activeMcpId" />
   </div>
 </template>
 
 <script setup lang="ts">
   import { ElButton, ElMessage, ElTag } from 'element-plus'
   import { useTable } from '@/hooks/core/useTable'
-  import {
-    fetchGetMcpDetail,
-    fetchGetMcpList,
-    fetchGetMcpOverview,
-    fetchTestMcp
-  } from '@/mock/dli/api'
+  import { fetchGetMcpDetail, fetchGetMcpList, fetchGetMcpOverview } from '@/mock/dli/api'
   import type { McpItem, McpOverview } from '@/mock/dli/types'
-  import { formatInt, formatLatency, MCP_STATUS_DOT } from '../format'
+  import { formatInt, MCP_STATUS_DOT } from '../format'
+  import { useIntelligenceRole } from '../useIntelligenceRole'
   import McpDetailDrawer from './modules/mcp-detail-drawer.vue'
 
   defineOptions({ name: 'DliIntelligenceMcp' })
+
+  const { isAdmin } = useIntelligenceRole()
 
   const overview = ref<McpOverview>({ services: 0, tools: 0, online: 0, calls30d: 0 })
 
@@ -144,18 +142,17 @@
         },
         {
           prop: 'protocol',
-          label: '协议',
-          width: 90,
+          label: '协议类型',
+          width: 100,
           formatter: (row: McpItem) =>
             h(ElTag, { type: PROTOCOL_TAG[row.protocol], effect: 'plain', size: 'small' }, () =>
               row.protocol.toUpperCase()
             )
         },
-        { prop: 'version', label: '版本', width: 90 },
-        { prop: 'tools', label: '工具数', width: 85, align: 'right' as const },
+        { prop: 'version', label: '服务版本', width: 100 },
         {
           prop: 'status',
-          label: '连接状态',
+          label: '服务状态',
           width: 105,
           formatter: (row: McpItem) =>
             h('div', { class: 'flex-c gap-2' }, [
@@ -164,24 +161,30 @@
             ])
         },
         {
-          prop: 'latency',
-          label: '延迟',
-          width: 85,
+          prop: 'calls30d',
+          label: '调用次数',
+          width: 105,
           align: 'right' as const,
-          formatter: (row: McpItem) => formatLatency(row.latency)
+          formatter: (row: McpItem) =>
+            h('span', { class: row.calls30d ? 'text-g-700' : 'text-g-400' }, [
+              row.calls30d ? formatInt(row.calls30d) : '暂无'
+            ])
         },
         {
-          prop: 'calls30d',
-          label: '近 30 天调用',
-          width: 115,
-          align: 'right' as const,
-          formatter: (row: McpItem) => formatInt(row.calls30d)
+          prop: 'lastCalledAt',
+          label: '最近调用时间',
+          width: 155,
+          formatter: (row: McpItem) =>
+            h(
+              'span',
+              { class: row.lastCalledAt ? 'text-g-700' : 'text-g-400' },
+              row.lastCalledAt || '暂无'
+            )
         },
-        { prop: 'updatedAt', label: '最近更新', width: 110 },
         {
           prop: 'operation',
           label: '操作',
-          width: 175,
+          width: 120,
           fixed: 'right' as const,
           align: 'center' as const,
           formatter: (row: McpItem) =>
@@ -191,16 +194,13 @@
                 { link: true, type: 'primary', onClick: () => openDetail(row) },
                 () => '详情'
               ),
-              h(
-                ElButton,
-                { link: true, type: 'primary', onClick: () => handleTest(row) },
-                () => '测试'
-              ),
-              h(
-                ElButton,
-                { link: true, type: 'primary', onClick: () => handleDownload(row) },
-                () => '下载'
-              )
+              isAdmin.value
+                ? h(
+                    ElButton,
+                    { link: true, type: 'primary', onClick: () => handleDownload(row) },
+                    () => '下载'
+                  )
+                : null
             ])
         }
       ]
@@ -226,51 +226,36 @@
     resetSearchParams()
   }
 
-  function handleDrawerRefresh() {
-    refreshSoft()
-    loadOverview()
-  }
-
   function openDetail(row: McpItem) {
     activeMcpId.value = row.id
     detailVisible.value = true
   }
 
-  async function handleTest(row: McpItem) {
-    const result = await fetchTestMcp(row.id)
-    if (result.ok) ElMessage.success(result.message)
-    else ElMessage.error(result.message)
-    await refreshSoft()
-    loadOverview()
-  }
-
   async function handleDownload(row: McpItem) {
-    const detail = await fetchGetMcpDetail(row.id)
-    const tools = detail.toolList.map((tool) => {
-      let schema: unknown = tool.schema
-      try {
-        schema = JSON.parse(tool.schema)
-      } catch {
-        schema = tool.schema
+    try {
+      const detail = await fetchGetMcpDetail(row.id)
+      const payload = {
+        id: detail.id,
+        name: detail.name,
+        protocol: detail.protocol,
+        version: detail.version,
+        endpoint: detail.endpoint,
+        authType: detail.authType,
+        tools: detail.toolList.map((tool) => ({
+          name: tool.name,
+          description: tool.description
+        }))
       }
-      return { name: tool.name, description: tool.description, schema }
-    })
-    const payload = {
-      id: detail.id,
-      name: detail.name,
-      protocol: detail.protocol,
-      version: detail.version,
-      endpoint: detail.endpoint,
-      authType: detail.authType,
-      tools
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${detail.name}-mcp.json`
+      link.click()
+      URL.revokeObjectURL(url)
+      ElMessage.success('服务描述文件已开始下载（不含密钥与凭据）')
+    } catch (error) {
+      ElMessage.error(`下载失败：${(error as Error)?.message ?? '服务详情获取异常'}`)
     }
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${detail.name}-mcp.json`
-    link.click()
-    URL.revokeObjectURL(url)
-    ElMessage.success('服务描述文件已下载（演示）')
   }
 </script>

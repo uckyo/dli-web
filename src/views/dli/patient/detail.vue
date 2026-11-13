@@ -1,10 +1,10 @@
-<!-- DLI 患者详情独立页面：患者概览 + 待核对上报 / 检查管理 / 样本管理 / 检测管理 / 安全事件 -->
+<!-- DLI 患者详情独立页面 [批注 01/02]：五页签 + 顶部阶段区 -->
 <template>
   <div ref="scroller" class="dli-detail art-full-height overflow-y-auto pb-5">
     <!-- 面包屑 -->
     <div class="dli-crumb">
       <ElButton link @click="goBack">
-        <ArtSvgIcon icon="ri:arrow-left-s-line" class="dli-back-icon" />返回患者列表
+        <ArtSvgIcon icon="ri:arrow-left-s-line" class="dli-back-icon" />返回
       </ElButton>
       <span class="dli-crumb-sep">/</span>
       <span>患者详情</span>
@@ -17,33 +17,75 @@
         <div class="dli-hero-id">
           <div class="dli-hero-title">
             <h1>{{ patient?.id ?? patientId }}</h1>
-            <ElTag v-if="patient" effect="light" :type="STATUS_TAG[patient.status]">
+            <ElTag v-if="profile" effect="light" type="primary">
+              当前阶段 {{ profile.stage }}
+            </ElTag>
+            <ElTag v-if="profile && !profile.stageConfirmed" effect="plain" type="warning">
+              阶段待医生确认
+            </ElTag>
+            <ElTag v-if="patient" effect="plain" :type="STATUS_TAG[patient.status]">
               {{ patient.status }}
             </ElTag>
-            <ElTag v-if="patient" effect="plain">{{ patient.group }}</ElTag>
-            <ElTag v-if="patient" effect="plain" :type="patient.enrolled ? 'success' : 'info'">
-              {{ patient.enrolled ? '已入组' : '仅建档' }}
-            </ElTag>
+            <ElTag v-if="profile" effect="plain">{{ profile.initialEntry }}</ElTag>
           </div>
           <p class="dli-hero-sub">
-            {{ patient?.researchNo ? `研究受试者编号 ${patient.researchNo}` : '尚未确认研究入组' }}
+            {{ profile?.diagnosisDate ? `诊断日期 ${profile.diagnosisDate}` : '暂无诊断日期' }}
+            <span class="dli-dot">·</span>
+            {{ profile?.diagnosisBasis || '暂无诊断依据摘要' }}
             <span class="dli-dot">·</span>
             {{ patient?.center ?? '—' }}
             <span class="dli-dot">·</span>
-            主管医生 {{ patient?.doctor ?? '—' }}
+            负责医生 {{ patient?.doctor ?? '—' }}
           </p>
         </div>
         <div class="dli-hero-actions">
-          <ElButton :disabled="!patient" @click="chatVisible = true">
-            <ArtSvgIcon icon="ri:chat-3-line" class="dli-btn-icon" />医患对话
-          </ElButton>
-          <ElButton :disabled="!patient" @click="historyVisible = true">
-            <ArtSvgIcon icon="ri:file-list-3-line" class="dli-btn-icon" />诊疗历程
-          </ElButton>
-          <ElButton @click="loadAll">
-            <ArtSvgIcon icon="ri:refresh-line" class="dli-btn-icon" />刷新
-          </ElButton>
+          <ElDropdown :disabled="!patient" trigger="click" @command="handleShortcut">
+            <ElButton> 快捷入口<ArtSvgIcon icon="ri:arrow-down-s-line" /> </ElButton>
+            <template #dropdown>
+              <ElDropdownMenu>
+                <ElDropdownItem command="chat">医患对话</ElDropdownItem>
+                <ElDropdownItem command="history">诊疗历程</ElDropdownItem>
+                <ElDropdownItem command="exam">检查资料</ElDropdownItem>
+                <ElDropdownItem command="sample">样本记录</ElDropdownItem>
+                <ElDropdownItem command="test">检测记录</ElDropdownItem>
+              </ElDropdownMenu>
+            </template>
+          </ElDropdown>
         </div>
+      </div>
+
+      <!-- 阶段区：确认后的阶段、诊断信息及阶段操作 [批注 02] -->
+      <div class="dli-stage-bar">
+        <div class="dli-stage-info">
+          <template v-if="profile?.diagnosisConfirmed">
+            诊断已确认 · {{ profile.stage }} · 生效 {{ profile.stageUpdatedAt || '—' }}
+            <span v-if="!hasReport" class="text-g-500">· 暂无报告</span>
+          </template>
+          <template v-else>
+            阶段 {{ profile?.stage ?? '—' }}
+            <span v-if="profile && !profile.stageConfirmed">（待医生核对确认）</span>
+            <span v-else-if="profile?.initialEntry === '已确诊DLI'">· 诊断结论待医生确认</span>
+          </template>
+        </div>
+        <ElButton v-if="isDoctor" @click="openStageDialog">更新阶段</ElButton>
+        <ElButton
+          v-if="isDoctor && profile?.initialEntry === '已确诊DLI' && !profile?.diagnosisConfirmed"
+          type="primary"
+          plain
+          @click="confirmDiagnosis"
+        >
+          确认诊断
+        </ElButton>
+        <ElButton v-if="profile?.diagnosisConfirmed && hasReport" @click="goReports">
+          查看诊断后评估
+        </ElButton>
+        <ElButton
+          v-if="profile?.diagnosisConfirmed && !hasReport && canManage"
+          @click="startAssessment"
+        >
+          发起评估
+        </ElButton>
+        <ElButton v-if="profile?.diagnosisConfirmed" @click="goFollowup">制定随访</ElButton>
       </div>
 
       <div v-if="patient" class="dli-metrics">
@@ -56,69 +98,97 @@
 
     <ElCard class="dli-card art-table-card dli-tab-card" shadow="never">
       <ElTabs v-model="activeTab" class="dli-tabs">
-        <ElTabPane label="检查管理" name="exam">
+        <ElTabPane label="基础资料" name="basic">
+          <BasicPanel
+            ref="basicRef"
+            :patient-id="patientId"
+            :patient="patient"
+            @edit="openEditBasic"
+          />
+        </ElTabPane>
+
+        <ElTabPane label="检查资料" name="exam">
           <div class="dli-pane dli-embed">
             <ExamView :key="patientId" :patient-id="patientId" />
           </div>
         </ElTabPane>
 
-        <ElTabPane label="样本管理" name="sample">
-          <div class="dli-pane dli-embed">
-            <SampleRecordView :key="patientId" :patient-id="patientId" />
-          </div>
+        <ElTabPane label="管理计划" name="plan">
+          <ManagementPanel :key="`plan-${patientId}`" :patient-id="patientId" />
         </ElTabPane>
 
-        <ElTabPane label="检测管理" name="test">
-          <div class="dli-pane dli-embed">
-            <SampleTestView :key="patientId" :patient-id="patientId" />
-          </div>
+        <ElTabPane label="研究入组" name="enrollment">
+          <EnrollmentPanel
+            :key="`enroll-${patientId}`"
+            :patient-id="patientId"
+            @go-consent="goConsent"
+          />
         </ElTabPane>
 
-        <ElTabPane
-          :label="`待核对上报${pendingReportCount ? '（' + pendingReportCount + '）' : ''}`"
-          name="report"
-        >
-          <div class="dli-pane dli-own">
-            <ArtTable :data="reportList" :columns="reportColumns" empty-text="暂无上报记录" />
-          </div>
-        </ElTabPane>
-
-        <ElTabPane label="安全事件" name="safety">
-          <div class="dli-pane dli-own">
-            <div class="dli-pane-bar">
-              <ElButton type="primary" @click="openSafetyDialog">
-                <ArtSvgIcon icon="ri:add-circle-line" class="dli-btn-icon" />登记事件
-              </ElButton>
-            </div>
-            <ArtTable :data="safetyList" :columns="safetyColumns" empty-text="暂无安全事件" />
-          </div>
+        <ElTabPane label="知情同意" name="consent">
+          <ConsentPanel
+            :key="`consent-${patientId}`"
+            :patient-id="patientId"
+            :focus-project-id="consentProjectId"
+          />
         </ElTabPane>
       </ElTabs>
     </ElCard>
 
-    <!-- 登记安全事件 -->
-    <ElDialog v-model="safetyDialogVisible" title="登记安全事件" width="440px" destroy-on-close>
-      <ElForm label-width="96px">
-        <ElFormItem label="事件类型">
-          <ElSelect v-model="safetyForm.type" class="w-full">
-            <ElOption v-for="item in SAFETY_TYPES" :key="item" :label="item" :value="item" />
+    <!-- 更新阶段 -->
+    <ElDialog v-model="stageDialogVisible" title="更新阶段" width="480px" destroy-on-close>
+      <ElForm label-width="110px">
+        <ElFormItem label="调整后阶段">
+          <ElSelect v-model="stageForm.stage" class="w-full">
+            <ElOption v-for="item in STAGE_OPTIONS" :key="item" :label="item" :value="item" />
           </ElSelect>
         </ElFormItem>
-        <ElFormItem label="级别">
-          <ElSelect v-model="safetyForm.level" class="w-full">
-            <ElOption v-for="item in SAFETY_LEVELS" :key="item" :label="item" :value="item" />
-          </ElSelect>
+        <ElFormItem label="阶段生效时间">
+          <ElDatePicker
+            v-model="stageForm.effectiveAt"
+            type="date"
+            value-format="YYYY-MM-DD"
+            class="w-full"
+          />
+        </ElFormItem>
+        <ElFormItem label="调整说明">
+          <ElInput v-model="stageForm.note" type="textarea" :rows="2" placeholder="说明调整原因" />
         </ElFormItem>
       </ElForm>
+      <div class="text-xs text-g-500">医生确认后写入诊疗历程，初始入口保持不变</div>
       <template #footer>
-        <ElButton @click="safetyDialogVisible = false">取消</ElButton>
-        <ElButton type="primary" @click="submitSafetyEvent">确认登记</ElButton>
+        <ElButton @click="stageDialogVisible = false">取消</ElButton>
+        <ElButton type="primary" :loading="stageBusy" @click="submitStage">医生确认</ElButton>
       </template>
     </ElDialog>
 
+    <!-- 编辑基础资料：复用建档弹窗编辑模式，保存后刷新详情 [批注 02] -->
+    <ArchiveDialog v-model="editVisible" :patient-id="patientId" @saved="handleBasicSaved" />
+
     <!-- 医患对话 / 诊疗历程：与患者列表页共用同一套抽屉 -->
-    <ChatDrawer v-model="chatVisible" :patient="patient" :readonly="!canReply" />
+    <ChatDrawer v-model="chatVisible" :patient="patient" :readonly="!canManage" />
     <HistoryDrawer v-model="historyVisible" :patient="patient" />
+
+    <!-- 样本 / 检测记录：复用原列表，不新增侧栏栏目；抽屉内切换不丢患者上下文 -->
+    <ElDrawer v-model="sampleDrawer" title="样本记录" size="72%">
+      <div class="dli-embed">
+        <SampleRecordView
+          :key="`sample-${patientId}`"
+          :patient-id="patientId"
+          @open-tests="handleOpenLinkedTests"
+        />
+      </div>
+    </ElDrawer>
+    <ElDrawer v-model="testDrawer" title="检测记录" size="72%">
+      <div class="dli-embed">
+        <SampleTestView
+          :key="`test-${patientId}`"
+          :patient-id="patientId"
+          :sample-id="linkedSampleId"
+          @clear-sample="linkedSampleId = ''"
+        />
+      </div>
+    </ElDrawer>
   </div>
 </template>
 
@@ -126,9 +196,15 @@
   import {
     ElButton,
     ElCard,
+    ElDatePicker,
     ElDialog,
+    ElDrawer,
+    ElDropdown,
+    ElDropdownItem,
+    ElDropdownMenu,
     ElForm,
     ElFormItem,
+    ElInput,
     ElMessage,
     ElOption,
     ElSelect,
@@ -136,23 +212,28 @@
     ElTabs,
     ElTag
   } from 'element-plus'
+  import { computed, onMounted, reactive, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
+  import { fetchGetPatientById } from '@/mock/dli/api'
   import {
-    fetchAddSafetyEvent,
-    fetchConfirmSafetyEvent,
-    fetchGetPatientById,
-    fetchGetPatientReports,
-    fetchGetPatientSafetyEvents,
-    fetchReviewPatientReport
-  } from '@/mock/dli/api'
-  import type { PatientReport, SafetyEvent, WebPatient } from '@/mock/dli/types'
-  import type { ColumnOption } from '@/types/component'
+    STAGE_OPTIONS,
+    fetchConfirmDiagnosis,
+    fetchGetPatientProfile,
+    fetchUpdatePatientStage,
+    hasDiagnosisReport
+  } from '@/mock/dli/patient-admin'
+  import type { PatientProfile, PatientStage, WebPatient } from '@/mock/dli/types'
   import { useUserStore } from '@/store/modules/user'
   import ExamView from '@/views/dli/exam/index.vue'
   import SampleRecordView from '@/views/dli/sample/record/index.vue'
   import SampleTestView from '@/views/dli/sample/test/index.vue'
   import ChatDrawer from './modules/chat-drawer.vue'
   import HistoryDrawer from './modules/history-drawer.vue'
+  import ArchiveDialog from './modules/archive-dialog.vue'
+  import BasicPanel from './modules/basic-panel.vue'
+  import ManagementPanel from './modules/management-panel.vue'
+  import EnrollmentPanel from './modules/enrollment-panel.vue'
+  import ConsentPanel from './modules/consent-panel.vue'
 
   defineOptions({ name: 'DliPatientDetail' })
 
@@ -161,13 +242,32 @@
   const userStore = useUserStore()
 
   const patientId = computed(() => String(route.params.id ?? ''))
-  const activeTab = ref('exam')
+  const activeTab = ref('basic')
   const scroller = ref<HTMLElement>()
   const chatVisible = ref(false)
   const historyVisible = ref(false)
+  const sampleDrawer = ref(false)
+  const testDrawer = ref(false)
+  /** 样本记录抽屉「关联检测」带入的样本编号 */
+  const linkedSampleId = ref('')
   const patient = ref<WebPatient>()
-  const reportList = ref<PatientReport[]>([])
-  const safetyList = ref<SafetyEvent[]>([])
+  const profile = ref<PatientProfile>()
+  const consentProjectId = ref('')
+  const basicRef = ref<{ load: () => Promise<void> }>()
+  const stageDialogVisible = ref(false)
+  /** 基础资料编辑弹窗（复用建档弹窗编辑模式） [批注 02] */
+  const editVisible = ref(false)
+  const stageBusy = ref(false)
+  const stageForm = reactive({
+    stage: '治疗前' as PatientStage,
+    effectiveAt: new Date().toISOString().slice(0, 10),
+    note: ''
+  })
+
+  const role = computed(() => userStore.getUserInfo.roles?.[0] ?? 'R_DOCTOR')
+  const isDoctor = computed(() => role.value === 'R_DOCTOR')
+  const canManage = computed(() => ['R_DOCTOR', 'R_ASSISTANT', 'R_NURSE'].includes(role.value))
+  const hasReport = computed(() => hasDiagnosisReport(patientId.value))
 
   const STATUS_TAG: Record<WebPatient['status'], 'success' | 'primary' | 'info' | 'warning'> = {
     待评估: 'warning',
@@ -176,121 +276,16 @@
     已结案: 'info'
   }
 
-  const SAFETY_TYPES = ['药物相关肝酶升高', '间质性肺病加重', '感染', '皮疹', '其他']
-  const SAFETY_LEVELS: Array<SafetyEvent['level']> = ['轻度', '中度', '重度']
-  const safetyDialogVisible = ref(false)
-  const safetyForm = reactive({
-    type: '药物相关肝酶升高',
-    level: '轻度' as SafetyEvent['level']
-  })
-
-  /** 待核对上报表格列（与项目 ArtTable 风格统一） */
-  const reportColumns: ColumnOption<PatientReport>[] = [
-    { prop: 'date', label: '上报日期', width: 130 },
-    { prop: 'type', label: '类型', width: 140 },
-    { prop: 'content', label: '内容', minWidth: 220, showOverflowTooltip: true },
-    {
-      prop: 'status',
-      label: '状态',
-      width: 110,
-      formatter: (row: PatientReport) =>
-        h(
-          ElTag,
-          {
-            type:
-              row.status === '已核对' ? 'success' : row.status === '已退回' ? 'danger' : 'warning',
-            effect: 'light'
-          },
-          () => row.status
-        )
-    },
-    {
-      prop: 'operation',
-      label: '操作',
-      width: 150,
-      formatter: (row: PatientReport) => {
-        if (row.status === '待核对') {
-          return h('div', { class: 'flex-c gap-1' }, [
-            h(
-              ElButton,
-              { link: true, type: 'primary', onClick: () => reviewReport(row, '已核对') },
-              () => '通过'
-            ),
-            h(
-              ElButton,
-              { link: true, type: 'danger', onClick: () => reviewReport(row, '已退回') },
-              () => '退回'
-            )
-          ])
-        }
-        return h('span', { class: 'text-xs text-g-500' }, () => row.reviewer)
-      }
-    }
-  ]
-
-  /** 安全事件表格列 */
-  const safetyColumns: ColumnOption<SafetyEvent>[] = [
-    { prop: 'date', label: '日期', width: 130 },
-    { prop: 'type', label: '事件类型', minWidth: 190, showOverflowTooltip: true },
-    { prop: 'level', label: '级别', width: 100 },
-    {
-      prop: 'confirmedBy',
-      label: '医生确认',
-      width: 130,
-      formatter: (row: SafetyEvent) =>
-        h(ElTag, { type: row.confirmed ? 'success' : 'warning', effect: 'light' }, () =>
-          row.confirmed ? row.confirmedBy : '待确认'
-        )
-    },
-    {
-      prop: 'operation',
-      label: '操作',
-      width: 110,
-      formatter: (row: SafetyEvent) => {
-        if (!row.confirmed && isDoctor.value) {
-          return h(
-            ElButton,
-            { link: true, type: 'primary', onClick: () => confirmSafetyEvent(row) },
-            () => '确认'
-          )
-        }
-        if (!row.confirmed) {
-          return h('span', { class: 'text-xs text-g-500' }, () => '仅医生可确认')
-        }
-        return h('span', { class: 'text-xs text-g-500' }, () => '已确认')
-      }
-    }
-  ]
-
-  const role = computed(() => userStore.getUserInfo.roles?.[0] ?? 'R_DOCTOR')
-  const isDoctor = computed(() => role.value === 'R_DOCTOR')
-  const canReply = computed(() => ['R_DOCTOR', 'R_ASSISTANT', 'R_NURSE'].includes(role.value))
-  const operatorName = computed(() => {
-    const info = userStore.getUserInfo as {
-      userName?: string
-      username?: string
-      nickName?: string
-    }
-    return info.userName ?? info.username ?? info.nickName ?? '当前医护'
-  })
-
-  const pendingReportCount = computed(
-    () => reportList.value.filter((item) => item.status === '待核对').length
-  )
-
   /** 概览指标：身份字段按 G1 不展示 */
   const metrics = computed(() => {
     const p = patient.value
     if (!p) return []
     return [
       { label: '所属中心', value: p.center },
-      { label: '主管医生', value: p.doctor },
-      { label: '入组入口', value: p.enrollEntry || '未入组' },
-      { label: '入组日期', value: p.enrollDate || '—' },
-      {
-        label: '知情同意',
-        value: p.consent.signed ? `${p.consent.version} · ${p.consent.date}` : '未签署'
-      },
+      { label: '负责医生', value: p.doctor },
+      { label: '初始入口', value: profile.value?.initialEntry ?? '—' },
+      { label: '管理状态', value: p.status },
+      { label: '入组状态', value: p.enrolled ? '已入组' : '仅建档' },
       { label: '最近更新', value: p.lastUpdate }
     ]
   })
@@ -300,60 +295,114 @@
   }
 
   function goBack() {
-    router.push('/dli/patient')
+    // 从哪里进来回哪里：有应用内上一页则返回，直接打开 URL 时兜底回患者列表
+    const back = (window.history.state as { back?: string } | null)?.back
+    if (back) {
+      router.back()
+    } else {
+      router.push('/dli/patient')
+    }
   }
 
   async function loadAll() {
     const id = patientId.value
     if (!id) return
     try {
-      const [detail, reports, events] = await Promise.all([
+      const [detail, detailProfile] = await Promise.all([
         fetchGetPatientById(id),
-        fetchGetPatientReports(id),
-        fetchGetPatientSafetyEvents(id)
+        fetchGetPatientProfile(id)
       ])
       patient.value = detail
-      reportList.value = reports
-      safetyList.value = events
+      profile.value = detailProfile
     } catch (error) {
       showError(error)
     }
   }
 
-  async function reviewReport(row: PatientReport, action: '已核对' | '已退回') {
+  function openStageDialog() {
+    stageForm.stage = profile.value?.stage ?? '治疗前'
+    stageForm.effectiveAt = new Date().toISOString().slice(0, 10)
+    stageForm.note = ''
+    stageDialogVisible.value = true
+  }
+
+  /** 基础资料右上角编辑入口：复用建档弹窗编辑模式 [批注 02] */
+  function openEditBasic() {
+    editVisible.value = true
+  }
+
+  /** 编辑保存成功：关闭弹窗并刷新当前详情（基础资料 + 概览指标 + 阶段区） */
+  async function handleBasicSaved() {
+    await loadAll()
+    await basicRef.value?.load()
+    ElMessage.success('基础资料已更新')
+  }
+
+  async function submitStage() {
+    stageBusy.value = true
     try {
-      const updated = await fetchReviewPatientReport(row.id, action, operatorName.value)
-      const target = reportList.value.find((item) => item.id === row.id)
-      if (target) Object.assign(target, updated)
-      ElMessage.success(`上报已${action}`)
+      await fetchUpdatePatientStage(patientId.value, { ...stageForm }, role.value)
+      stageDialogVisible.value = false
+      await loadAll()
+      await basicRef.value?.load()
+      ElMessage.success('阶段已更新并写入诊疗历程')
     } catch (error) {
       showError(error)
+    } finally {
+      stageBusy.value = false
     }
   }
 
-  function openSafetyDialog() {
-    safetyDialogVisible.value = true
-  }
-
-  async function submitSafetyEvent() {
+  async function confirmDiagnosis() {
     try {
-      await fetchAddSafetyEvent(patientId.value, { ...safetyForm })
-      safetyDialogVisible.value = false
-      safetyList.value = await fetchGetPatientSafetyEvents(patientId.value)
-      ElMessage.success('安全事件已登记，等待医生确认')
+      await fetchConfirmDiagnosis(patientId.value, role.value)
+      await loadAll()
+      await basicRef.value?.load()
+      ElMessage.success('医生已确认诊断结论')
     } catch (error) {
       showError(error)
     }
   }
 
-  async function confirmSafetyEvent(row: SafetyEvent) {
-    try {
-      await fetchConfirmSafetyEvent(patientId.value, row.id, operatorName.value)
-      safetyList.value = await fetchGetPatientSafetyEvents(patientId.value)
-      ElMessage.success('医生已确认该安全事件')
-    } catch (error) {
-      showError(error)
+  function goReports() {
+    router.push({ name: 'DliAssessmentReports', query: { patientId: patientId.value } })
+  }
+
+  function startAssessment() {
+    router.push({
+      name: 'DliAssessmentReports',
+      query: { patientId: patientId.value, openManual: '1' }
+    })
+  }
+
+  function goFollowup() {
+    router.push({ name: 'DliFollowup', query: { patientId: patientId.value } })
+  }
+
+  /** 从研究入组行内「办理知情同意」切页签并带项目 */
+  function goConsent(projectId: string) {
+    consentProjectId.value = projectId
+    activeTab.value = 'consent'
+  }
+
+  /** 右上角快捷入口：复用原有抽屉 / 列表，不新增侧栏栏目 */
+  function handleShortcut(command: unknown) {
+    const key = String(command)
+    if (key === 'chat') chatVisible.value = true
+    else if (key === 'history') historyVisible.value = true
+    else if (key === 'exam') activeTab.value = 'exam'
+    else if (key === 'sample') sampleDrawer.value = true
+    else if (key === 'test') {
+      linkedSampleId.value = ''
+      testDrawer.value = true
     }
+  }
+
+  /** 样本记录行内「关联检测」：在原抽屉内切换，不跳路由 [批注 07] */
+  function handleOpenLinkedTests(sampleId: string) {
+    linkedSampleId.value = sampleId
+    sampleDrawer.value = false
+    testDrawer.value = true
   }
 
   /** 切换 Tab 回到顶部，避免停在上一页的滚动位置 */
@@ -364,13 +413,21 @@
   watch(
     patientId,
     () => {
-      activeTab.value = 'exam'
       chatVisible.value = false
       historyVisible.value = false
-      loadAll()
+      sampleDrawer.value = false
+      testDrawer.value = false
+      linkedSampleId.value = ''
+      consentProjectId.value = ''
+      void loadAll()
     },
     { immediate: true }
   )
+
+  onMounted(() => {
+    const tab = route.query.tab
+    if (typeof tab === 'string' && tab) activeTab.value = tab
+  })
 </script>
 
 <style lang="scss">
@@ -573,6 +630,23 @@
     height: auto !important;
     padding-bottom: 0 !important;
     overflow: visible !important;
+  }
+
+  /* 阶段区：批注 02 新增，不改动上方既有 hero 样式 */
+  .dli-stage-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 12px 20px 14px;
+    border-top: 1px solid var(--art-gray-200);
+  }
+
+  .dli-stage-info {
+    flex: 0 1 auto;
+    margin-right: auto;
+    font-size: 12px;
+    color: var(--art-gray-600);
   }
 
   @media (width <= 1180px) {

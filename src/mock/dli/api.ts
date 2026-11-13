@@ -13,6 +13,7 @@ import {
   AGENT_VERSIONS,
   CENTER_MAP_DATA,
   CENTERS_DATA,
+  AUTOMATION_TASKS,
   EXAM_AUTOMATION,
   EXAMS,
   FOLLOWUP_AUTOMATION,
@@ -23,7 +24,7 @@ import {
   KNOWLEDGE_LOGS,
   LLMS,
   LLM_AGENT_USAGE,
-  LLM_RECHARGES,
+  LLM_ALLOCATES,
   LLM_TRENDS,
   MCP_CONFIG,
   MCP_LOGS,
@@ -47,6 +48,7 @@ import {
   TREND_DATA,
   USERS_DATA
 } from './data'
+import { WARNING_TICKETS, appendSystemLog } from './blueprint/data'
 import type {
   AgentDetail,
   AgentItem,
@@ -54,10 +56,18 @@ import type {
   AgentPayload,
   AgentSession,
   AiModel,
+  AutomationTask,
+  AutomationTaskStatus,
+  AutomationTaskType,
   ConnectivityResult,
   EnrollEntry,
+  ExamAttachment,
   ExamCategory,
+  ExamModifyRecord,
+  ExamProcessStatus,
+  ExamRecognitionField,
   ExamRecord,
+  ExamSource,
   GroupDoctor,
   KnowledgeChangeLog,
   KnowledgeDetail,
@@ -85,6 +95,7 @@ import type {
   SkillOverview,
   SkillPayload,
   StaffItem,
+  SyncStatus,
   UserType,
   WarnLevel,
   WebPatient,
@@ -126,6 +137,8 @@ export interface ExamQueryParams {
   size?: number
   keyword?: string
   category?: ExamCategory | ''
+  source?: ExamSource | ''
+  status?: ExamProcessStatus | ''
   /** 患者详情页嵌入模式：只返回该患者的检查资料 */
   patientId?: string
 }
@@ -160,11 +173,14 @@ export async function fetchGetWorkbench(role: WebRoleCode): Promise<WorkbenchSta
     return { status, count }
   })
 
+  /** 工作台样本 / 检测指标与生物样本库同源，不再硬编码 [批注 07] */
   const stats: WorkbenchStats = {
     patientTotal,
     examTotal: 1864,
-    sampleTotal: 742,
-    dataVolume: 126.8,
+    sampleTotal: SAMPLES.length,
+    dataVolume: Number(
+      (SAMPLE_TESTS.reduce((sum, item) => sum + item.dataSizeGb, 0) / 1000).toFixed(1)
+    ),
     earlyScreen: { count: 46, total: 231, accuracy: 0.912 },
     earlyDiagnosis: { count: 28, total: 64, accuracy: 0.883 },
     outcome: [
@@ -326,7 +342,9 @@ export interface EnrollCheckItem {
 /** 同步核对逻辑（供核对与确认入组共用） */
 function checkEnrollment(id: string, entry: EnrollEntry): EnrollCheckItem[] {
   const patient = requirePatient(id)
-  const baseline = EXAMS.filter((item) => item.patientId === id && item.status === '已归档').length
+  const baseline = EXAMS.filter(
+    (item) => item.patientId === id && item.status === '已核对归档'
+  ).length
   return [
     { label: '患者档案已建立', passed: Boolean(patient.id), detail: patient.id },
     {
@@ -380,7 +398,27 @@ export async function fetchAddBaselineExam(patientId: string): Promise<ExamRecor
     item: '基线血常规',
     center: patient.center,
     date: todayStr(),
-    status: '已归档'
+    status: '已核对归档',
+    source: '院内同步',
+    verified: true,
+    checkedBy: '医护',
+    checkedAt: todayStr(),
+    uploader: '院内系统同步',
+    uploadedAt: todayStr(),
+    attachment: { name: `基线血常规_${patientId}.pdf`, type: 'PDF 报告', size: '1.0 MB' },
+    recognitionFields: [
+      { name: '白细胞计数', raw: 'WBC 6.8', extracted: '6.8', unit: '×10⁹/L', range: '3.5–9.5' }
+    ],
+    modifyRecords: [],
+    logs: [
+      {
+        id: `EL-${Date.now()}`,
+        action: '补录基线资料',
+        operator: '医护',
+        time: todayStr(),
+        detail: '入组核对时补录'
+      }
+    ]
   }
   EXAMS.unshift(record)
   return record
@@ -448,10 +486,12 @@ export async function fetchGetPatientSamples(patientId: string): Promise<SampleR
   return SAMPLES.filter((item) => item.patientId === patientId).map((item) => ({ ...item }))
 }
 
-/** 关联检测记录（与 P07 检测管理同源，按患者编号匹配） */
+/** 关联检测记录（与 P07 检测管理同源）：只保留该患者有权查看的样本-患者对应关系 [批注 07] */
 export async function fetchGetPatientSampleTests(patientId: string): Promise<SampleTestRecord[]> {
   await delay()
-  return SAMPLE_TESTS.filter((item) => item.patientId === patientId).map((item) => ({ ...item }))
+  return SAMPLE_TESTS.map((item) => scopeTestToPatient(item, patientId)).filter(
+    (item): item is SampleTestRecord => Boolean(item)
+  )
 }
 
 /** 核对关联记录：更新原记录状态，不重复建档 */
@@ -459,8 +499,9 @@ export async function fetchVerifyLinkedRecord(recordId: string): Promise<ExamRec
   await delay()
   const record = EXAMS.find((item) => item.id === recordId)
   if (!record) throw new Error('关联记录不存在')
-  if (record.status === '已归档') throw new Error('该记录已归档，无需重复核对')
-  record.status = '已归档'
+  if (record.status === '已核对归档') throw new Error('该记录已归档，无需重复核对')
+  record.status = '已核对归档'
+  record.verified = true
   return { ...record }
 }
 
@@ -593,6 +634,8 @@ export async function fetchGetExamList(
   await delay()
   let list = EXAMS.filter((item) => !params.category || item.category === params.category)
   if (params.patientId) list = list.filter((item) => item.patientId === params.patientId)
+  if (params.source) list = list.filter((item) => item.source === params.source)
+  if (params.status) list = list.filter((item) => item.status === params.status)
   if (params.keyword) {
     const keyword = params.keyword.trim().toLowerCase()
     list = list.filter(
@@ -605,57 +648,336 @@ export async function fetchGetExamList(
   return paginate(list, params.current, params.size)
 }
 
-/** 生物样本列表 */
-export async function fetchGetSampleList(params: {
+/* ---------------- 检查资料共享领域：检查管理与患者详情引用同一份 EXAMS [批注 03-1] ---------------- */
+
+const examNowStr = () => new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-')
+const examId = (prefix: string) => `${prefix}-${Date.now()}-${Math.round(Math.random() * 1000)}`
+
+function requireExam(id: string): ExamRecord {
+  const record = EXAMS.find((item) => item.id === id)
+  if (!record) throw new Error('资料不存在')
+  return record
+}
+
+function addExamLog(record: ExamRecord, action: string, operator: string, detail = '') {
+  record.logs.push({ id: examId('EL'), action, operator, time: examNowStr(), detail })
+}
+
+/** 只有报告图片 / PDF 类按需识别；影像原图走影像查看入口 [批注 03-3] */
+const REPORT_CATEGORIES: ExamCategory[] = ['病理', '检验', '病历']
+export function isReportExam(category: ExamCategory): boolean {
+  return REPORT_CATEGORIES.includes(category)
+}
+
+export interface ExamUploadPayload {
+  patientId: string
+  category: ExamCategory
+  item: string
+  center: string
+  date: string
+  attachment: ExamAttachment
+  operator: string
+}
+
+/** 授权上传：直接写入共享数据源，两个入口立即可见 [批注 03-1] */
+export async function fetchCreateExamUpload(payload: ExamUploadPayload): Promise<ExamRecord> {
+  await delay()
+  const patient = requirePatient(payload.patientId)
+  const record: ExamRecord = {
+    id: examId('EX'),
+    patientId: payload.patientId,
+    patientName: patient.name,
+    category: payload.category,
+    item: payload.item,
+    center: payload.center,
+    date: payload.date,
+    // 影像类无需识别，直接进入人工核对；报告类先待识别
+    status: isReportExam(payload.category) ? '待识别' : '待核对',
+    source: '授权上传',
+    verified: false,
+    checkedBy: '',
+    checkedAt: '',
+    uploader: payload.operator,
+    uploadedAt: examNowStr(),
+    attachment: payload.attachment,
+    recognitionFields: [],
+    modifyRecords: [],
+    logs: []
+  }
+  addExamLog(
+    record,
+    '授权上传',
+    payload.operator,
+    `${payload.attachment.name} · ${payload.category}`
+  )
+  EXAMS.unshift(record)
+  return { ...record }
+}
+
+/** 资料详情：附件 + 上传 / 核对记录，已有字段复用 [批注 03-2] */
+export async function fetchGetExamDetail(id: string): Promise<ExamRecord> {
+  await delay(120)
+  return { ...requireExam(id) }
+}
+
+/** 重试识别：失败后重新识别，不补造缺失字段值 [批注 03-3] */
+export async function fetchRetryExamRecognition(id: string, operator: string): Promise<ExamRecord> {
+  await delay(400)
+  const record = requireExam(id)
+  if (!isReportExam(record.category)) throw new Error('影像原图不参与字段识别，请使用影像查看入口')
+  record.status = '待核对'
+  addExamLog(record, '重试识别', operator, '识别完成，等待人工核对')
+  return { ...record }
+}
+
+/** 人工录入：仅留痕，字段由医护自行填写，缺失值不自动填充 [批注 03-3] */
+export async function fetchManualExamEntry(id: string, operator: string): Promise<ExamRecord> {
+  await delay(120)
+  const record = requireExam(id)
+  addExamLog(record, '人工录入', operator, '切换人工录入模式')
+  return { ...record }
+}
+
+export interface ExamConfirmPayload {
+  fields: ExamRecognitionField[]
+  modifyRecords: ExamModifyRecord[]
+  operator: string
+}
+
+/**
+ * 确认核对完成：写回共享数据 + 联动预警 sourceVerified
+ * 识别结果核对后才能用于评估 [批注 03-3 / G7]
+ */
+export async function fetchConfirmExamRecognition(
+  id: string,
+  payload: ExamConfirmPayload
+): Promise<ExamRecord> {
+  await delay()
+  const record = requireExam(id)
+  if (record.verified) throw new Error('该资料已核对，无需重复操作')
+  if (isReportExam(record.category)) {
+    const missing = payload.fields.filter((field) => !field.extracted.trim() || !field.raw.trim())
+    if (missing.length || payload.fields.length === 0) {
+      throw new Error('存在未核对的识别字段，请重试识别或人工录入，不得补造缺失内容')
+    }
+  }
+  record.recognitionFields = payload.fields
+  record.modifyRecords = payload.modifyRecords
+  record.verified = true
+  record.checkedBy = payload.operator
+  record.checkedAt = examNowStr()
+  record.status = '已核对归档'
+  addExamLog(record, '核对完成', payload.operator, '识别结果已核对，可用于评估')
+
+  // 同一患者因识别未核对而暂缓的预警，核对后同步放行 [批注 03-3]
+  const linked = WARNING_TICKETS.filter(
+    (item) =>
+      item.patientId === record.patientId &&
+      !item.sourceVerified &&
+      item.trigger.includes('识别结果未核对')
+  )
+  for (const warning of linked) {
+    warning.sourceVerified = true
+    warning.records.push({
+      id: examId('DR'),
+      operator: payload.operator,
+      role: '医护',
+      action: `检查资料 ${record.id} 识别结果已核对，可用于评估`,
+      createdAt: examNowStr()
+    })
+    addExamLog(record, '核对结果同步预警', payload.operator, warning.id)
+  }
+  return { ...record }
+}
+
+/* -------------------------------------------------------------------------- */
+/* P07 生物样本 · 样本管理 / 检测管理 [批注 07]                                 */
+/* -------------------------------------------------------------------------- */
+
+/** 样本列表查询参数 */
+export interface SampleQueryParams {
   current?: number
   size?: number
   keyword?: string
-  /** 患者详情页嵌入模式：只返回该患者的样本 */
+  sampleId?: string
   patientId?: string
-}): Promise<Api.Common.PaginatedResponse<SampleRecord>> {
+  center?: string
+  type?: SampleRecord['type'] | ''
+  collectDateRange?: string[] | ''
+  status?: SampleRecord['status'] | ''
+  syncStatus?: SyncStatus | ''
+}
+
+/** 检测列表查询参数 */
+export interface SampleTestQueryParams {
+  current?: number
+  size?: number
+  keyword?: string
+  testId?: string
+  /** 样本管理「关联检测」跳转带入 */
+  sampleId?: string
+  patientId?: string
+  type?: SampleTestRecord['type'] | ''
+  batch?: string
+  testDateRange?: string[] | ''
+  status?: SampleTestRecord['status'] | ''
+}
+
+function matchKeyword(value: string, keyword: string): boolean {
+  return value.toLowerCase().includes(keyword.trim().toLowerCase())
+}
+
+/** 日期范围筛选：valueFormat=YYYY-MM-DD，与 YYYY-MM-DD HH:mm 的前 10 位比较 */
+function withinDateRange(value: string, range?: string[] | ''): boolean {
+  if (!Array.isArray(range) || range.length < 2 || !range[0] || !range[1]) return true
+  const date = value.slice(0, 10)
+  return date >= range[0] && date <= range[1]
+}
+
+/** 患者详情嵌入模式：批次内只保留该患者的样本，不把其他患者带出来 [批注 07] */
+function scopeTestToPatient(
+  record: SampleTestRecord,
+  patientId: string
+): SampleTestRecord | undefined {
+  const links = record.linkedSamples.filter((item) => item.patientId === patientId)
+  if (!links.length) return undefined
+  return {
+    ...record,
+    linkedSamples: links.map((item) => ({ ...item })),
+    sampleId: links[0].sampleId,
+    patientId
+  }
+}
+
+/** 生物样本列表 */
+export async function fetchGetSampleList(
+  params: SampleQueryParams
+): Promise<Api.Common.PaginatedResponse<SampleRecord>> {
   await delay()
   let list = [...SAMPLES]
-  if (params.patientId) list = list.filter((item) => item.patientId === params.patientId)
-  if (params.keyword) {
-    const keyword = params.keyword.trim().toLowerCase()
+  const { patientId, sampleId, center, type, status, syncStatus, collectDateRange, keyword } =
+    params
+  if (patientId) list = list.filter((item) => item.patientId === patientId)
+  if (sampleId) list = list.filter((item) => matchKeyword(item.id, sampleId))
+  if (center) list = list.filter((item) => item.center === center)
+  if (type) list = list.filter((item) => item.type === type)
+  if (status) list = list.filter((item) => item.status === status)
+  if (syncStatus) list = list.filter((item) => item.syncStatus === syncStatus)
+  list = list.filter((item) => withinDateRange(item.collectedAt, collectDateRange))
+  if (keyword) {
     list = list.filter(
       (item) =>
-        item.id.toLowerCase().includes(keyword) ||
-        item.name.includes(keyword) ||
-        item.patientId.toLowerCase().includes(keyword)
+        matchKeyword(item.id, keyword) ||
+        matchKeyword(item.name, keyword) ||
+        matchKeyword(item.patientId, keyword)
     )
   }
-  return paginate(list, params.current, params.size)
+  return paginate(
+    list.map((item) => ({ ...item })),
+    params.current,
+    params.size
+  )
 }
 
 /** 按编号读取样本（检测详情关联样本） */
 export async function fetchGetSampleById(id: string): Promise<SampleRecord | undefined> {
   await delay(120)
-  return SAMPLES.find((item) => item.id === id)
+  const sample = SAMPLES.find((item) => item.id === id)
+  return sample ? { ...sample } : undefined
 }
 
 /** 样本检测列表 */
-export async function fetchGetSampleTestList(params: {
-  current?: number
-  size?: number
-  keyword?: string
-  /** 患者详情页嵌入模式：只返回该患者的检测 */
-  patientId?: string
-}): Promise<Api.Common.PaginatedResponse<SampleTestRecord>> {
+export async function fetchGetSampleTestList(
+  params: SampleTestQueryParams
+): Promise<Api.Common.PaginatedResponse<SampleTestRecord>> {
   await delay()
   let list = [...SAMPLE_TESTS]
-  if (params.patientId) list = list.filter((item) => item.patientId === params.patientId)
-  if (params.keyword) {
-    const keyword = params.keyword.trim().toLowerCase()
+  const { patientId, testId, sampleId, type, batch, testDateRange, status, keyword } = params
+  if (patientId) {
+    list = list
+      .map((item) => scopeTestToPatient(item, patientId))
+      .filter((item): item is SampleTestRecord => Boolean(item))
+  }
+  if (testId) list = list.filter((item) => matchKeyword(item.id, testId))
+  if (sampleId) {
     list = list.filter(
       (item) =>
-        item.id.toLowerCase().includes(keyword) ||
-        item.item.includes(keyword) ||
-        item.sampleId.toLowerCase().includes(keyword) ||
-        item.patientId.toLowerCase().includes(keyword)
+        matchKeyword(item.sampleId, sampleId) ||
+        item.linkedSamples.some((link) => matchKeyword(link.sampleId, sampleId))
     )
   }
-  return paginate(list, params.current, params.size)
+  if (type) list = list.filter((item) => item.type === type)
+  if (batch) list = list.filter((item) => matchKeyword(item.batch, batch))
+  if (status) list = list.filter((item) => item.status === status)
+  list = list.filter((item) => withinDateRange(item.testedAt, testDateRange))
+  if (keyword) {
+    list = list.filter(
+      (item) =>
+        matchKeyword(item.id, keyword) ||
+        matchKeyword(item.item, keyword) ||
+        matchKeyword(item.batch, keyword) ||
+        matchKeyword(item.sampleId, keyword) ||
+        item.linkedSamples.some((link) => matchKeyword(link.sampleId, keyword))
+    )
+  }
+  return paginate(
+    list.map((item) => ({
+      ...item,
+      linkedSamples: item.linkedSamples.map((link) => ({ ...link }))
+    })),
+    params.current,
+    params.size
+  )
+}
+
+/** 按编号读取检测记录（同步处理后刷新详情用） */
+export async function fetchGetSampleTestById(id: string): Promise<SampleTestRecord | undefined> {
+  await delay(120)
+  const record = SAMPLE_TESTS.find((item) => item.id === id)
+  return record
+    ? { ...record, linkedSamples: record.linkedSamples.map((link) => ({ ...link })) }
+    : undefined
+}
+
+/** 同步故障处理动作：仅系统管理员可用，处理后状态恢复「正常」并写系统日志 [批注 07] */
+export type SampleSyncAction = '标记已核对' | '重新同步'
+
+export async function fetchHandleSampleSync(input: {
+  kind: 'sample' | 'test'
+  id: string
+  action: SampleSyncAction
+  operator: string
+  role: string
+  note?: string
+}): Promise<SampleRecord | SampleTestRecord> {
+  await delay(180)
+  if (input.role !== 'R_SYS') throw new Error('仅系统管理员可处理源库同步故障')
+  const target: SampleRecord | SampleTestRecord | undefined =
+    input.kind === 'sample'
+      ? SAMPLES.find((item) => item.id === input.id)
+      : SAMPLE_TESTS.find((item) => item.id === input.id)
+  if (!target) throw new Error('同步记录不存在')
+  if (target.syncStatus === '正常') throw new Error('该记录同步状态正常，无需处理')
+  if (input.action === '标记已核对' && !input.note?.trim()) {
+    throw new Error('标记已核对需填写核对说明')
+  }
+  const before = target.syncStatus
+  target.syncStatus = '正常'
+  target.lastSyncedAt = examNowStr()
+  target.syncNote =
+    input.action === '重新同步'
+      ? `已重新从源库同步（原状态：${before}）`
+      : `已人工核对：${input.note?.trim() ?? ''}`
+  appendSystemLog({
+    category: '重要数据',
+    action: `生物样本同步${input.action}`,
+    operator: input.operator,
+    role: input.role,
+    scope: input.kind === 'sample' ? '样本管理' : '检测管理',
+    target: input.id,
+    detail: `${before} → 正常；${target.syncNote}；未自动写入评估或研究数据`
+  })
+  return { ...target }
 }
 
 /** 模型列表 */
@@ -664,34 +986,97 @@ export async function fetchGetModels(): Promise<AiModel[]> {
   return [...MODELS]
 }
 
-/** 启停模型 */
-export async function fetchToggleModel(id: string, enabled: boolean): Promise<void> {
+/** 启停模型：未接入不可启用；接入后操作提示影响的中心/课题组范围 [批注 20] */
+export async function fetchToggleModel(
+  id: string,
+  enabled: boolean,
+  role = 'R_PLATFORM'
+): Promise<void> {
   await delay(150)
   const model = MODELS.find((item) => item.id === id)
-  if (model) model.enabled = enabled
+  if (!model) return
+  if (enabled && !model.connected) throw new Error('模型未接入，不可启用')
+  if (role !== 'R_PLATFORM') throw new Error('仅平台管理员及获明确授权的角色可配置模型')
+  model.enabled = enabled
+  appendSystemLog({
+    category: '配置变更',
+    action: enabled ? '启用模型' : '停用模型',
+    operator: '平台管理员',
+    role,
+    scope: '全平台',
+    objectType: '模型配置',
+    objectId: model.id,
+    target: `${model.name} ${model.version}`,
+    detail: enabled
+      ? `启用后影响范围：${model.scope || '全部适用中心/课题组'}；Web 与 App 使用同一接入状态`
+      : '停用不删历史报告，仅停止新评估'
+  })
 }
 
-/** 新建模型 */
+/** 新建模型：接入状态默认未接入，现阶段仅完成 UI 占位 [批注 20] */
 export async function fetchCreateModel(payload: Omit<AiModel, 'id' | 'updatedAt'>): Promise<void> {
   await delay(300)
   const nextId =
     MODELS.reduce((max, item) => Math.max(max, Number(item.id.split('-')[1]) || 0), 0) + 1
-  MODELS.unshift({
+  const created: AiModel = {
     ...payload,
     id: `M-${String(nextId).padStart(3, '0')}`,
+    connected: payload.connected ?? false,
+    enabled: payload.connected && payload.enabled ? payload.enabled : false,
+    configVersion: 'V1.0',
     updatedAt: new Date().toISOString().slice(0, 10)
+  }
+  MODELS.unshift(created)
+  appendSystemLog({
+    category: '配置变更',
+    action: '新建模型',
+    operator: '平台管理员',
+    role: 'R_PLATFORM',
+    scope: '全平台',
+    objectType: '模型配置',
+    objectId: created.id,
+    target: `${created.name} ${created.version}`,
+    detail: `用途：${created.field}；接入状态：${created.connected ? '已接入' : '未接入'}`
   })
 }
 
-/** 保存模型 */
+/** 保存模型配置：必需输入项不能缺省；配置留版本 [批注 20] */
 export async function fetchSaveModel(payload: AiModel): Promise<void> {
   await delay(300)
+  const missing = (payload.inputMappings ?? []).filter(
+    (row) => row.required && !row.systemField.trim()
+  )
+  if (missing.length)
+    throw new Error(
+      `模型必需输入项「${missing.map((row) => row.item).join('、')}」未映射系统字段，不能保存`
+    )
   const index = MODELS.findIndex((item) => item.id === payload.id)
   if (index > -1) {
-    MODELS[index] = payload
+    const prev = MODELS[index]
+    const versionBumped = bumpConfigVersion(prev.configVersion)
+    MODELS[index] = { ...payload, configVersion: versionBumped }
+    appendSystemLog({
+      category: '配置变更',
+      action: '更新模型配置',
+      operator: '平台管理员',
+      role: 'R_PLATFORM',
+      scope: '全平台',
+      objectType: '模型配置',
+      objectId: payload.id,
+      target: `${payload.name} ${payload.version}`,
+      detail: `配置版本 ${prev.configVersion} → ${versionBumped}；停用不删历史报告`,
+      beforeContent: `配置版本：${prev.configVersion}`,
+      afterContent: `配置版本：${versionBumped}`
+    })
     return
   }
-  MODELS.unshift(payload)
+  MODELS.unshift({ ...payload, configVersion: 'V1.0' })
+}
+
+function bumpConfigVersion(version: string): string {
+  const match = version.match(/^V(\d+)\.(\d+)$/)
+  if (!match) return 'V1.1'
+  return `V${match[1]}.${Number(match[2]) + 1}`
 }
 
 /* ------------------------------ 智能管理 ------------------------------ */
@@ -1271,7 +1656,7 @@ export async function fetchGetLlmDetail(id: string): Promise<LlmDetail> {
   return {
     ...llm,
     trend: [...(LLM_TRENDS[id] ?? [])],
-    recharges: LLM_RECHARGES.filter((record) => record.note.includes(llm.name)),
+    allocations: LLM_ALLOCATES.filter((record) => record.llmId === id),
     agentUsage: [...(LLM_AGENT_USAGE[id] ?? [])]
   }
 }
@@ -1294,33 +1679,82 @@ export async function fetchGetLlmUsageTrend(): Promise<LlmUsagePoint[]> {
   })
 }
 
-/** 启停 LLM */
-export async function fetchToggleLlm(id: string, enabled: boolean): Promise<void> {
+/** 启停 LLM（仅授权管理员 [批注 22]） */
+export async function fetchToggleLlm(
+  id: string,
+  enabled: boolean,
+  role = 'R_PLATFORM'
+): Promise<void> {
   await delay(200)
+  if (role !== 'R_PLATFORM' && role !== 'R_SYS') {
+    throw new Error('仅明确获授权的管理员可启停模型服务')
+  }
   const llm = LLMS.find((item) => item.id === id)
   if (!llm) return
   llm.status = enabled ? (llm.balance < 120000 ? '余额预警' : '正常') : '已停用'
   llm.connected = enabled
   llm.lastCheckedAt = `${todayStr()} ${new Date().toTimeString().slice(0, 5)}`
+  appendSystemLog({
+    category: '配置变更',
+    action: enabled ? '启用模型服务' : '停用模型服务',
+    operator: '当前管理员',
+    role,
+    scope: '全平台',
+    objectType: '模型服务',
+    objectId: llm.id,
+    target: llm.name,
+    detail: `影响范围：依赖「${llm.name}」的全部智能体${enabled ? '恢复可用' : '将不可用'}；剩余额度 ${llm.balance} ${llm.unit}`
+  })
 }
 
-/** 充值（金额按输入单价换算为 Token） */
-export async function fetchRechargeLlm(id: string, amount: number, note = ''): Promise<number> {
+/** 内部分配额度（非真实购买 [批注 22]） */
+export interface LlmAllocatePayload {
+  target: string
+  amount: number
+  unit: 'Token' | '万 Token'
+  note: string
+  role?: string
+}
+
+export async function fetchAllocateLlmQuota(
+  id: string,
+  payload: LlmAllocatePayload
+): Promise<void> {
   await delay(360)
+  const role = payload.role ?? 'R_PLATFORM'
+  if (role !== 'R_PLATFORM' && role !== 'R_SYS') {
+    throw new Error('仅明确获授权的管理员可分配模型额度')
+  }
   const llm = LLMS.find((item) => item.id === id)
-  if (!llm) return 0
-  const tokens = Math.round((amount / Math.max(llm.priceIn, 0.0001)) * 1000)
+  if (!llm) throw new Error('模型不存在')
+  const amount = Math.round(payload.amount * 100) / 100
+  if (!payload.target.trim()) throw new Error('请填写分配对象')
+  if (!(amount > 0)) throw new Error('分配数量必须大于 0')
+  const tokens = payload.unit === '万 Token' ? Math.round(amount * 10000) : Math.round(amount)
   llm.balance += tokens
   if (llm.status !== '已停用') llm.status = '正常'
-  LLM_RECHARGES.unshift({
-    id: `LR-${Date.now()}`,
+  llm.updatedAt = `${todayStr()} ${new Date().toTimeString().slice(0, 5)}`
+  LLM_ALLOCATES.unshift({
+    id: `LA-${Date.now()}`,
+    llmId: id,
+    time: llm.updatedAt,
+    target: payload.target.trim(),
     amount,
-    tokens,
-    operator: '当前管理员',
-    time: `${todayStr()} ${new Date().toTimeString().slice(0, 5)}`,
-    note: note ? `${llm.name} · ${note}` : `${llm.name} 充值`
+    unit: payload.unit,
+    operator: role === 'R_SYS' ? '系统管理员' : '平台管理员',
+    note: payload.note.trim()
   })
-  return tokens
+  appendSystemLog({
+    category: '配置变更',
+    action: '分配模型额度',
+    operator: role === 'R_SYS' ? '系统管理员' : '平台管理员',
+    role,
+    scope: '全平台',
+    objectType: '模型服务',
+    objectId: llm.id,
+    target: llm.name,
+    detail: `分配对象「${payload.target.trim()}」，数量 ${amount} ${payload.unit}；${payload.note.trim() || '无说明'}`
+  })
 }
 
 /** 更新 LLM 参数与告警阈值 */
@@ -1571,12 +2005,26 @@ export async function fetchGetResearchList(params: {
   current?: number
   size?: number
   keyword?: string
-  /** 仅查看共享项目（管理端） */
+  /** 仅查看共享项目（管理端）；本人创建 / 本组织授权项目即使未共享也可见 */
   onlyShared?: boolean
+  viewerName?: string
+  viewerOrg?: string
+  status?: ResearchItem['status'] | ''
+  shareLevel?: ResearchItem['shareLevel'] | ''
 }): Promise<Api.Common.PaginatedResponse<ResearchItem>> {
   await delay()
   let list = [...RESEARCHES]
-  if (params.onlyShared) list = list.filter((item) => item.shared)
+  if (params.onlyShared) {
+    const org = params.viewerOrg?.split(' · ')[0] ?? ''
+    list = list.filter(
+      (item) =>
+        item.shared || item.owner === params.viewerName || (org.length > 0 && item.center === org)
+    )
+  }
+  if (params.status) list = list.filter((item) => item.status === params.status)
+  if (params.shareLevel) {
+    list = list.filter((item) => item.shared && item.shareLevel === params.shareLevel)
+  }
   if (params.keyword) {
     const keyword = params.keyword.trim()
     list = list.filter(
@@ -1587,6 +2035,13 @@ export async function fetchGetResearchList(params: {
   return paginate(list, params.current, params.size)
 }
 
+/** 按研究编号读取列表行，供项目详情顶部与共享弹窗复用 */
+export async function fetchGetResearchById(id: string): Promise<ResearchItem | undefined> {
+  await delay(80)
+  const research = RESEARCHES.find((item) => item.id === id)
+  return research ? structuredClone(research) : undefined
+}
+
 /** 新建研究项目 */
 export async function fetchCreateResearch(
   payload: Pick<
@@ -1595,16 +2050,23 @@ export async function fetchCreateResearch(
   >
 ): Promise<void> {
   await delay(400)
+  const id = `R-2026-${String(RESEARCHES.length + 4).padStart(3, '0')}`
   RESEARCHES.unshift({
     ...payload,
-    id: `R-2026-${String(RESEARCHES.length + 4).padStart(3, '0')}`,
+    id,
+    shareTargets: [payload.center],
+    shareContents: payload.shared ? ['项目概况', '进度汇总'] : [],
+    actualVisibleScope: payload.shared
+      ? `${payload.shareLevel}内可见项目概况 / 进度汇总`
+      : '仅项目成员可见',
+    detailId: id,
     members: 1,
     status: '进行中',
     updatedAt: new Date().toISOString().slice(0, 10)
   })
 }
 
-/** 更新研究共享设置 */
+/** 更新研究共享设置（旧接口，保留兼容） */
 export async function fetchUpdateResearchShare(
   id: string,
   shared: boolean,
@@ -1617,6 +2079,42 @@ export async function fetchUpdateResearchShare(
     research.shareLevel = shareLevel
     research.updatedAt = new Date().toISOString().slice(0, 10)
   }
+}
+
+export interface ResearchShareInput {
+  shared: boolean
+  shareLevel: ResearchItem['shareLevel']
+  shareTargets: string[]
+  shareContents: NonNullable<ResearchItem['shareContents']>
+  actualVisibleScope: string
+  operator: string
+  role: string
+}
+
+/** 更新研究共享设置并留痕 [批注 12]：保存关闭共享才收回访问 */
+export async function fetchUpdateResearchShareV2(
+  id: string,
+  input: ResearchShareInput
+): Promise<ResearchItem> {
+  await delay(240)
+  const research = RESEARCHES.find((item) => item.id === id)
+  if (!research) throw new Error('研究项目不存在')
+  research.shared = input.shared
+  research.shareLevel = input.shareLevel
+  research.shareTargets = [...input.shareTargets]
+  research.shareContents = [...input.shareContents]
+  research.actualVisibleScope = input.actualVisibleScope
+  research.updatedAt = new Date().toISOString().slice(0, 10)
+  appendSystemLog({
+    category: '权限变更',
+    action: input.shared ? '更新研究共享设置' : '取消研究共享',
+    operator: input.operator,
+    role: input.role,
+    scope: research.center,
+    target: research.id,
+    detail: input.actualVisibleScope
+  })
+  return structuredClone(research)
 }
 
 /** 人员列表 */
@@ -1653,6 +2151,71 @@ export async function fetchGetAutomation() {
     exam: [...EXAM_AUTOMATION],
     followup: [...FOLLOWUP_AUTOMATION]
   }
+}
+
+/* ---------------- 状态管理 · 执行记录 [批注 09] ---------------- */
+
+/** 执行记录筛选：患者编号 / 任务类型 / 触发时间范围 / 执行状态 [批注 09] */
+export interface AutomationTaskQueryParams {
+  patientId?: string
+  type?: AutomationTaskType | ''
+  timeRange?: string[]
+  status?: AutomationTaskStatus | ''
+}
+
+export async function fetchGetAutomationTasks(
+  params: AutomationTaskQueryParams = {}
+): Promise<AutomationTask[]> {
+  await delay(220)
+  let list = [...AUTOMATION_TASKS]
+  if (params.patientId) list = list.filter((item) => item.patientId.includes(params.patientId!))
+  if (params.type) list = list.filter((item) => item.type === params.type)
+  if (params.timeRange?.length === 2)
+    list = list.filter((item) => {
+      const date = item.triggeredAt.slice(0, 10)
+      return date >= params.timeRange![0] && date <= params.timeRange![1]
+    })
+  if (params.status) list = list.filter((item) => item.status === params.status)
+  return list.map((item) => ({ ...item, inputs: [...item.inputs] }))
+}
+
+/** 医生确认重新评估：待补资料 / 执行失败 → 执行中，同一来源记录版本不重复调用 [批注 09] */
+export async function fetchRerunAutomationTask(
+  id: string,
+  operator: string
+): Promise<AutomationTask> {
+  await delay(260)
+  const item = AUTOMATION_TASKS.find((row) => row.id === id)
+  if (!item) throw new Error('执行记录不存在')
+  if (item.status === '执行成功' || item.status === '执行中') {
+    throw new Error('该任务已成功或正在执行，无需重新评估')
+  }
+  item.status = '执行中'
+  item.note = ''
+  item.relatedResult = `${item.relatedResult}；医生已确认重新评估`
+  appendSystemLog({
+    category: '重要数据',
+    action: '确认重新评估（执行记录）',
+    operator,
+    role: 'R_DOCTOR',
+    scope: '状态管理',
+    objectType: '执行记录',
+    objectId: id,
+    target: item.patientId,
+    detail: `来源记录：${item.sourceRecord}；同一来源记录版本不重复调用`
+  })
+  return { ...item, inputs: [...item.inputs] }
+}
+
+/** 补充资料：待补资料 → 执行中（前端同时跳原检查或患者记录）[批注 09] */
+export async function fetchSupplementAutomationTask(id: string): Promise<AutomationTask> {
+  await delay(200)
+  const item = AUTOMATION_TASKS.find((row) => row.id === id)
+  if (!item) throw new Error('执行记录不存在')
+  if (item.status !== '待补资料') throw new Error('仅待补资料任务可补充')
+  item.status = '执行中'
+  item.note = '资料已补充，重新进入执行队列'
+  return { ...item, inputs: [...item.inputs] }
 }
 
 /* ------------------------------ 管理端：中心 / 课题组 ------------------------------ */
@@ -1773,7 +2336,7 @@ export async function fetchGetUserList(
   return paginate(list, params.current, params.size)
 }
 
-/** 新增用户 */
+/** 新增用户 [批注 19] */
 export async function fetchAddUser(payload: Omit<WebUserItem, 'id' | 'createdAt'>): Promise<void> {
   await delay(300)
   USERS_DATA.push({
@@ -1781,20 +2344,57 @@ export async function fetchAddUser(payload: Omit<WebUserItem, 'id' | 'createdAt'
     id: `MU-${9000 + USERS_DATA.length}`,
     createdAt: new Date().toISOString().slice(0, 10)
   })
+  appendSystemLog({
+    category: '权限变更',
+    action: '新增用户',
+    operator: '当前管理员',
+    role: 'R_PLATFORM',
+    scope: '全平台',
+    objectType: '用户账号',
+    objectId: payload.phone,
+    target: `${payload.type} ${payload.phone}`,
+    detail: '新增账号，待激活后可登录'
+  })
 }
 
-/** 启用 / 停用用户 */
+/** 启用 / 停用用户：停用终止会话并保留历史 [批注 19] */
 export async function fetchToggleUser(id: string, status: WebUserItem['status']): Promise<void> {
   await delay(200)
   const user = USERS_DATA.find((item) => item.id === id)
-  if (user) user.status = status
+  if (user) {
+    user.status = status
+    appendSystemLog({
+      category: '权限变更',
+      action: status === '已停用' ? '停用用户账号' : '启用用户账号',
+      operator: '当前管理员',
+      role: 'R_PLATFORM',
+      scope: '全平台',
+      objectType: '用户账号',
+      objectId: user.id,
+      target: `${user.type} ${user.id}`,
+      detail: status === '已停用' ? '停用终止会话并保留历史，接口执行同样权限' : '账号恢复登录'
+    })
+  }
 }
 
-/** 删除用户（仅平台管理端可调用） */
+/** 删除用户（仅平台管理端可调用）[批注 19] */
 export async function fetchDeleteUser(id: string): Promise<void> {
   await delay(250)
   const index = USERS_DATA.findIndex((item) => item.id === id)
-  if (index > -1) USERS_DATA.splice(index, 1)
+  if (index > -1) {
+    const [removed] = USERS_DATA.splice(index, 1)
+    appendSystemLog({
+      category: '权限变更',
+      action: '删除用户账号',
+      operator: '当前管理员',
+      role: 'R_PLATFORM',
+      scope: '全平台',
+      objectType: '用户账号',
+      objectId: id,
+      target: `${removed.type} ${id}`,
+      detail: '有业务记录的账号以停用保留关联，删除仅限无业务记录账号'
+    })
+  }
 }
 
 /* ------------------------------ 管理端：课题组医生 ------------------------------ */

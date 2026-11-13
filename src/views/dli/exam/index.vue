@@ -1,6 +1,7 @@
-<!-- DLI 检查管理：影像 / 病理 / 检验 / 病历 / 其他 -->
+<!-- DLI 检查管理：影像 / 病理 / 检验 / 病历 / 其他 [批注 03] -->
 <template>
   <div class="art-full-height overflow-y-auto pb-5">
+    <!-- 患者详情页嵌入模式不显示筛选栏 -->
     <ArtSearchBar
       v-if="!props.patientId"
       v-model="searchParams"
@@ -12,9 +13,10 @@
     <ElCard class="art-table-card">
       <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
         <template #left>
-          <ElButton type="primary" @click="openUpload">
+          <ElButton v-if="canManage" type="primary" @click="openUpload">
             <ArtSvgIcon icon="ri:upload-cloud-2-line" class="mr-1" />授权上传
           </ElButton>
+          <ElButton v-else plain @click="requestDataPermission">申请数据权限</ElButton>
         </template>
       </ArtTableHeader>
 
@@ -28,80 +30,156 @@
       />
     </ElCard>
 
-    <!-- 授权上传 -->
-    <ElDialog v-model="uploadVisible" title="授权上传" width="480px" destroy-on-close>
-      <ElForm label-width="96px">
+    <!-- 授权上传：附件 + 完整资料字段 [批注 03-1] -->
+    <ElDialog v-model="uploadVisible" title="授权上传" width="560px" destroy-on-close>
+      <ElForm label-width="100px">
+        <ElFormItem label="资料附件">
+          <ElUpload
+            drag
+            action="#"
+            :auto-upload="false"
+            :show-file-list="false"
+            accept=".pdf,.jpg,.jpeg,.png,.dcm"
+            :on-change="handleFileChange"
+          >
+            <div class="py-3">
+              <ArtSvgIcon icon="ri:upload-cloud-2-line" class="text-3xl text-g-400" />
+              <p class="mt-2 text-sm text-g-700">
+                {{ uploadForm.attachment.name || '将文件拖到此处，或点击选择' }}
+              </p>
+              <p class="mt-1 text-xs text-g-500">支持 PDF / 图片 / DICOM，演示环境仅记录附件信息</p>
+            </div>
+          </ElUpload>
+        </ElFormItem>
         <ElFormItem label="资料分类">
           <ElSelect v-model="uploadForm.category" class="w-full" placeholder="选择资料分类">
             <ElOption v-for="item in CATEGORY_OPTIONS" :key="item" :label="item" :value="item" />
           </ElSelect>
         </ElFormItem>
-        <ElFormItem label="资料名称">
-          <ElInput v-model="uploadForm.name" maxlength="40" placeholder="请输入资料名称" />
+        <ElFormItem label="项目／名称">
+          <ElInput v-model="uploadForm.item" maxlength="40" placeholder="请输入项目／名称" />
         </ElFormItem>
         <ElFormItem label="患者编号">
           <ElInput
             v-model="uploadForm.patientId"
             maxlength="30"
-            placeholder="如 DLI-2026-0347"
+            placeholder="如 DLI-2026-0012"
             :disabled="!!props.patientId"
+          />
+        </ElFormItem>
+        <ElFormItem label="所属中心">
+          <ElSelect v-model="uploadForm.center" class="w-full" placeholder="选择所属中心">
+            <ElOption v-for="item in CENTER_OPTIONS" :key="item" :label="item" :value="item" />
+          </ElSelect>
+        </ElFormItem>
+        <ElFormItem label="检查／资料日期">
+          <ElDatePicker
+            v-model="uploadForm.date"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择日期"
+            class="w-full"
           />
         </ElFormItem>
       </ElForm>
       <template #footer>
         <ElButton @click="uploadVisible = false">取消</ElButton>
-        <ElButton type="primary" @click="submitUpload">确认上传</ElButton>
+        <ElButton type="primary" :loading="uploading" @click="submitUpload">确认上传</ElButton>
       </template>
     </ElDialog>
 
-    <!-- 脱敏查看：仅展示患者编号等非身份字段 -->
-    <ElDialog v-model="maskVisible" title="脱敏查看" width="440px">
-      <div v-if="maskRow" class="space-y-2 text-sm">
-        <div class="flex-cb"
-          ><span class="text-g-500">患者编号</span
-          ><span class="font-medium text-g-900">{{ maskRow.patientId }}</span></div
-        >
-        <div class="flex-cb"
-          ><span class="text-g-500">检查项目</span><span>{{ maskRow.item }}</span></div
-        >
-        <div class="flex-cb"
-          ><span class="text-g-500">资料分类</span><span>{{ maskRow.category }}</span></div
-        >
-        <div class="flex-cb"
-          ><span class="text-g-500">所属中心</span><span>{{ maskRow.center }}</span></div
-        >
-        <div class="flex-cb"
-          ><span class="text-g-500">检查日期</span><span>{{ maskRow.date }}</span></div
-        >
-        <div class="flex-cb"
-          ><span class="text-g-500">来源</span
-          ><span>{{ sourceMap[maskRow.id] ?? '院内同步' }}</span></div
-        >
+    <!-- 资料详情：脱敏字段 + 附件 + 上传 / 核对记录 [批注 03-2] -->
+    <ElDrawer v-model="detailVisible" title="资料详情" size="620px" destroy-on-close>
+      <template v-if="detailRow">
+        <ElDescriptions :column="2" border size="small" class="mb-4">
+          <ElDescriptionsItem label="资料编号">{{ detailRow.id }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="患者编号">{{ detailRow.patientId }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="资料分类">{{ detailRow.category }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="项目／名称">{{ detailRow.item }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="所属中心">{{ detailRow.center }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="检查／资料日期">{{ detailRow.date }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="来源">{{ detailRow.source }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="处理状态">{{ detailRow.status }}</ElDescriptionsItem>
+        </ElDescriptions>
+
+        <div class="mb-2 text-sm font-medium text-g-800">附件</div>
+        <div class="mb-4 flex-cb rounded-lg border border-full-d px-3 py-2">
+          <div class="text-sm">
+            <div class="text-g-900">{{ detailRow.attachment.name }}</div>
+            <div class="mt-1 text-xs text-g-500">
+              {{ detailRow.attachment.type }} · {{ detailRow.attachment.size }}
+            </div>
+          </div>
+          <ElButton link type="primary" @click="previewAttachment(detailRow)">
+            {{ detailRow.category === '影像' ? '影像查看入口' : '查看附件' }}
+          </ElButton>
+        </div>
+
+        <div class="mb-2 text-sm font-medium text-g-800">上传与核对记录</div>
+        <ElTimeline>
+          <ElTimelineItem
+            v-for="log in detailRow.logs"
+            :key="log.id"
+            :timestamp="log.time"
+            placement="top"
+          >
+            <div class="text-sm text-g-900">{{ log.action }} · {{ log.operator }}</div>
+            <p v-if="log.detail" class="mt-1 text-xs text-g-500">{{ log.detail }}</p>
+          </ElTimelineItem>
+        </ElTimeline>
+
+        <template v-if="detailRow.modifyRecords.length">
+          <div class="mb-2 mt-4 text-sm font-medium text-g-800">字段修改记录</div>
+          <div
+            v-for="record in detailRow.modifyRecords"
+            :key="record.id"
+            class="mb-2 rounded-lg bg-g-100/60 px-3 py-2 text-xs text-g-700"
+          >
+            {{ record.field }}：{{ record.before || '空' }} → {{ record.after || '空' }}
+            <span class="ml-2 text-g-500">{{ record.operator }} · {{ record.time }}</span>
+          </div>
+        </template>
+      </template>
+    </ElDrawer>
+
+    <!-- 影像查看入口：原图通过院内影像系统访问 [批注 03-3] -->
+    <ElDialog v-model="imageVisible" title="影像查看" width="520px">
+      <div class="rounded-lg border border-dashed border-full-d px-4 py-8 text-center">
+        <ArtSvgIcon icon="ri:image-2-line" class="text-4xl text-g-400" />
+        <p class="mt-3 text-sm text-g-800">{{ imageRow?.attachment.name }}</p>
+        <p class="mt-1 text-xs text-g-500">
+          影像原图由院内影像系统提供，检查管理仅保留查看入口与脱敏索引
+        </p>
       </div>
     </ElDialog>
 
-    <!-- 识别核对 -->
-    <ElDrawer v-model="recognizeVisible" title="识别核对" size="680px" destroy-on-close>
+    <!-- 识别核对：报告图片 / PDF 按需识别，原文与提取字段对照 [批注 03-3] -->
+    <ElDrawer v-model="recognizeVisible" title="识别核对" size="760px" destroy-on-close>
       <template v-if="activeExam">
-        <div class="mb-3 flex-c gap-2">
-          <span class="w-20 shrink-0 text-sm text-g-600">检查项目</span>
-          <ElInput v-model="checkForm.item" maxlength="40" />
+        <div class="mb-4 rounded-lg bg-g-100/60 px-3 py-2 text-sm">
+          <span class="text-g-500">识别原文附件：</span>
+          <span class="text-g-900">{{ activeExam.attachment.name }}</span>
+          <span class="ml-2 text-xs text-g-500">（{{ activeExam.attachment.type }}）</span>
         </div>
 
         <div class="mb-2 flex-cb">
-          <h5 class="text-sm font-medium text-g-800">原文值 / 提取值</h5>
+          <h5 class="text-sm font-medium text-g-800">原文值 / 提取值对照</h5>
           <ElTag v-if="manualMode" effect="plain" type="warning" size="small">人工录入模式</ElTag>
         </div>
-        <ElTable :data="checkForm.fields" border class="mb-4">
-          <ElTableColumn prop="name" label="字段" width="120" />
-          <ElTableColumn label="原文值" minWidth="140">
+        <ElTable :data="checkForm.fields" border class="mb-3">
+          <ElTableColumn label="字段" width="130">
             <template #default="{ row }">
-              <ElInput v-model="row.raw" size="small" />
+              <ElInput v-model="row.name" size="small" placeholder="字段名" />
             </template>
           </ElTableColumn>
-          <ElTableColumn label="提取值" minWidth="140">
+          <ElTableColumn label="原文值" minWidth="150">
             <template #default="{ row }">
-              <ElInput v-model="row.extracted" size="small" />
+              <ElInput v-model="row.raw" size="small" placeholder="原文（缺失留空）" />
+            </template>
+          </ElTableColumn>
+          <ElTableColumn label="提取值" minWidth="150">
+            <template #default="{ row }">
+              <ElInput v-model="row.extracted" size="small" placeholder="待核对 / 人工录入" />
             </template>
           </ElTableColumn>
           <ElTableColumn label="单位" width="130">
@@ -115,6 +193,9 @@
             </template>
           </ElTableColumn>
         </ElTable>
+        <p class="mb-4 text-xs text-g-500">
+          缺失内容不自动补造；原文或提取值为空时不能确认核对，请重试识别或人工录入。
+        </p>
 
         <div class="mb-2 flex-cb">
           <h5 class="text-sm font-medium text-g-800">修改记录</h5>
@@ -124,7 +205,6 @@
           <ElInput v-model="record.field" size="small" class="w-32" placeholder="字段" />
           <ElInput v-model="record.before" size="small" class="flex-1" placeholder="修改前" />
           <ElInput v-model="record.after" size="small" class="flex-1" placeholder="修改后" />
-          <span class="w-32 shrink-0 text-xs text-g-500">{{ record.time }}</span>
           <ElButton link type="danger" @click="removeModifyRecord(record.id)">删除</ElButton>
         </div>
         <p v-if="checkForm.modifyRecords.length === 0" class="text-xs text-g-500">暂无修改记录</p>
@@ -133,12 +213,14 @@
       <template #footer>
         <div class="flex-cb w-full">
           <div class="flex-c gap-2">
-            <ElButton @click="retryRecognize">重试识别</ElButton>
+            <ElButton :loading="recognizing" @click="retryRecognize">重试识别</ElButton>
             <ElButton @click="manualEntry">人工录入</ElButton>
           </div>
           <div class="flex-c gap-2">
             <ElButton @click="recognizeVisible = false">取消</ElButton>
-            <ElButton type="primary" @click="confirmRecognition">确认核对完成</ElButton>
+            <ElButton type="primary" :loading="confirming" @click="confirmRecognition"
+              >确认核对完成</ElButton
+            >
           </div>
         </div>
       </template>
@@ -159,111 +241,112 @@
     ElInput,
     ElSelect,
     ElOption,
+    ElDatePicker,
+    ElUpload,
     ElTable,
-    ElTableColumn
+    ElTableColumn,
+    ElDescriptions,
+    ElDescriptionsItem,
+    ElTimeline,
+    ElTimelineItem
   } from 'element-plus'
+  import type { UploadFile } from 'element-plus'
+  import { useRouter } from 'vue-router'
   import { useTable } from '@/hooks/core/useTable'
-  import { fetchGetExamList } from '@/mock/dli/api'
-  import type { ExamCategory, ExamRecord } from '@/mock/dli/types'
+  import { useUserStore } from '@/store/modules/user'
+  import {
+    fetchGetExamList,
+    fetchCreateExamUpload,
+    fetchGetExamDetail,
+    fetchRetryExamRecognition,
+    fetchManualExamEntry,
+    fetchConfirmExamRecognition,
+    isReportExam
+  } from '@/mock/dli/api'
+  import type {
+    ExamAttachment,
+    ExamCategory,
+    ExamModifyRecord,
+    ExamProcessStatus,
+    ExamRecognitionField,
+    ExamRecord,
+    ExamSource
+  } from '@/mock/dli/types'
 
   defineOptions({ name: 'DliExam' })
 
-  /** 患者详情页嵌入模式：传入患者编号后仅展示该患者资料，全量列与功能保持不变 */
+  /** 患者详情页嵌入模式：同一资料源按患者编号过滤，且不显示筛选栏 */
   const props = defineProps<{ patientId?: string }>()
 
-  /** 检查分类 */
-  const CATEGORY_OPTIONS: ExamCategory[] = ['影像', '病理', '检验', '病历', '其他']
+  const router = useRouter()
+  const userStore = useUserStore()
 
-  /** 识别核对默认字段 */
-  const RECOGNITION_FIELDS = [
-    { name: '白细胞计数', raw: 'WBC 6.8', extracted: '6.8', unit: '×10⁹/L', range: '3.5–9.5' },
-    { name: '血红蛋白', raw: 'Hb 132', extracted: '132', unit: 'g/L', range: '115–150' },
-    { name: '血小板计数', raw: 'PLT 210', extracted: '210', unit: '×10⁹/L', range: '125–350' }
+  /** 角色：临床三角色按授权上传核对；四类管理员需另获数据权限后查看 [批注 03-角色] */
+  const CLINICAL_ROLES = ['R_DOCTOR', 'R_ASSISTANT', 'R_NURSE']
+  const MANAGER_ROLES = ['R_PLATFORM', 'R_CENTER', 'R_GROUP', 'R_SYS']
+  const role = computed(() => userStore.getUserInfo.roles?.[0] ?? 'R_DOCTOR')
+  const canManage = computed(() => CLINICAL_ROLES.includes(role.value))
+  const isManager = computed(() => MANAGER_ROLES.includes(role.value))
+  const dataGranted = ref(false)
+  const canView = computed(() => canManage.value || dataGranted.value)
+  const operatorName = computed(() => userStore.getUserInfo.userName || '当前医护')
+
+  function requestDataPermission() {
+    if (!isManager.value) return
+    dataGranted.value = true
+    ElMessage.success('数据权限申请已通过（演示），现可查看资料详情')
+  }
+
+  const CATEGORY_OPTIONS: ExamCategory[] = ['影像', '病理', '检验', '病历', '其他']
+  const CENTER_OPTIONS = ['华东中心', '华北中心', '华南中心', '西南中心']
+  const SOURCE_OPTIONS: ExamSource[] = ['院内同步', '授权上传']
+  const STATUS_OPTIONS: ExamProcessStatus[] = [
+    '待识别',
+    '识别中',
+    '识别失败',
+    '待核对',
+    '已核对归档'
   ]
 
-  interface CheckField {
-    name: string
-    raw: string
-    extracted: string
-    unit: string
-    range: string
-  }
-  interface ModifyRecord {
-    id: string
-    field: string
-    before: string
-    after: string
-    time: string
-  }
-  interface CheckedInfo {
-    operator: string
-    time: string
-  }
-  type ExamSource = '院内同步' | '授权上传'
-
-  const nowStr = () =>
-    `${new Date().toISOString().slice(0, 10)} ${new Date().toTimeString().slice(0, 5)}`
-
-  /** 解析状态标签 */
-  const STATUS_TAG: Record<ExamRecord['status'], 'success' | 'primary' | 'warning'> = {
-    已归档: 'success',
-    待解析: 'warning',
-    解析中: 'primary'
+  const STATUS_TAG: Record<ExamProcessStatus, 'success' | 'primary' | 'warning' | 'danger'> = {
+    待识别: 'warning',
+    识别中: 'primary',
+    识别失败: 'danger',
+    待核对: 'warning',
+    已核对归档: 'success'
   }
 
+  /** 独立页顶部筛选：分类 / 来源 / 处理状态（嵌入模式整块隐藏） */
   const searchItems = [
     {
       key: 'keyword',
       label: '关键词',
       type: 'input',
-      placeholder: '检查编号 / 患者编号 / 检查项目',
+      placeholder: '资料编号 / 患者编号 / 项目',
       span: 6
+    },
+    {
+      key: 'category',
+      label: '资料分类',
+      type: 'select',
+      placeholder: '全部分类',
+      options: CATEGORY_OPTIONS.map((item) => ({ label: item, value: item }))
+    },
+    {
+      key: 'source',
+      label: '来源',
+      type: 'select',
+      placeholder: '全部来源',
+      options: SOURCE_OPTIONS.map((item) => ({ label: item, value: item }))
+    },
+    {
+      key: 'status',
+      label: '处理状态',
+      type: 'select',
+      placeholder: '全部状态',
+      options: STATUS_OPTIONS.map((item) => ({ label: item, value: item }))
     }
   ]
-
-  /* -------- 页面内扩展状态：不修改共享类型，按 id 关联 -------- */
-
-  /** 授权上传新增记录，独立于接口分页数据源 */
-  const extraExams = ref<ExamRecord[]>([])
-  const sourceMap = reactive<Record<string, ExamSource>>({})
-  const verifiedMap = reactive<Record<string, boolean>>({})
-  const checkedInfo = reactive<Record<string, CheckedInfo>>({})
-
-  /** 识别核对抽屉 */
-  const recognizeVisible = ref(false)
-  const activeExam = ref<ExamRecord>()
-  const manualMode = ref(false)
-  const checkForm = reactive({
-    item: '',
-    fields: [] as CheckField[],
-    modifyRecords: [] as ModifyRecord[]
-  })
-
-  function addModifyRecord(field = '', before = '', after = '') {
-    checkForm.modifyRecords.push({
-      id: `MR-${Date.now()}-${Math.round(Math.random() * 1000)}`,
-      field,
-      before,
-      after,
-      time: nowStr()
-    })
-  }
-  function removeModifyRecord(id: string) {
-    const index = checkForm.modifyRecords.findIndex((item) => item.id === id)
-    if (index > -1) checkForm.modifyRecords.splice(index, 1)
-  }
-
-  /** 授权上传表单 */
-  const uploadVisible = ref(false)
-  const uploadForm = reactive({
-    category: '' as ExamCategory | '',
-    name: '',
-    patientId: ''
-  })
-
-  /** 脱敏查看 */
-  const maskVisible = ref(false)
-  const maskRow = ref<ExamRecord>()
 
   const {
     columns,
@@ -276,9 +359,7 @@
     resetSearchParams,
     handleSizeChange,
     handleCurrentChange,
-    refreshData,
-    refreshCreate,
-    refreshUpdate
+    refreshData
   } = useTable({
     core: {
       apiFn: fetchGetExamList,
@@ -286,188 +367,297 @@
         current: 1,
         size: 10,
         keyword: '',
+        category: '',
+        source: '',
+        status: '',
         patientId: props.patientId ?? ''
       },
       columnsFactory: () => [
-        { prop: 'id', label: '检查编号', width: 130 },
+        { prop: 'id', label: '资料编号', width: 150 },
+        {
+          prop: 'patientId',
+          label: '患者编号',
+          width: 150,
+          formatter: (row: ExamRecord) =>
+            props.patientId
+              ? h('span', row.patientId)
+              : h(
+                  ElButton,
+                  { link: true, type: 'primary', onClick: () => goPatientDetail(row) },
+                  () => row.patientId
+                )
+        },
+        { prop: 'center', label: '所属中心', width: 120 },
         {
           prop: 'category',
-          label: '资料分类',
-          width: 100,
+          label: '分类',
+          width: 90,
           formatter: (row: ExamRecord) =>
             h(ElTag, { effect: 'plain', type: 'primary' }, () => row.category)
         },
-        { prop: 'item', label: '检查项目', minWidth: 170 },
-        { prop: 'center', label: '所属中心', width: 120 },
-        { prop: 'date', label: '检查日期', width: 120 },
+        { prop: 'item', label: '项目／名称', minWidth: 170, showOverflowTooltip: true },
+        { prop: 'date', label: '检查／资料日期', width: 140 },
         {
           prop: 'source',
           label: '来源',
           width: 110,
-          formatter: (row: ExamRecord) => {
-            const source = sourceMap[row.id] ?? '院内同步'
-            return h(
+          formatter: (row: ExamRecord) =>
+            h(
               ElTag,
-              { effect: 'plain', size: 'small', type: source === '授权上传' ? 'warning' : 'info' },
-              () => source
+              {
+                effect: 'plain',
+                size: 'small',
+                type: row.source === '授权上传' ? 'warning' : 'info'
+              },
+              () => row.source
             )
-          }
         },
         {
           prop: 'status',
-          label: '解析状态',
-          width: 100,
+          label: '处理状态',
+          width: 120,
           formatter: (row: ExamRecord) =>
             h(ElTag, { effect: 'light', type: STATUS_TAG[row.status] }, () => row.status)
         },
         {
-          prop: 'verified',
-          label: '核对状态',
-          width: 130,
-          formatter: (row: ExamRecord) => {
-            const verified = verifiedMap[row.id] === true
-            const info = checkedInfo[row.id]
-            return h('div', { class: 'leading-5' }, [
-              h(
-                ElTag,
-                { effect: 'plain', size: 'small', type: verified ? 'success' : 'info' },
-                () => (verified ? '已核对' : '未核对')
-              ),
-              info
-                ? h('div', { class: 'text-xs text-g-500' }, `${info.operator} · ${info.time}`)
-                : null
-            ])
-          }
-        },
-        {
           prop: 'operation',
           label: '操作',
-          width: 180,
+          width: 200,
+          fixed: 'right' as const,
           align: 'center' as const,
           formatter: (row: ExamRecord) =>
-            h('div', { class: 'flex-c justify-center gap-3' }, [
-              h(
-                ElButton,
-                { link: true, type: 'primary', onClick: () => openMaskView(row) },
-                () => '脱敏查看'
-              ),
+            h('div', { class: 'flex-c justify-center gap-2' }, [
               h(
                 ElButton,
                 {
                   link: true,
                   type: 'primary',
-                  disabled: row.status === '已归档',
-                  onClick: () => openRecognition(row)
+                  disabled: !canView.value,
+                  onClick: () => openDetail(row)
                 },
-                () => (row.status === '已归档' ? '已解析' : '识别核对')
-              )
+                () => '详情'
+              ),
+              ...(row.category === '影像'
+                ? [
+                    h(
+                      ElButton,
+                      {
+                        link: true,
+                        type: 'primary',
+                        disabled: !canView.value,
+                        onClick: () => openImageView(row)
+                      },
+                      () => '影像查看'
+                    )
+                  ]
+                : []),
+              ...(canManage.value && isReportExam(row.category) && !row.verified
+                ? [
+                    h(
+                      ElButton,
+                      { link: true, type: 'primary', onClick: () => openRecognition(row) },
+                      () => '识别核对'
+                    )
+                  ]
+                : [])
             ])
         }
       ]
     }
   })
 
-  /** 表格数据源：授权上传记录置顶，其余为接口分页数据 */
-  const tableData = computed<ExamRecord[]>(() => {
-    const extras = props.patientId
-      ? extraExams.value.filter((item) => item.patientId === props.patientId)
-      : extraExams.value
-    return [...extras, ...data.value]
-  })
+  /** 数据全部来自共享接口，检查管理与患者详情看到的是同一份资料 */
+  const tableData = computed<ExamRecord[]>(() => data.value)
 
-  /** 查询（关键词 + 资料分类） */
   function handleSearch() {
     getData()
   }
 
-  /** 重置分类与关键词 */
   function handleReset() {
     resetSearchParams()
   }
 
-  /** 脱敏查看：仅展示患者编号，不展示姓名 / 手机号 / 病历号 */
-  function openMaskView(row: ExamRecord) {
-    maskRow.value = row
-    maskVisible.value = true
+  function goPatientDetail(row: ExamRecord) {
+    router.push({ name: 'DliPatientDetail', params: { id: row.patientId } })
   }
 
-  /** 打开识别核对抽屉 */
-  function openRecognition(row: ExamRecord) {
-    activeExam.value = row
-    manualMode.value = false
-    checkForm.item = row.item
-    checkForm.fields = RECOGNITION_FIELDS.map((field) => ({ ...field }))
-    checkForm.modifyRecords = []
-    recognizeVisible.value = true
-  }
+  /* ------------------------------ 授权上传 ------------------------------ */
+  const uploadVisible = ref(false)
+  const uploading = ref(false)
+  const uploadForm = reactive({
+    category: '' as ExamCategory | '',
+    item: '',
+    patientId: '',
+    center: '',
+    date: new Date().toISOString().slice(0, 10),
+    attachment: { name: '', type: '', size: '' } as ExamAttachment
+  })
 
-  /** 重试识别：解析中 → 定时回到待解析 */
-  let retryTimer: number | undefined
-  function retryRecognize() {
-    const row = activeExam.value
-    if (!row) return
-    row.status = '解析中'
-    ElMessage.info(`检查 ${row.id} 已重新提交识别`)
-    if (retryTimer) window.clearTimeout(retryTimer)
-    retryTimer = window.setTimeout(() => {
-      row.status = '待解析'
-      ElMessage.success('识别完成，请人工核对')
-    }, 1500)
-  }
-
-  /** 人工录入：切换模式，提取值以原文为基础供人工修订，并写入修改记录 */
-  function manualEntry() {
-    manualMode.value = true
-    checkForm.fields.forEach((field) => {
-      field.extracted = field.raw
-    })
-    addModifyRecord('全部字段', '识别提取值', '切换人工录入')
-    ElMessage.success('已切换人工录入，提取值可编辑')
-  }
-
-  /** 确认核对完成：归档、记录核对人与时间、刷新列表；未确认前保持「未核对」 */
-  async function confirmRecognition() {
-    const row = activeExam.value
-    if (!row) return
-    row.status = '已归档'
-    verifiedMap[row.id] = true
-    checkedInfo[row.id] = { operator: '当前医护', time: nowStr() }
-    addModifyRecord('核对结论', '未核对', '已核对归档')
-    recognizeVisible.value = false
-    ElMessage.success('核对完成，已归档，可用于评估')
-    await refreshUpdate()
-  }
-
-  /** 打开授权上传 */
   function openUpload() {
     uploadForm.category = ''
-    uploadForm.name = ''
+    uploadForm.item = ''
     uploadForm.patientId = props.patientId ?? ''
+    uploadForm.center = ''
+    uploadForm.date = new Date().toISOString().slice(0, 10)
+    uploadForm.attachment = { name: '', type: '', size: '' }
     uploadVisible.value = true
   }
 
-  /** 提交授权上传：新增记录置入列表数据源并刷新 */
+  function handleFileChange(file: UploadFile) {
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+    uploadForm.attachment = {
+      name: file.name,
+      type: ext === 'dcm' ? 'DICOM 原图' : ext === 'pdf' ? 'PDF 报告' : '图片报告',
+      size: file.size ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : '—'
+    }
+    if (!uploadForm.item.trim()) uploadForm.item = file.name.replace(/\.[^.]+$/, '')
+  }
+
   async function submitUpload() {
-    if (!uploadForm.category || !uploadForm.name.trim() || !uploadForm.patientId.trim()) {
-      ElMessage.warning('请填写资料分类、资料名称与患者编号')
+    if (
+      !uploadForm.category ||
+      !uploadForm.item.trim() ||
+      !uploadForm.patientId.trim() ||
+      !uploadForm.center ||
+      !uploadForm.date ||
+      !uploadForm.attachment.name
+    ) {
+      ElMessage.warning('请填写分类、项目／名称、患者编号、所属中心、日期并选择附件')
       return
     }
-    const base = data.value[0] ?? extraExams.value[0]
-    const row = Object.assign({}, base, {
-      id: `EX-${Date.now()}`,
-      patientId: props.patientId || uploadForm.patientId.trim(),
-      patientName: '授权上传',
-      category: uploadForm.category,
-      item: uploadForm.name.trim(),
-      center: '授权上传',
-      date: new Date().toISOString().slice(0, 10),
-      status: '待解析' as const
-    }) as ExamRecord
-    extraExams.value.unshift(row)
-    sourceMap[row.id] = '授权上传'
-    verifiedMap[row.id] = false
-    uploadVisible.value = false
-    ElMessage.success('资料已授权上传，待解析')
-    await refreshCreate()
+    uploading.value = true
+    try {
+      await fetchCreateExamUpload({
+        patientId: uploadForm.patientId.trim(),
+        category: uploadForm.category as ExamCategory,
+        item: uploadForm.item.trim(),
+        center: uploadForm.center,
+        date: uploadForm.date,
+        attachment: { ...uploadForm.attachment },
+        operator: operatorName.value
+      })
+      ElMessage.success('资料已授权上传，进入待识别 / 待核对')
+      uploadVisible.value = false
+      await getData()
+    } catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : '上传失败')
+    } finally {
+      uploading.value = false
+    }
+  }
+
+  /* ------------------------------ 资料详情 / 影像查看 ------------------------------ */
+  const detailVisible = ref(false)
+  const detailRow = ref<ExamRecord>()
+  const imageVisible = ref(false)
+  const imageRow = ref<ExamRecord>()
+
+  async function openDetail(row: ExamRecord) {
+    if (!canView.value) {
+      ElMessage.warning('请先申请数据权限')
+      return
+    }
+    detailRow.value = await fetchGetExamDetail(row.id)
+    detailVisible.value = true
+  }
+
+  function openImageView(row: ExamRecord) {
+    if (!canView.value) {
+      ElMessage.warning('请先申请数据权限')
+      return
+    }
+    imageRow.value = row
+    imageVisible.value = true
+  }
+
+  function previewAttachment(row: ExamRecord) {
+    if (row.category === '影像') {
+      openImageView(row)
+    } else {
+      ElMessage.info('演示环境不预览真实文件')
+    }
+  }
+
+  /* ------------------------------ 识别核对 ------------------------------ */
+  const recognizeVisible = ref(false)
+  const activeExam = ref<ExamRecord>()
+  const manualMode = ref(false)
+  const recognizing = ref(false)
+  const confirming = ref(false)
+  const checkForm = reactive({
+    fields: [] as ExamRecognitionField[],
+    modifyRecords: [] as ExamModifyRecord[]
+  })
+
+  async function openRecognition(row: ExamRecord) {
+    const detail = await fetchGetExamDetail(row.id)
+    activeExam.value = detail
+    manualMode.value = false
+    checkForm.fields = detail.recognitionFields.map((field) => ({ ...field }))
+    checkForm.modifyRecords = detail.modifyRecords.map((record) => ({ ...record }))
+    recognizeVisible.value = true
+  }
+
+  function addModifyRecord(field = '', before = '', after = '') {
+    checkForm.modifyRecords.push({
+      id: `MR-${Date.now()}-${Math.round(Math.random() * 1000)}`,
+      field,
+      before,
+      after,
+      operator: operatorName.value,
+      time: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-')
+    })
+  }
+
+  function removeModifyRecord(id: string) {
+    const index = checkForm.modifyRecords.findIndex((item) => item.id === id)
+    if (index > -1) checkForm.modifyRecords.splice(index, 1)
+  }
+
+  async function retryRecognize() {
+    const row = activeExam.value
+    if (!row) return
+    recognizing.value = true
+    try {
+      const updated = await fetchRetryExamRecognition(row.id, operatorName.value)
+      activeExam.value = updated
+      ElMessage.success('识别完成，请逐项核对原文与提取值')
+      await getData()
+    } catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : '重试识别失败')
+    } finally {
+      recognizing.value = false
+    }
+  }
+
+  async function manualEntry() {
+    const row = activeExam.value
+    if (!row) return
+    manualMode.value = true
+    // 仅新增空白行由医护填写，不自动填充任何缺失内容
+    checkForm.fields.push({ name: '', raw: '', extracted: '', unit: '', range: '' })
+    addModifyRecord('人工录入', '识别提取值', '新增空白字段行')
+    await fetchManualExamEntry(row.id, operatorName.value)
+    ElMessage.info('已切换人工录入，请填写原文与提取值')
+  }
+
+  async function confirmRecognition() {
+    const row = activeExam.value
+    if (!row) return
+    confirming.value = true
+    try {
+      await fetchConfirmExamRecognition(row.id, {
+        fields: checkForm.fields,
+        modifyRecords: checkForm.modifyRecords,
+        operator: operatorName.value
+      })
+      ElMessage.success('核对完成，可用于评估')
+      recognizeVisible.value = false
+      await getData()
+    } catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : '核对失败')
+    } finally {
+      confirming.value = false
+    }
   }
 </script>

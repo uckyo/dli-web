@@ -1,4 +1,4 @@
-<!-- DLI 模型管理：用量总览、模型卡片、充值、参数与密钥 -->
+<!-- DLI LLM 管理：服务卡片、用量趋势与余额；额度操作仅授权管理员 [批注 22] -->
 <template>
   <div class="art-full-height overflow-y-auto pb-5">
     <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -43,7 +43,7 @@
         <ElRadioGroup v-model="usageMetric" size="small">
           <ElRadioButton value="calls">调用次数</ElRadioButton>
           <ElRadioButton value="tokens">Token</ElRadioButton>
-          <ElRadioButton value="cost">费用</ElRadioButton>
+          <ElRadioButton value="cost">费用（¥）</ElRadioButton>
         </ElRadioGroup>
       </template>
     </TrendPanel>
@@ -84,8 +84,8 @@
 
           <div>
             <div class="flex-cb text-xs text-g-600">
-              <span>余额 {{ formatTokens(item.balance) }}</span>
-              <span>已用 {{ formatTokens(item.used) }}</span>
+              <span>已用额度 {{ formatTokens(item.used) }} {{ item.unit }}</span>
+              <span>剩余额度 {{ formatTokens(item.balance) }} {{ item.unit }}</span>
             </div>
             <ElProgress
               :percentage="usedPercent(item)"
@@ -113,12 +113,19 @@
             </div>
           </div>
 
+          <div class="text-xs text-g-500">
+            <p>额度所属组织：{{ item.quotaOrg }}</p>
+            <p class="mt-0.5">数据更新时间：{{ item.updatedAt }}</p>
+          </div>
+
           <div class="mt-auto flex-cb border-t border-full-d pt-3">
-            <span class="text-xs text-g-500">本月 {{ formatCurrency(item.monthCost) }}</span>
+            <span class="text-xs text-g-500"
+              >本月费用（人民币）{{ formatCurrency(item.monthCost) }}</span
+            >
             <div class="flex-c gap-1">
               <ElButton link type="primary" @click="openDetail(item)">详情</ElButton>
-              <ElButton v-if="isAdmin" link type="primary" @click="openRecharge(item)">
-                充值
+              <ElButton v-if="isAdmin" link type="primary" @click="openAllocate(item)">
+                分配额度
               </ElButton>
               <ElButton
                 link
@@ -144,12 +151,12 @@
       @refresh="handleRefresh"
     />
 
-    <LlmRechargeDialog v-model="rechargeVisible" :llm="rechargeTarget" @done="handleRefresh" />
+    <LlmAllocateDialog v-model="allocateVisible" :llm="allocateTarget" @done="handleRefresh" />
   </div>
 </template>
 
 <script setup lang="ts">
-  import { ElButton, ElMessage, ElSwitch, ElTag } from 'element-plus'
+  import { ElButton, ElMessage, ElMessageBox, ElSwitch, ElTag } from 'element-plus'
   import {
     fetchGetLlmList,
     fetchGetLlmOverview,
@@ -163,11 +170,11 @@
   import { formatCurrency, formatInt, formatLatency, formatTokens, LLM_STATUS_TAG } from '../format'
   import TrendPanel from '../modules/trend-panel.vue'
   import LlmDetailDrawer from './modules/llm-detail-drawer.vue'
-  import LlmRechargeDialog from './modules/llm-recharge-dialog.vue'
+  import LlmAllocateDialog from './modules/llm-allocate-dialog.vue'
 
   defineOptions({ name: 'DliIntelligenceLlm' })
 
-  const { isAdmin } = useIntelligenceRole()
+  const { isAdmin, role } = useIntelligenceRole()
 
   const overview = ref<LlmOverview>({ models: 0, todayCalls: 0, todayTokens: 0, monthCost: 0 })
   const usageTrend = ref<LlmUsagePoint[]>([])
@@ -229,8 +236,8 @@
 
   const detailVisible = ref(false)
   const activeLlmId = ref('')
-  const rechargeVisible = ref(false)
-  const rechargeTarget = ref<LlmItem | null>(null)
+  const allocateVisible = ref(false)
+  const allocateTarget = ref<LlmItem | null>(null)
 
   function usedPercent(item: LlmItem): number {
     const total = item.balance + item.used
@@ -298,16 +305,33 @@
     detailVisible.value = true
   }
 
-  function openRecharge(item: LlmItem) {
-    rechargeTarget.value = item
-    rechargeVisible.value = true
+  function openAllocate(item: LlmItem) {
+    allocateTarget.value = item
+    allocateVisible.value = true
   }
 
   async function handleToggle(item: LlmItem): Promise<boolean> {
-    await fetchToggleLlm(item.id, item.status === '已停用')
-    ElMessage.success(`已${item.status === '已停用' ? '启用' : '停用'}「${item.name}」`)
-    await loadAll()
-    return true
+    const enabling = item.status === '已停用'
+    try {
+      await ElMessageBox.confirm(
+        `${enabling ? '启用' : '停用'}「${item.name}」将${enabling ? '恢复' : '影响'}依赖该模型的全部智能体调用${
+          enabling ? '' : '，进行中的会话会被中断'
+        }。是否继续？`,
+        '影响范围确认',
+        { confirmButtonText: '继续', cancelButtonText: '取消', type: 'warning' }
+      )
+    } catch {
+      return false
+    }
+    try {
+      await fetchToggleLlm(item.id, enabling, role.value)
+      ElMessage.success(`已${enabling ? '启用' : '停用'}「${item.name}」`)
+      await loadAll()
+      return true
+    } catch (error) {
+      ElMessage.error((error as Error)?.message ?? '操作失败')
+      return false
+    }
   }
 
   async function handleTest(item: LlmItem) {

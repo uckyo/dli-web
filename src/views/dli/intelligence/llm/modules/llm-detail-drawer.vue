@@ -1,4 +1,4 @@
-<!-- LLM 详情：概览 / 用量趋势 / 调用分布 / 参数与密钥 -->
+<!-- LLM 详情：概览 / 用量趋势 / 调用分布 / 参数与密钥 [批注 22] -->
 <template>
   <AiDetailDrawer
     :model-value="modelValue"
@@ -20,6 +20,19 @@
       <ElTabPane label="概览" name="overview">
         <MetricStrip :items="metricItems" class="mb-4" />
 
+        <ElDescriptions :column="2" border size="small" class="mb-4">
+          <ElDescriptionsItem label="服务名称">{{ detail.name }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="计费 / 额度单位">{{ detail.unit }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="额度所属组织">{{ detail.quotaOrg }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="数据更新时间">{{ detail.updatedAt }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="已用额度">
+            {{ formatTokens(detail.used) }} {{ detail.unit }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="剩余额度">
+            {{ formatTokens(detail.balance) }} {{ detail.unit }}
+          </ElDescriptionsItem>
+        </ElDescriptions>
+
         <div class="mb-4 rounded-lg bg-g-100 p-3">
           <div class="flex-cb text-sm">
             <span class="text-g-700">额度消耗</span>
@@ -34,37 +47,30 @@
             class="mt-2"
           />
           <p class="mt-2 text-xs text-g-500">
-            余额低于 {{ detail.alertThreshold }}% 时触发告警，当前余额
-            {{ formatTokens(detail.balance) }} Token
+            剩余额度低于 {{ detail.alertThreshold }}% 时触发告警；费用按人民币（¥）单独计费，不将
+            Token 数当作金额。
           </p>
         </div>
 
         <div class="mb-2 flex-cb">
-          <p class="text-sm font-medium text-g-900">充值记录</p>
-          <span class="text-xs text-g-500">近 {{ detail.recharges.length }} 次</span>
+          <p class="text-sm font-medium text-g-900">分配记录</p>
+          <span class="text-xs text-g-500">共 {{ detail.allocations.length }} 条</span>
         </div>
-        <ElTimeline v-if="detail.recharges.length">
-          <ElTimelineItem
-            v-for="record in detail.recharges"
-            :key="record.id"
-            :timestamp="record.time"
-            :type="record.amount >= 1000 ? 'primary' : 'success'"
-            placement="top"
-          >
-            <div class="flex-c flex-wrap gap-2 text-sm">
-              <span class="font-medium text-g-900">{{ formatCurrency(record.amount) }}</span>
-              <span class="text-g-600">{{ formatTokens(record.tokens) }} Token</span>
-              <span class="text-xs text-g-500">{{ record.operator }}</span>
-            </div>
-            <p class="mt-1 text-sm text-g-700">{{ record.note }}</p>
-          </ElTimelineItem>
-        </ElTimeline>
-        <ElEmpty v-else description="暂无充值记录" :image-size="70" />
+        <ElTable v-if="detail.allocations.length" :data="detail.allocations" size="small" border>
+          <ElTableColumn prop="time" label="操作时间" width="150" />
+          <ElTableColumn prop="target" label="分配对象" min-width="180" show-overflow-tooltip />
+          <ElTableColumn label="分配数量" width="100" align="right">
+            <template #default="{ row }">{{ formatInt(row.amount) }}</template>
+          </ElTableColumn>
+          <ElTableColumn prop="unit" label="额度单位" width="100" />
+          <ElTableColumn prop="operator" label="操作者" width="110" />
+        </ElTable>
+        <ElEmpty v-else description="暂无分配记录" :image-size="70" />
       </ElTabPane>
 
       <ElTabPane label="用量趋势" name="usage">
         <TrendPanel
-          title="近 14 天输入 / 输出 Token"
+          title="近 14 天输入 / 输出 Token（统计范围：近 14 天，单位：Token）"
           :x-axis="last14.map((item) => item.date)"
           :series="[
             { name: '输入 Token', data: last14.map((item) => item.tokensIn) },
@@ -77,7 +83,7 @@
             <p class="mt-1 text-g-900">{{ formatInt(detail.todayCalls) }} 次</p>
           </div>
           <div class="rounded-lg bg-g-100 px-3 py-2">
-            <p class="text-xs text-g-500">本月费用</p>
+            <p class="text-xs text-g-500">本月费用（人民币）</p>
             <p class="mt-1 text-g-900">{{ formatCurrency(detail.monthCost) }}</p>
           </div>
         </div>
@@ -110,8 +116,11 @@
         <ElDescriptions :column="1" border size="small" class="mb-4">
           <ElDescriptionsItem label="模型标识">{{ detail.model }}</ElDescriptionsItem>
           <ElDescriptionsItem label="上下文窗口">{{ detail.contextWindow }}K</ElDescriptionsItem>
-          <ElDescriptionsItem label="API 密钥">
+          <ElDescriptionsItem v-if="isAdmin" label="API 密钥">
             <span class="font-mono text-g-700">{{ detail.apiKeyMasked }}</span>
+          </ElDescriptionsItem>
+          <ElDescriptionsItem v-else label="API 密钥">
+            <span class="text-g-500">仅授权管理员可见，普通医护不下发凭据</span>
           </ElDescriptionsItem>
           <ElDescriptionsItem label="连接状态">
             {{ detail.connected ? '已连接' : '未连接' }} · 最近检查 {{ detail.lastCheckedAt }}
@@ -167,7 +176,7 @@
         </ElForm>
 
         <p class="mt-2 rounded-lg bg-g-100 px-3 py-2 text-xs text-g-600">
-          单价按元 / 千 Token 计，汇率与供应商账单可能存在差异；密钥仅展示脱敏结果。
+          单价按元 / 千 Token 计（人民币），金额与 Token 用量分别展示；密钥仅授权管理员可见。
         </p>
       </ElTabPane>
     </ElTabs>
@@ -179,15 +188,15 @@
         <ElButton :loading="testing" @click="handleTest">测试连通性</ElButton>
         <div class="flex-c gap-2">
           <ElButton @click="emit('update:modelValue', false)">关闭</ElButton>
-          <ElButton v-if="isAdmin && detail" type="primary" @click="rechargeVisible = true">
-            充值
+          <ElButton v-if="isAdmin && detail" type="primary" @click="allocateVisible = true">
+            分配额度
           </ElButton>
         </div>
       </div>
     </template>
   </AiDetailDrawer>
 
-  <LlmRechargeDialog v-model="rechargeVisible" :llm="detail" @done="handleRecharged" />
+  <LlmAllocateDialog v-model="allocateVisible" :llm="detail" @done="handleAllocated" />
 </template>
 
 <script setup lang="ts">
@@ -197,7 +206,7 @@
   import MetricStrip from '../../modules/metric-strip.vue'
   import TrendPanel from '../../modules/trend-panel.vue'
   import TestResultAlert from '../../modules/test-result-alert.vue'
-  import LlmRechargeDialog from './llm-recharge-dialog.vue'
+  import LlmAllocateDialog from './llm-allocate-dialog.vue'
   import { fetchGetLlmDetail, fetchTestLlm, fetchUpdateLlm } from '@/mock/dli/api'
   import type { LlmDetail } from '@/mock/dli/types'
   import {
@@ -227,7 +236,7 @@
   const activeTab = ref('overview')
   const testing = ref(false)
   const testResult = ref<{ ok: boolean; latency: number; message: string } | null>(null)
-  const rechargeVisible = ref(false)
+  const allocateVisible = ref(false)
   const saving = ref(false)
 
   const params = reactive({
@@ -258,8 +267,8 @@
   const metricItems = computed(() => {
     if (!detail.value) return []
     return [
-      { label: '余额 Token', value: formatTokens(detail.value.balance) },
-      { label: '已用 Token', value: formatTokens(detail.value.used) },
+      { label: '剩余额度', value: `${formatTokens(detail.value.balance)} ${detail.value.unit}` },
+      { label: '已用额度', value: `${formatTokens(detail.value.used)} ${detail.value.unit}` },
       { label: '今日调用', value: formatInt(detail.value.todayCalls) },
       { label: '平均延迟', value: formatLatency(detail.value.avgLatency) }
     ]
@@ -324,7 +333,7 @@
     }
   }
 
-  async function handleRecharged() {
+  async function handleAllocated() {
     if (!detail.value) return
     await loadDetail(detail.value.id)
     emit('refresh')

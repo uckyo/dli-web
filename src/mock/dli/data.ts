@@ -15,9 +15,13 @@ import type {
   AgentVersion,
   AiModel,
   AutomationItem,
+  AutomationTask,
   EnrollEntry,
   ExamCategory,
+  ExamProcessStatus,
+  ExamRecognitionField,
   ExamRecord,
+  ExamSource,
   GroupDoctor,
   PatientReport,
   KnowledgeChangeLog,
@@ -25,7 +29,7 @@ import type {
   KnowledgeItem,
   LlmAgentUsage,
   LlmItem,
-  LlmRechargeRecord,
+  LlmAllocateRecord,
   LlmUsagePoint,
   McpCallLog,
   McpItem,
@@ -257,6 +261,37 @@ export const EXAMS: ExamRecord[] = PATIENTS.slice(0, 16).flatMap((patient, index
     其他: '肺功能检查（FVC/DLCO）'
   }
   const category = categories[index % categories.length]
+  const date = day(index % 20)
+  // EX-0013 对应 WN-0003「识别结果未核对，暂缓评估」，保持待核对用于联动演示 [批注 03-3]
+  const status: ExamProcessStatus =
+    index === 12
+      ? '待核对'
+      : index % 9 === 0
+        ? '识别失败'
+        : index % 7 === 0
+          ? '识别中'
+          : index % 5 === 0
+            ? '待识别'
+            : '已核对归档'
+  const verified = status === '已核对归档'
+  // 只有报告图片 / PDF 类按需生成识别字段；影像与其他类不补造字段 [批注 03-3]
+  let recognitionFields: ExamRecognitionField[] = []
+  if (category === '检验') {
+    recognitionFields = [
+      { name: '白细胞计数', raw: 'WBC 6.8', extracted: '6.8', unit: '×10⁹/L', range: '3.5–9.5' },
+      { name: '血红蛋白', raw: 'Hb 132', extracted: '132', unit: 'g/L', range: '115–150' },
+      { name: '血小板计数', raw: 'PLT 210', extracted: '210', unit: '×10⁹/L', range: '125–350' }
+    ]
+  } else if (category === '病理') {
+    // 原文缺失的提取值留空，由人工核对补录
+    recognitionFields = [
+      { name: '病理诊断', raw: '镜下见异型细胞', extracted: '', unit: '', range: '' }
+    ]
+  } else if (category === '病历') {
+    recognitionFields = [
+      { name: '主诉', raw: '咳嗽 2 周', extracted: '咳嗽 2 周', unit: '', range: '' }
+    ]
+  }
   return [
     {
       id: `EX-${String(index + 1).padStart(4, '0')}`,
@@ -265,8 +300,29 @@ export const EXAMS: ExamRecord[] = PATIENTS.slice(0, 16).flatMap((patient, index
       category,
       item: items[category],
       center: patient.center,
-      date: day(index % 20),
-      status: index % 5 === 0 ? '待解析' : index % 7 === 0 ? '解析中' : '已归档'
+      date,
+      status,
+      source: '院内同步' as ExamSource,
+      verified,
+      checkedBy: verified ? '医护' : '',
+      checkedAt: verified ? date : '',
+      uploader: '院内系统同步',
+      uploadedAt: date,
+      attachment:
+        category === '影像'
+          ? { name: `HRCT_${patient.id}.dcm`, type: 'DICOM 原图', size: '12.4 MB' }
+          : { name: `${items[category]}_${patient.id}.pdf`, type: 'PDF 报告', size: '1.2 MB' },
+      recognitionFields,
+      modifyRecords: [],
+      logs: [
+        {
+          id: `EL-${index + 1}-1`,
+          action: '院内同步',
+          operator: '系统',
+          time: date,
+          detail: '院内系统同步入库'
+        }
+      ]
     }
   ]
 })
@@ -281,6 +337,15 @@ const CENTER_CODE: Record<string, string> = {
 
 const SAMPLE_TYPES: SampleRecord['type'][] = ['全血', '血浆', '血清', '组织', '尿液']
 
+/** SOP 名称 / 版本：详情按源库已有值展示，不在页面补造 [批注 07] */
+const SAMPLE_SOP_NAME: Record<SampleRecord['type'], string> = {
+  全血: '全血采集与冻存 SOP',
+  血浆: '血浆分离与冻存 SOP',
+  血清: '血清分离与冻存 SOP',
+  组织: '组织取材与冻存 SOP',
+  尿液: '尿液采集与冻存 SOP'
+}
+
 /** 每位患者 2 条样本，覆盖全部患者，供患者详情关联展示 */
 export const SAMPLES: SampleRecord[] = Array.from({ length: PATIENTS.length * 2 }, (_, index) => {
   const patient = PATIENTS[Math.floor(index / 2)]
@@ -293,27 +358,62 @@ export const SAMPLES: SampleRecord[] = Array.from({ length: PATIENTS.length * 2 
     index % 6 === 0 ? '待入库' : index % 9 === 0 ? '已出库' : '已入库'
   const location = `${patient.center} B${(index % 3) + 1}-${String((index % 20) + 1).padStart(2, '0')}`
   const operator = DOCTORS[index % DOCTORS.length]
+  const quantity = isTissue ? 1 + (index % 2) : 4
+  const flowUnit = isTissue ? '块' : 'mL'
+  const collectPoint = `${patient.center} 采集点`
+  const processPoint = `${patient.center} 分装台`
+  const syncStatus: SampleRecord['syncStatus'] =
+    index % 11 === 0 ? '异常' : index % 7 === 3 ? '待匹配' : '正常'
+  const syncNote =
+    syncStatus === '异常'
+      ? '源库样本条码与患者档案冲突，待人工核对'
+      : syncStatus === '待匹配'
+        ? '源库记录尚未匹配到平台患者档案'
+        : ''
+
+  /** 流转记录六列：时间 / 类型 / 数量及单位 / 起始位置 / 目标位置 / 操作者 */
   const flow: SampleFlowLog[] = [
     {
       time: `${collectDate} ${collectTime}`,
       action: '样本采集',
+      quantity,
+      unit: flowUnit,
+      from: '—',
+      to: collectPoint,
       operator,
       remark: `${patient.center} · ${type}采集`
     },
     {
       time: `${collectDate} 10:05`,
       action: '样本处理',
+      quantity,
+      unit: flowUnit,
+      from: collectPoint,
+      to: processPoint,
       operator,
       remark: isTissue ? '组织切块后编号保存' : '离心分装并标记管号'
     }
   ]
   if (status !== '待入库') {
-    flow.push({ time: storedAt, action: '样本入库', operator, remark: `存入 ${location}` })
+    flow.push({
+      time: storedAt,
+      action: '样本入库',
+      quantity,
+      unit: flowUnit,
+      from: processPoint,
+      to: location,
+      operator,
+      remark: `存入 ${location}`
+    })
   }
   if (status === '已出库') {
     flow.push({
       time: `${day(index % 8)} 09:40`,
       action: '样本出库',
+      quantity,
+      unit: flowUnit,
+      from: location,
+      to: `${patient.center} 检测实验室`,
       operator,
       remark: '出库用于检测'
     })
@@ -335,6 +435,12 @@ export const SAMPLES: SampleRecord[] = Array.from({ length: PATIENTS.length * 2 
     device: isTissue
       ? `液氮罐 LN-${(index % 4) + 1} · ${location}`
       : `超低温冰箱 -80℃ · ${location}`,
+    sopName: SAMPLE_SOP_NAME[type],
+    sopVersion: `V${2 + (index % 3)}.1`,
+    sourceSystem: index % 4 === 0 ? '区域生物样本库同步' : '院内生物样本库（LIS）',
+    lastSyncedAt: syncStatus === '正常' ? `${collectDate} 18:20` : `${day((index + 5) % 15)} 06:10`,
+    syncStatus,
+    syncNote,
     sop: [
       {
         stage: '取样',
@@ -371,46 +477,115 @@ const TEST_DATA_EXT: Record<SampleTestRecord['type'], string> = {
   基因组: 'idat'
 }
 
+/** 指标名称 / 单位 / 参考范围；检测中的指标结果留空，不补造 [批注 07] */
+const TEST_INDICATORS: Record<SampleTestRecord['type'], Array<[string, string, string]>> = {
+  蛋白组: [
+    ['IL-6', 'pg/mL', '0-7.0'],
+    ['TNF-α', 'pg/mL', '0-8.1'],
+    ['CRP', 'mg/L', '0-8.0']
+  ],
+  转录组: [
+    ['RNA 完整性 RIN', '', '≥7.0'],
+    ['有效 reads', 'M', '≥20'],
+    ['比对率', '%', '≥85']
+  ],
+  代谢组: [
+    ['血药谷浓度', 'ng/mL', '100-400'],
+    ['峰面积', '', '—'],
+    ['内标回收率', '%', '85-115']
+  ],
+  基因组: [
+    ['甲基化位点检出', '个', '—'],
+    ['平均覆盖深度', 'X', '≥30'],
+    ['样本检出率', '%', '≥95']
+  ]
+}
+
+/** 一批次聚合多条样本；批次可以跨患者，但对应关系不会被压成单一患者 [批注 07] */
+const TEST_BATCH_SIZE = 3
+
 /** 样本检测记录 */
-export const SAMPLE_TESTS: SampleTestRecord[] = SAMPLES.map((sample, index) => {
-  const type = TEST_TYPES[index % TEST_TYPES.length]
-  const item = TEST_ITEMS[type]
-  const status: SampleTestRecord['status'] =
-    index % 5 === 0 ? '检测中' : index % 7 === 0 ? '异常' : '已完成'
-  const testDate = day(index % 10)
-  const testedAt = `${testDate} ${String(9 + (index % 8)).padStart(2, '0')}:${index % 2 === 0 ? '15' : '40'}`
-  const id = `BIO-${CENTER_CODE[sample.center]}-${sample.patientId}-D${String(index + 1).padStart(3, '0')}`
-  return {
-    id,
-    type,
-    item,
-    batch: `B2026-${String(Math.floor(index / 4) + 1).padStart(2, '0')}`,
-    sampleId: sample.id,
-    patientId: sample.patientId,
-    center: sample.center,
-    collectedAt: sample.collectedAt,
-    testedAt,
-    status,
-    qc: status === '异常' ? '不合格' : status === '检测中' ? '待质控' : '合格',
-    shareLevel: sample.shareLevel,
-    operator: DOCTORS[(index + 1) % DOCTORS.length],
-    recordedAt: `${testDate} ${String(15 + (index % 4)).padStart(2, '0')}:30`,
-    sop: [
-      {
-        stage: '前处理',
-        content: type === '转录组' ? '总 RNA 提取并构建文库' : '样本裂解并提取蛋白/代谢物'
-      },
-      {
-        stage: '上机',
-        content: type === '基因组' ? '甲基化芯片扫描' : '质谱/测序平台上机检测'
-      },
-      { stage: '分析', content: '质控过滤后进行定量与差异分析' }
-    ],
-    qcReport: `QC-${String(index + 1).padStart(4, '0')}`,
-    dataFile: `${id}_raw.${TEST_DATA_EXT[type]}`,
-    expression: `${item}表达谱 · ${12 + index} 个特征 × 24 个样本`
+export const SAMPLE_TESTS: SampleTestRecord[] = Array.from(
+  { length: Math.ceil(SAMPLES.length / TEST_BATCH_SIZE) },
+  (_, batchIndex) => {
+    const batchSamples = SAMPLES.slice(
+      batchIndex * TEST_BATCH_SIZE,
+      (batchIndex + 1) * TEST_BATCH_SIZE
+    )
+    const primary = batchSamples[0]
+    const type = TEST_TYPES[batchIndex % TEST_TYPES.length]
+    const item = TEST_ITEMS[type]
+    const status: SampleTestRecord['status'] =
+      batchIndex % 5 === 0 ? '检测中' : batchIndex % 7 === 0 ? '异常' : '已完成'
+    const testDate = day(batchIndex % 10)
+    const testedAt = `${testDate} ${String(9 + (batchIndex % 8)).padStart(2, '0')}:${batchIndex % 2 === 0 ? '15' : '40'}`
+    const id = `BIO-${CENTER_CODE[primary.center]}-${primary.patientId}-D${String(batchIndex + 1).padStart(3, '0')}`
+    const syncStatus: SampleTestRecord['syncStatus'] =
+      batchIndex % 5 === 2 ? '异常' : batchIndex % 4 === 1 ? '待匹配' : '正常'
+    const syncNote =
+      syncStatus === '异常'
+        ? '源库批次与样本对应关系冲突，待人工核对'
+        : syncStatus === '待匹配'
+          ? '源库检测结果尚未匹配到平台样本编号'
+          : ''
+    const linkedSamples = batchSamples.map((sample, index) => ({
+      sampleId: sample.id,
+      patientId: sample.patientId,
+      center: sample.center,
+      type: sample.type,
+      collectedAt: sample.collectedAt,
+      role: index === 0 ? '主关联样本' : '同批次样本'
+    }))
+    return {
+      id,
+      type,
+      item,
+      batch: `B2026-${String(batchIndex + 1).padStart(2, '0')}`,
+      sampleId: primary.id,
+      patientId: primary.patientId,
+      center: primary.center,
+      collectedAt: primary.collectedAt,
+      testedAt,
+      status,
+      qc: status === '异常' ? '不合格' : status === '检测中' ? '待质控' : '合格',
+      shareLevel: primary.shareLevel,
+      operator: DOCTORS[(batchIndex + 1) % DOCTORS.length],
+      recordedAt: `${testDate} ${String(15 + (batchIndex % 4)).padStart(2, '0')}:30`,
+      linkedSamples,
+      indicators: TEST_INDICATORS[type].map(([name, unit, range], index) => ({
+        name,
+        result:
+          status === '检测中' && index === 2
+            ? ''
+            : (8.6 + batchIndex * 0.9 + index * 2.3).toFixed(1),
+        unit,
+        range
+      })),
+      sop: [
+        {
+          stage: '前处理',
+          content: type === '转录组' ? '总 RNA 提取并构建文库' : '样本裂解并提取蛋白/代谢物'
+        },
+        {
+          stage: '上机',
+          content: type === '基因组' ? '甲基化芯片扫描' : '质谱/测序平台上机检测'
+        },
+        { stage: '分析', content: '质控过滤后进行定量与差异分析' }
+      ],
+      sopName: `${type}检测 SOP`,
+      sopVersion: `V${2 + (batchIndex % 3)}.0`,
+      qcReport: `QC-${String(batchIndex + 1).padStart(4, '0')}`,
+      dataFile: `${id}_raw.${TEST_DATA_EXT[type]}`,
+      dataSizeGb: 6200 + (batchIndex % 6) * 720,
+      expression: `${item}表达谱 · ${12 + batchIndex} 个特征 × ${batchSamples.length} 个样本`,
+      sourceSystem: batchIndex % 4 === 0 ? '区域检测中心同步' : '院内检测平台（LIMS）',
+      lastSyncedAt:
+        syncStatus === '正常' ? `${testDate} 19:40` : `${day((batchIndex + 6) % 15)} 07:15`,
+      syncStatus,
+      syncNote
+    }
   }
-})
+)
 
 /** AI 模型：按早筛预警 / 早诊预警 / 转归预测三个方向占位，接入情况以模型服务为准 */
 export const MODELS: AiModel[] = [
@@ -418,10 +593,16 @@ export const MODELS: AiModel[] = [
     id: 'M-001',
     name: '早筛预警模型',
     field: '早筛预警',
+    version: '待接入',
     mode: '',
     timePoints: [],
     input: '',
     output: '',
+    inputMappings: [],
+    source: '',
+    scope: '',
+    evaluation: '',
+    configVersion: 'V1.0',
     connected: false,
     enabled: false,
     updatedAt: '2026-10-26'
@@ -430,10 +611,16 @@ export const MODELS: AiModel[] = [
     id: 'M-002',
     name: '早诊预警模型',
     field: '早诊预警',
+    version: '待接入',
     mode: '',
     timePoints: [],
     input: '',
     output: '',
+    inputMappings: [],
+    source: '',
+    scope: '',
+    evaluation: '',
+    configVersion: 'V1.0',
     connected: false,
     enabled: false,
     updatedAt: '2026-10-26'
@@ -442,10 +629,16 @@ export const MODELS: AiModel[] = [
     id: 'M-003',
     name: '转归预测模型',
     field: '转归预测',
+    version: '待接入',
     mode: '',
     timePoints: [],
     input: '',
     output: '',
+    inputMappings: [],
+    source: '',
+    scope: '',
+    evaluation: '',
+    configVersion: 'V1.0',
     connected: false,
     enabled: false,
     updatedAt: '2026-10-26'
@@ -1289,9 +1482,12 @@ export const MCPS: McpItem[] = [
     version: '1.4.0',
     tools: 6,
     description: '患者主索引与就诊记录读取',
+    purpose: '为虚拟医生、随访等智能体提供患者主索引与就诊记录读取能力',
+    scope: '全平台各中心',
     status: '在线',
     latency: 86,
     calls30d: 4820,
+    lastCalledAt: '',
     updatedAt: '2026-10-18',
     maintainer: '平台运维组',
     endpoint: 'https://his.dli.internal/mcp',
@@ -1305,9 +1501,12 @@ export const MCPS: McpItem[] = [
     version: '2.0.1',
     tools: 4,
     description: 'DICOM 影像拉取与序列解析',
+    purpose: '为影像分析智能体提供 DICOM 影像拉取与序列解析能力',
+    scope: '全平台各中心（影像科授权后使用）',
     status: '在线',
     latency: 152,
     calls30d: 3160,
+    lastCalledAt: '',
     updatedAt: '2026-10-21',
     maintainer: '平台运维组',
     endpoint: 'https://pacs.dli.internal/mcp/sse',
@@ -1321,9 +1520,12 @@ export const MCPS: McpItem[] = [
     version: '1.2.2',
     tools: 5,
     description: '检验结果同步与参考区间查询',
+    purpose: '为早筛、转归预测等智能体提供检验结果同步与参考区间查询',
+    scope: '全平台各中心',
     status: '在线',
     latency: 104,
     calls30d: 2640,
+    lastCalledAt: '',
     updatedAt: '2026-10-12',
     maintainer: '平台运维组',
     endpoint: 'https://lis.dli.internal/mcp',
@@ -1337,9 +1539,12 @@ export const MCPS: McpItem[] = [
     version: '0.9.6',
     tools: 3,
     description: '病理报告文本与切片索引',
+    purpose: '为病理分析智能体提供病理报告文本与切片索引读取',
+    scope: '中心A（试点）',
     status: '离线',
     latency: 0,
     calls30d: 0,
+    lastCalledAt: '',
     updatedAt: '2026-09-30',
     maintainer: '平台运维组',
     endpoint: 'stdio://path-svc',
@@ -1353,9 +1558,12 @@ export const MCPS: McpItem[] = [
     version: '1.0.3',
     tools: 4,
     description: '随访提醒下发与患者回复回收',
+    purpose: '为随访智能体提供提醒下发与患者回复回收通道',
+    scope: '全平台各中心（随访模块）',
     status: '异常',
     latency: 980,
     calls30d: 1240,
+    lastCalledAt: '',
     updatedAt: '2026-10-24',
     maintainer: '平台运维组',
     endpoint: 'https://msg.dli.internal/mcp/sse',
@@ -1572,12 +1780,12 @@ export const MCP_TOOLS: McpTool[] = [
   }
 ]
 
-/** MCP 调用记录 */
+/** MCP 调用记录（未接入服务不生成模拟记录，避免把演示值当真实值 [批注 21]） */
 export const MCP_LOGS: McpCallLog[] = []
 MCPS.forEach((mcp, index) => {
   const rand = seeded(6200 + index)
   const tools = MCP_TOOLS.filter((tool) => tool.mcpId === mcp.id)
-  if (!tools.length) return
+  if (!tools.length || mcp.status === '离线') return
   const callers = ['虚拟医生Agent', '早诊报告Agent', '随访Agent', '早筛报告Agent']
   for (let i = 0; i < 8; i++) {
     const tool = tools[i % tools.length]
@@ -1592,6 +1800,14 @@ MCPS.forEach((mcp, index) => {
       latency: mcp.status === '在线' ? Math.round(mcp.latency * (0.7 + rand() * 0.6)) : 0
     })
   }
+})
+
+/** 回填最近调用时间（取该服务最新一条记录；未接入保持空串展示「暂无」） */
+MCPS.forEach((mcp) => {
+  const latest = MCP_LOGS.filter((log) => log.mcpId === mcp.id).sort((a, b) =>
+    b.calledAt.localeCompare(a.calledAt)
+  )[0]
+  if (latest) mcp.lastCalledAt = latest.calledAt
 })
 
 /** MCP 近 14 日调用趋势 */
@@ -1636,6 +1852,8 @@ export const LLMS: LlmItem[] = [
     priceIn: 0.02,
     priceOut: 0.06,
     apiKeyMasked: 'sk-qwen-****-8f2a',
+    quotaOrg: '全平台统一额度',
+    updatedAt: '2026-10-24 09:00',
     rateLimit: 600,
     alertThreshold: 20,
     connected: true,
@@ -1658,6 +1876,8 @@ export const LLMS: LlmItem[] = [
     priceIn: 0.001,
     priceOut: 0.002,
     apiKeyMasked: 'sk-ds-****-31c7',
+    quotaOrg: '全平台统一额度',
+    updatedAt: '2026-10-24 09:00',
     rateLimit: 300,
     alertThreshold: 25,
     connected: true,
@@ -1680,6 +1900,8 @@ export const LLMS: LlmItem[] = [
     priceIn: 0.05,
     priceOut: 0.05,
     apiKeyMasked: 'sk-glm-****-5b90',
+    quotaOrg: '中心A 专项额度',
+    updatedAt: '2026-10-03 17:20',
     rateLimit: 200,
     alertThreshold: 20,
     connected: false,
@@ -1702,6 +1924,8 @@ export const LLMS: LlmItem[] = [
     priceIn: 0.03,
     priceOut: 0.09,
     apiKeyMasked: 'sk-ernie-****-7d41',
+    quotaOrg: '中心B 专项额度',
+    updatedAt: '2026-10-24 09:00',
     rateLimit: 240,
     alertThreshold: 20,
     connected: true,
@@ -1724,6 +1948,8 @@ export const LLMS: LlmItem[] = [
     priceIn: 0.0008,
     priceOut: 0.002,
     apiKeyMasked: 'ak-doubao-****-9e12',
+    quotaOrg: '课题组2 专项额度',
+    updatedAt: '2026-10-24 09:00',
     rateLimit: 500,
     alertThreshold: 20,
     connected: true,
@@ -1770,71 +1996,87 @@ LLMS.forEach((llm) => {
   }))
 })
 
-/** LLM 充值记录 */
-export const LLM_RECHARGES: LlmRechargeRecord[] = [
+/** LLM 额度分配记录（内部分配，非真实购买 [批注 22]） */
+export const LLM_ALLOCATES: LlmAllocateRecord[] = [
   {
-    id: 'LR-01',
-    amount: 2000,
-    tokens: 100000000,
-    operator: '系统管理员',
+    id: 'LA-01',
+    llmId: 'L-01',
     time: shiftDate(-2, 10, 12),
+    target: '全平台 · 虚拟医生Agent',
+    amount: 10000,
+    unit: '万 Token',
+    operator: '系统管理员',
     note: 'Qwen-Max 季度额度补充'
   },
   {
-    id: 'LR-02',
-    amount: 500,
-    tokens: 500000000,
-    operator: '系统管理员',
+    id: 'LA-02',
+    llmId: 'L-02',
     time: shiftDate(-4, 15, 36),
-    note: 'DeepSeek-V3 按量计费充值'
-  },
-  {
-    id: 'LR-03',
-    amount: 800,
-    tokens: 26666666,
-    operator: '平台管理员',
-    time: shiftDate(-7, 9, 18),
-    note: 'ERNIE-4.0-Turbo 首批额度'
-  },
-  {
-    id: 'LR-04',
-    amount: 1000,
-    tokens: 500000000,
+    target: '全平台 · 早筛报告Agent',
+    amount: 50000,
+    unit: '万 Token',
     operator: '系统管理员',
-    time: shiftDate(-11, 14, 2),
-    note: 'Doubao-Pro-128K 充值'
+    note: 'DeepSeek-V3 按量计费额度补充'
   },
   {
-    id: 'LR-05',
-    amount: 300,
-    tokens: 15000000,
+    id: 'LA-03',
+    llmId: 'L-04',
+    time: shiftDate(-7, 9, 18),
+    target: '中心B · 早诊报告Agent',
+    amount: 2600,
+    unit: '万 Token',
     operator: '平台管理员',
+    note: 'ERNIE-4.0-Turbo 首批额度分配'
+  },
+  {
+    id: 'LA-04',
+    llmId: 'L-05',
+    time: shiftDate(-11, 14, 2),
+    target: '课题组2 · 随访Agent',
+    amount: 5000,
+    unit: '万 Token',
+    operator: '系统管理员',
+    note: 'Doubao-Pro-128K 随访模块额度'
+  },
+  {
+    id: 'LA-05',
+    llmId: 'L-01',
     time: shiftDate(-16, 16, 44),
+    target: '中心A · 转归预测报告Agent',
+    amount: 1500,
+    unit: '万 Token',
+    operator: '平台管理员',
     note: 'Qwen-Max 临时补量'
   },
   {
-    id: 'LR-06',
-    amount: 500,
-    tokens: 500000000,
-    operator: '系统管理员',
+    id: 'LA-06',
+    llmId: 'L-02',
     time: shiftDate(-23, 11, 8),
-    note: 'DeepSeek-V3 续费'
+    target: '全平台 · 早筛报告Agent',
+    amount: 50000,
+    unit: '万 Token',
+    operator: '系统管理员',
+    note: 'DeepSeek-V3 额度续配'
   },
   {
-    id: 'LR-07',
-    amount: 600,
-    tokens: 12000000,
-    operator: '平台管理员',
+    id: 'LA-07',
+    llmId: 'L-03',
     time: shiftDate(-29, 9, 55),
+    target: '中心A · 全部智能体',
+    amount: 1200,
+    unit: '万 Token',
+    operator: '平台管理员',
     note: 'GLM-4-Plus 停用前结余退回'
   },
   {
-    id: 'LR-08',
-    amount: 1200,
-    tokens: 60000000,
-    operator: '系统管理员',
+    id: 'LA-08',
+    llmId: 'L-01',
     time: shiftDate(-36, 15, 30),
-    note: 'Qwen-Max 年度框架合同首付款'
+    target: '全平台 · 虚拟医生Agent',
+    amount: 6000,
+    unit: '万 Token',
+    operator: '系统管理员',
+    note: 'Qwen-Max 年度框架额度首期分配'
   }
 ]
 
@@ -2485,6 +2727,18 @@ export const RESEARCHES: ResearchItem[] = [
   }
 ]
 
+/** 研究共享设置默认值 [批注 12]：已有数据不重复维护对象、内容与可见范围 */
+RESEARCHES.forEach((item) => {
+  if (!item.shareTargets) item.shareTargets = [item.center]
+  if (!item.shareContents) item.shareContents = item.shared ? ['项目概况', '进度汇总'] : []
+  if (!item.actualVisibleScope) {
+    item.actualVisibleScope = item.shared
+      ? `${item.shareLevel}内可见项目概况 / 进度汇总`
+      : '仅项目成员可见'
+  }
+  if (!item.detailId) item.detailId = item.id
+})
+
 /** 助理 / 护士 */
 export const STAFFS: StaffItem[] = [
   {
@@ -2538,8 +2792,8 @@ export const STAFFS: StaffItem[] = [
 export const PATIENT_AUTOMATION: AutomationItem[] = [
   {
     key: 'autoEnroll',
-    label: '自动入组',
-    description: '符合高危药物条件的患者自动进入 DLI 管理队列',
+    label: '自动纳入管理候选队列',
+    description: '仅生成待评估／待核对的管理记录，正式研究入组走研究管理流程 [批注 09]',
     enabled: true
   },
   {
@@ -2583,7 +2837,7 @@ export const FOLLOWUP_AUTOMATION: AutomationItem[] = [
   {
     key: 'autoPlan',
     label: '自动生成随访计划',
-    description: '按诊断后 1/3/6/12 月节点自动生成随访任务',
+    description: '只生成随访草稿，医生在随访管理确认发布后生效 [批注 09]',
     enabled: true
   },
   {
@@ -2792,4 +3046,102 @@ export const TREND_DATA = [
   { date: '10-24', patients: 221, alerts: 19 },
   { date: '10-25', patients: 213, alerts: 26 },
   { date: '10-26', patients: 231, alerts: 16 }
+]
+
+/* ---------------- 状态管理 · 执行记录 [批注 09] ---------------- */
+
+export const AUTOMATION_TASKS: AutomationTask[] = [
+  {
+    id: 'AT-2001',
+    patientId: 'DLI-2026-0005',
+    type: '识别解析',
+    triggeredAt: '2026-11-09 08:40',
+    triggerSource: '自动',
+    status: '执行成功',
+    note: '',
+    sourceRecord: '检验报告解析任务 EX-2026-1109-05',
+    inputs: ['肝功能检验影像（上传件）', '患者基础档案'],
+    modelVersion: 'OCR-LIS v1.6 / 解析规则 R2',
+    relatedResult: '解析完成并归档，识别结果待核对',
+    relatedReportId: ''
+  },
+  {
+    id: 'AT-2002',
+    patientId: 'DLI-2026-0012',
+    type: '模型评估',
+    triggeredAt: '2026-11-09 08:12',
+    triggerSource: '自动',
+    status: '执行成功',
+    note: '',
+    sourceRecord: '早筛预警触发（新数据入库）',
+    inputs: ['基线影像（识别已核对）', '用药史'],
+    modelVersion: 'DLI-Risk v2.3',
+    relatedResult: '生成评估报告 AR-0001，结果进入评估报告列表',
+    relatedReportId: 'AR-0001'
+  },
+  {
+    id: 'AT-2003',
+    patientId: 'DLI-2026-0018',
+    type: '随访草稿生成',
+    triggeredAt: '2026-11-08 17:30',
+    triggerSource: '自动',
+    status: '执行成功',
+    note: '',
+    sourceRecord: '诊断后 1 月随访节点（自动规则 R-FU1）',
+    inputs: ['诊断记录', '随访模板 FUT-001'],
+    modelVersion: '自动规则 R-FU1',
+    relatedResult: '生成随访计划草稿 FP-DR01，待医生在随访管理确认发布'
+  },
+  {
+    id: 'AT-2004',
+    patientId: 'DLI-2026-0021',
+    type: '资料同步',
+    triggeredAt: '2026-11-08 16:20',
+    triggerSource: '自动',
+    status: '执行失败',
+    note: '源库接口超时（PACS 网关无响应），已按同步故障流程留痕',
+    sourceRecord: 'PACS 定时同步任务（每日 16:00）',
+    inputs: ['PACS 增量影像清单'],
+    modelVersion: '同步服务 SYNC v3.1',
+    relatedResult: '同步失败，待系统管理员处理接口后重试'
+  },
+  {
+    id: 'AT-2005',
+    patientId: 'DLI-2026-0023',
+    type: '模型评估',
+    triggeredAt: '2026-11-08 15:48',
+    triggerSource: '人工',
+    status: '待补资料',
+    note: '缺必需输入：HRCT 影像（识别未核对），缺资料不显示为低风险',
+    sourceRecord: '医生发起的转归预测评估',
+    inputs: ['病理报告（已就绪）', 'HRCT 影像（缺失）', '随访数据（缺失）'],
+    modelVersion: 'DLI-Dx v3.0',
+    relatedResult: '评估暂停，补充资料后重新触发'
+  },
+  {
+    id: 'AT-2006',
+    patientId: 'DLI-2026-0016',
+    type: '资料同步',
+    triggeredAt: '2026-11-08 14:05',
+    triggerSource: '人工',
+    status: '执行中',
+    note: '',
+    sourceRecord: 'LIS 手动同步（检验科新批次）',
+    inputs: ['LIS 检验结果增量'],
+    modelVersion: '同步服务 SYNC v3.1',
+    relatedResult: '同步进行中，完成后进入识别解析'
+  },
+  {
+    id: 'AT-2007',
+    patientId: 'DLI-2026-0009',
+    type: '识别解析',
+    triggeredAt: '2026-11-07 11:22',
+    triggerSource: '自动',
+    status: '待执行',
+    note: '',
+    sourceRecord: '上传件排队解析（队列位置 3）',
+    inputs: ['病理报告上传件'],
+    modelVersion: 'OCR-LIS v1.6 / 解析规则 R2',
+    relatedResult: '排队待执行'
+  }
 ]
