@@ -96,7 +96,6 @@
         <template #left>
           <div class="flex-c gap-2">
             <ElButton v-if="canManage" type="primary" @click="openArchive">新增患者</ElButton>
-            <ElButton plain @click="downloadTemplate">下载模板</ElButton>
             <ElButton v-if="canManage" plain @click="importVisible = true">导入</ElButton>
             <ElButton plain @click="exportVisible = true">导出</ElButton>
           </div>
@@ -134,12 +133,14 @@
     ElButton,
     ElForm,
     ElFormItem,
+    ElIcon,
     ElInput,
-    ElMessage,
     ElOption,
+    ElPopover,
     ElSelect,
     ElTag
   } from 'element-plus'
+  import { InfoFilled } from '@element-plus/icons-vue'
   import { computed, h, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
   import { useRouter } from 'vue-router'
   import { useTable } from '@/hooks/core/useTable'
@@ -147,7 +148,6 @@
     INITIAL_ENTRY_OPTIONS,
     MANAGE_STATUS_OPTIONS,
     STAGE_OPTIONS,
-    buildTemplateCsv,
     fetchGetPatientRows,
     type PatientRowQuery
   } from '@/mock/dli/patient-admin'
@@ -213,6 +213,14 @@
     return h(ElTag, { type: config.type, effect: 'plain' }, () => text)
   }
 
+  /**
+   * 「诊断后」是否处于待医生确认状态。
+   * 只有初始入口为「已确诊DLI」才有这个状态，其他入口不存在待确认。
+   */
+  function isStagePending(row: PatientRow): boolean {
+    return row.initialEntry === '已确诊DLI' && row.stage === '诊断后' && !row.diagnosisConfirmed
+  }
+
   const {
     columns,
     columnChecks,
@@ -244,14 +252,34 @@
         {
           prop: 'stage',
           label: '当前阶段',
-          width: 125,
-          formatter: (row: PatientRow) =>
-            h('div', { class: 'flex-c gap-1' }, [
-              h('span', {}, row.stage),
-              row.stageConfirmed
-                ? null
-                : h(ElTag, { type: 'warning', effect: 'plain', size: 'small' }, () => '待确认')
-            ])
+          width: 160,
+          formatter: (row: PatientRow) => {
+            // 只有「已确诊DLI + 诊断后」存在待医生确认，其他入口/阶段不显示待确认
+            if (!isStagePending(row)) return h('span', {}, row.stage)
+            return h(
+              ElPopover,
+              { trigger: 'click', width: 300, placement: 'bottom-start' },
+              {
+                reference: () =>
+                  h('span', { class: 'dli-stage-pending' }, [
+                    '诊断后（待确认）',
+                    h(ElIcon, { class: 'dli-stage-pending-icon' }, () => h(InfoFilled))
+                  ]),
+                default: () =>
+                  h('div', { class: 'dli-stage-pop' }, [
+                    h('div', { class: 'dli-stage-pop-title' }, '诊断信息（待医生确认）'),
+                    h('div', { class: 'dli-stage-pop-row' }, [
+                      h('span', { class: 'dli-stage-pop-label' }, '诊断日期'),
+                      h('span', {}, row.diagnosisDate || '—')
+                    ]),
+                    h('div', { class: 'dli-stage-pop-row' }, [
+                      h('span', { class: 'dli-stage-pop-label' }, '诊断依据'),
+                      h('span', {}, row.diagnosisBasis || '—')
+                    ])
+                  ])
+              }
+            )
+          }
         },
         {
           prop: 'projectCount',
@@ -269,6 +297,23 @@
               () => text
             )
           }
+        },
+        {
+          prop: 'pendingReportCount',
+          label: '上报',
+          width: 130,
+          align: 'center' as const,
+          // 显示待核对条数，点击进患者详情的「上报」页签
+          formatter: (row: PatientRow) =>
+            h(
+              ElButton,
+              {
+                link: true,
+                type: row.pendingReportCount ? 'warning' : 'info',
+                onClick: () => goPatientDetail(row, 'report')
+              },
+              () => (row.pendingReportCount ? `${row.pendingReportCount} 条待核对` : '无')
+            )
         },
         { prop: 'center', label: '所属中心', width: 115 },
         { prop: 'doctor', label: '负责医生', width: 105 },
@@ -352,7 +397,7 @@
               h(
                 ElButton,
                 { link: true, type: 'primary', onClick: () => goPatientDetail(row) },
-                () => '患者详情'
+                () => '详情'
               )
             ]
             if (canManage.value) {
@@ -475,18 +520,6 @@
     selectedIds.value = rows.map((row) => row.id)
   }
 
-  /** 下载当前已发布字段导入模板（与导入弹窗同一份模板，不含敏感字段） [批注 04] */
-  function downloadTemplate() {
-    const blob = new Blob([buildTemplateCsv()], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = '患者导入模板.csv'
-    link.click()
-    URL.revokeObjectURL(url)
-    ElMessage.success('模板已下载')
-  }
-
   function openArchive() {
     editPatientId.value = ''
     archiveVisible.value = true
@@ -564,5 +597,43 @@
     :deep(.el-form-item__content) {
       flex-wrap: nowrap;
     }
+  }
+</style>
+
+<!-- 阶段待确认：内容渲染在表格单元格与 popover 中，用非 scoped 样式保证命中 -->
+<style lang="scss">
+  .dli-stage-pending {
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+    color: var(--el-color-warning);
+    white-space: nowrap;
+    cursor: pointer;
+    border-bottom: 1px dashed var(--el-color-warning);
+  }
+
+  .dli-stage-pending-icon {
+    font-size: 12px;
+  }
+
+  .dli-stage-pop-title {
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--art-gray-800);
+  }
+
+  .dli-stage-pop-row {
+    display: flex;
+    gap: 8px;
+    font-size: 12px;
+    line-height: 20px;
+    color: var(--art-gray-700);
+  }
+
+  .dli-stage-pop-label {
+    flex: none;
+    width: 56px;
+    color: var(--art-gray-500);
   }
 </style>

@@ -5,7 +5,7 @@
  * 新增字段统一放在按患者编号关联的 PROFILES 内存表中，刷新与其他 mock 一样复位。
  * 所有页面读写同一份数据，避免组件实例内状态各自隔离。
  */
-import { PATIENTS, PATIENT_DETAILS, RESEARCHES } from './data'
+import { PATIENTS, PATIENT_DETAILS, PATIENT_REPORTS, RESEARCHES } from './data'
 import {
   ASSESSMENT_REPORTS,
   RESEARCH_CRITERIA_LISTS,
@@ -275,15 +275,25 @@ function defaultProfile(patient: WebPatient, index: number): PatientProfile {
       : index % 3 === 0
         ? '正在接受高危药物治疗'
         : '拟接受高危药物治疗'
+  // 已确诊DLI 的患者入口本身就意味着至少进入「诊断后」，用药中则为治疗中
   const stage: PatientStage =
-    patient.status === '待评估' ? '治疗前' : patient.status === '用药中' ? '治疗中' : '诊断后'
-  const diagnosisConfirmed = initialEntry === '已确诊DLI' && stage === '诊断后' && index % 5 !== 2
+    initialEntry === '已确诊DLI'
+      ? patient.status === '用药中'
+        ? '治疗中'
+        : '诊断后'
+      : patient.status === '待评估'
+        ? '治疗前'
+        : patient.status === '用药中'
+          ? '治疗中'
+          : '诊断后'
+  // 只有「已确诊DLI + 诊断后」需要医生确认；其他入口/阶段不存在待确认态
+  const needsConfirm = initialEntry === '已确诊DLI' && stage === '诊断后' && index % 5 === 2
   return {
     patientId: patient.id,
     initialEntry,
     stage,
-    stageConfirmed: index % 7 !== 3,
-    diagnosisConfirmed,
+    stageConfirmed: !needsConfirm,
+    diagnosisConfirmed: !needsConfirm,
     diagnosisDate: initialEntry === '已确诊DLI' ? patient.enrollDate : '',
     diagnosisBasis: initialEntry === '已确诊DLI' ? '影像学及实验室检查综合判定，详见检查资料' : '',
     stageUpdatedAt: patient.lastUpdate,
@@ -386,7 +396,14 @@ function toRow(patient: WebPatient, projectId: string): PatientRow {
     initialEntry: profile.initialEntry,
     stage: profile.stage,
     stageConfirmed: profile.stageConfirmed,
+    diagnosisConfirmed: profile.diagnosisConfirmed,
+    diagnosisDate: profile.diagnosisDate,
+    diagnosisBasis: profile.diagnosisBasis,
     projectCount: profile.enrollments.length,
+    /** 患者端上报里待医护核对的数量，列表「上报」列直接展示并可跳详情 */
+    pendingReportCount: PATIENT_REPORTS.filter(
+      (item) => item.patientId === patient.id && item.status === '待核对'
+    ).length,
     projectSelected: Boolean(projectId),
     selectedProjectName: findProject(projectId)?.name ?? '',
     selectedEnrollStatus: enrollment?.status ?? '未申请',
@@ -443,6 +460,30 @@ function assertArchive(input: ArchiveInput): void {
   if (!MANAGE_STATUS_OPTIONS.includes(input.manageStatus)) throw new Error('管理状态无效')
 }
 
+/**
+ * 判定「阶段 / 诊断」是否需要医生确认 [批注 02 调整]
+ * - 仅「已确诊DLI + 诊断后」存在待确认，其他初始入口与阶段一律视为已确认；
+ * - 医生录入即视为医生本人确认，不需要再确认一次；
+ * - 助理 / 护士录入「诊断后」时置为待确认，需医生在详情页确认；
+ * - 助理 / 护士仅修改其他字段、且原本已由医生确认过时，保留原确认状态，避免误退回。
+ */
+function resolveConfirmState(
+  input: ArchiveInput,
+  role: string,
+  prev?: PatientProfile
+): { stageConfirmed: boolean; diagnosisConfirmed: boolean } {
+  const needsConfirm = input.initialEntry === '已确诊DLI' && input.stage === '诊断后'
+  if (!needsConfirm) return { stageConfirmed: true, diagnosisConfirmed: false }
+  if (role === 'R_DOCTOR') return { stageConfirmed: true, diagnosisConfirmed: true }
+  const keepConfirmed = Boolean(
+    prev &&
+      prev.diagnosisConfirmed &&
+      prev.initialEntry === input.initialEntry &&
+      prev.stage === input.stage
+  )
+  return { stageConfirmed: keepConfirmed, diagnosisConfirmed: keepConfirmed }
+}
+
 function nextPatientId(): string {
   let seq = PATIENTS.length + 1
   while (PATIENTS.some((item) => item.id === `DLI-2026-${String(seq).padStart(4, '0')}`)) {
@@ -479,7 +520,10 @@ function appendHistory(
   })
 }
 
-export async function fetchCreatePatientV2(input: ArchiveInput): Promise<WebPatient> {
+export async function fetchCreatePatientV2(
+  input: ArchiveInput,
+  role = 'R_DOCTOR'
+): Promise<WebPatient> {
   await delay()
   assertArchive(input)
   const patient: WebPatient = {
@@ -504,12 +548,13 @@ export async function fetchCreatePatientV2(input: ArchiveInput): Promise<WebPati
   }
   PATIENTS.unshift(patient)
   attachEmptyDetail(patient)
+  const confirmState = resolveConfirmState(input, role)
   PROFILES.set(patient.id, {
     patientId: patient.id,
     initialEntry: input.initialEntry,
     stage: input.stage,
-    stageConfirmed: false,
-    diagnosisConfirmed: false,
+    stageConfirmed: confirmState.stageConfirmed,
+    diagnosisConfirmed: confirmState.diagnosisConfirmed,
     diagnosisDate: input.diagnosisDate,
     diagnosisBasis: input.diagnosisBasis,
     stageUpdatedAt: today(),
@@ -521,7 +566,8 @@ export async function fetchCreatePatientV2(input: ArchiveInput): Promise<WebPati
 
 export async function fetchUpdatePatientBasic(
   patientId: string,
-  input: ArchiveInput
+  input: ArchiveInput,
+  role = 'R_DOCTOR'
 ): Promise<PatientProfile> {
   await delay()
   assertArchive(input)
@@ -532,9 +578,23 @@ export async function fetchUpdatePatientBasic(
   patient.status = input.manageStatus
   patient.lastUpdate = today()
   const profile = getProfile(patientId)
+  const prev: PatientProfile = structuredClone(profile)
+  const confirmState = resolveConfirmState(input, role, prev)
   profile.initialEntry = input.initialEntry
   profile.diagnosisDate = input.diagnosisDate
   profile.diagnosisBasis = input.diagnosisBasis
+  profile.stage = input.stage
+  profile.stageConfirmed = confirmState.stageConfirmed
+  profile.diagnosisConfirmed = confirmState.diagnosisConfirmed
+  if (prev.stage !== input.stage) {
+    profile.stageUpdatedAt = today()
+    appendHistory(
+      patientId,
+      '诊断',
+      `阶段更新为${input.stage}`,
+      `${confirmState.diagnosisConfirmed ? '医生确认' : '待医生确认'}；初始入口：${input.initialEntry}`
+    )
+  }
   return structuredClone(profile)
 }
 

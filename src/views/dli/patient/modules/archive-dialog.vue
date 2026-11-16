@@ -56,11 +56,15 @@
         </ElFormItem>
       </template>
       <ElAlert
-        v-if="!isDoctor"
-        type="info"
+        v-if="needsDoctorConfirm"
+        type="warning"
         :closable="false"
         show-icon
-        title="助理 / 护士录入的诊断与阶段需医生核对确认，不会直接成为已确认结论"
+        :title="`「已确诊DLI + 诊断后」需医生确认${
+          isDoctor
+            ? '，本次由医生录入将直接确认为已更新'
+            : '，保存后为待确认，需医生在患者详情页确认'
+        }`"
         class="mt-1"
       />
     </ElForm>
@@ -130,6 +134,11 @@
   })
   const form = reactive<ArchiveInput>(emptyForm())
 
+  /** 仅「已确诊DLI + 诊断后」需要医生确认 */
+  const needsDoctorConfirm = computed(
+    () => form.initialEntry === '已确诊DLI' && form.stage === '诊断后'
+  )
+
   const rules = {
     center: [{ required: true, message: '请选择所属中心', trigger: 'change' }],
     doctor: [{ required: true, message: '请选择负责医生', trigger: 'change' }],
@@ -155,7 +164,6 @@
         form.initialEntry = profile.initialEntry as InitialEntry
         form.diagnosisDate = profile.diagnosisDate
         form.diagnosisBasis = profile.diagnosisBasis
-        // 阶段由「更新阶段」单独维护，基础资料编辑不带出阶段字段
         form.stage = profile.stage as PatientStage
       }
     },
@@ -177,9 +185,9 @@
       let id = props.patientId ?? ''
       const created = !isEdit.value
       if (isEdit.value && props.patientId) {
-        await fetchUpdatePatientBasic(props.patientId, { ...form })
+        await fetchUpdatePatientBasic(props.patientId, { ...form }, role.value)
       } else {
-        const patient: WebPatient = await fetchCreatePatientV2({ ...form })
+        const patient: WebPatient = await fetchCreatePatientV2({ ...form }, role.value)
         id = patient.id
       }
       ElMessage.success(created ? `建档成功，患者编号 ${id}` : '基础资料已更新')

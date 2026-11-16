@@ -67,13 +67,23 @@ export interface PatientReport {
   reviewer: string
 }
 
-/** 安全事件（须医生确认，普通预警不自动转为不良事件） */
+/**
+ * 安全事件（须医生确认，普通预警不自动转为不良事件）[批注 15]
+ * 字段对齐文档：事件名称、发生时间、事件说明、关联资料、医生确认状态。
+ */
 export interface SafetyEvent {
   id: string
   patientId: string
+  /** 事件名称 */
   type: string
   level: '轻度' | '中度' | '重度'
+  /** 发生时间 */
   date: string
+  /** 事件说明 */
+  description: string
+  /** 关联资料 */
+  source: string
+  /** 医生确认状态 */
   confirmed: boolean
   confirmedBy: string
 }
@@ -1119,7 +1129,13 @@ export interface PatientRow extends WebPatient {
   initialEntry: InitialEntry
   stage: PatientStage
   stageConfirmed: boolean
+  /** 仅「已确诊DLI + 诊断后」存在待医生确认 */
+  diagnosisConfirmed: boolean
+  diagnosisDate: string
+  diagnosisBasis: string
   projectCount: number
+  /** 待医护核对的患者端上报数量（列表「上报」列） */
+  pendingReportCount: number
   projectSelected: boolean
   selectedProjectName: string
   selectedEnrollStatus: EnrollStatus

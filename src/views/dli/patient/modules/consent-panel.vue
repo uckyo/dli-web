@@ -9,9 +9,6 @@
       show-icon
       :title="`已从研究入组带入项目：${focusProjectName}`"
     />
-    <div class="mb-3 text-xs text-g-500">
-      同意书按研究项目分别发放与核对；模板及版本取自已发布配置，签署不以普通勾选替代
-    </div>
 
     <ArtTable :data="rows" :columns="columns" empty-text="暂无知情同意记录" />
 

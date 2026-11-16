@@ -1,4 +1,4 @@
-<!-- 患者详情 → 管理计划：管理安排 + 随访计划 + 待核对上报 + 安全事件 [批注 05] -->
+<!-- 患者详情 → 管理计划：仅保留管理安排 [批注 05]；上报归属见检查资料，安全事件归属见研究入组→研究记录 [批注 14/15] -->
 <template>
   <div class="dli-pane dli-own">
     <!-- 管理安排：安排名称 / 类型 / 执行时间 / 发布状态 / 操作 [批注 05] -->
@@ -6,29 +6,7 @@
     <div class="dli-pane-bar mb-2">
       <ElButton type="primary" plain @click="openPlanDialog()">新增安排</ElButton>
     </div>
-    <ArtTable
-      :data="planTableData"
-      :columns="managementColumns"
-      empty-text="暂无管理安排"
-      class="mb-5"
-    />
-
-    <div class="dli-section-title">随访计划 · 关联任务</div>
-    <ArtTable :data="planList" :columns="planColumns" empty-text="暂无关联随访任务" class="mb-5" />
-    <div class="dli-pane-bar">
-      <ElButton type="primary" plain @click="goFollowup">制定随访</ElButton>
-    </div>
-
-    <div class="dli-section-title">待核对上报</div>
-    <ArtTable :data="reportList" :columns="reportColumns" empty-text="暂无上报记录" class="mb-5" />
-
-    <div class="dli-section-title">安全事件</div>
-    <div class="dli-pane-bar">
-      <ElButton v-if="canManage" type="primary" @click="safetyDialogVisible = true">
-        登记事件
-      </ElButton>
-    </div>
-    <ArtTable :data="safetyList" :columns="safetyColumns" empty-text="暂无安全事件" />
+    <ArtTable :data="planTableData" :columns="managementColumns" empty-text="暂无管理安排" />
 
     <!-- 管理安排新增 / 编辑弹窗：安排名称、类型、具体内容、执行时间、执行要求 [批注 05] -->
     <ElDialog
@@ -80,25 +58,6 @@
         </ElButton>
       </template>
     </ElDialog>
-
-    <ElDialog v-model="safetyDialogVisible" title="登记安全事件" width="440px" destroy-on-close>
-      <ElForm label-width="96px">
-        <ElFormItem label="事件类型">
-          <ElSelect v-model="safetyForm.type" class="w-full">
-            <ElOption v-for="item in SAFETY_TYPES" :key="item" :label="item" :value="item" />
-          </ElSelect>
-        </ElFormItem>
-        <ElFormItem label="级别">
-          <ElSelect v-model="safetyForm.level" class="w-full">
-            <ElOption v-for="item in SAFETY_LEVELS" :key="item" :label="item" :value="item" />
-          </ElSelect>
-        </ElFormItem>
-      </ElForm>
-      <template #footer>
-        <ElButton @click="safetyDialogVisible = false">取消</ElButton>
-        <ElButton type="primary" @click="submitSafetyEvent">确认登记</ElButton>
-      </template>
-    </ElDialog>
   </div>
 </template>
 
@@ -117,25 +76,15 @@
   } from 'element-plus'
   import type { FormInstance, FormRules } from 'element-plus'
   import { computed, reactive, ref, watch } from 'vue'
-  import { useRouter } from 'vue-router'
-  import {
-    fetchAddSafetyEvent,
-    fetchConfirmSafetyEvent,
-    fetchGetPatientReports,
-    fetchGetPatientSafetyEvents,
-    fetchReviewPatientReport
-  } from '@/mock/dli/api'
   import {
     fetchCancelManagementPlan,
     fetchGetManagementPlans,
     fetchPublishManagementPlan,
     fetchSaveManagementPlan
   } from '@/mock/dli/blueprint/api'
-  import { FOLLOWUP_PLANS, FOLLOWUP_TASKS } from '@/mock/dli/blueprint/data'
   import { useUserStore } from '@/store/modules/user'
   import type { ColumnOption } from '@/types/component'
   import type { ManagementPlan } from '@/mock/dli/blueprint/types'
-  import type { PatientReport, SafetyEvent } from '@/mock/dli/types'
 
   defineOptions({ name: 'PatientManagementPanel' })
 
@@ -289,11 +238,9 @@
 
   const planTableData = computed(() => managementList.value)
 
-  const router = useRouter()
   const userStore = useUserStore()
   const role = computed(() => userStore.getUserInfo.roles?.[0] ?? 'R_DOCTOR')
   const isDoctor = computed(() => role.value === 'R_DOCTOR')
-  const canManage = computed(() => ['R_DOCTOR', 'R_ASSISTANT', 'R_NURSE'].includes(role.value))
   const operatorName = computed(() => {
     const info = userStore.getUserInfo as {
       userName?: string
@@ -303,165 +250,14 @@
     return info.userName ?? info.username ?? info.nickName ?? '当前医护'
   })
 
-  const reportList = ref<PatientReport[]>([])
-  const safetyList = ref<SafetyEvent[]>([])
-  const planList = computed(() =>
-    FOLLOWUP_TASKS.filter((item) => item.patientId === props.patientId)
-  )
-
-  const planColumns: ColumnOption<(typeof FOLLOWUP_TASKS)[number]>[] = [
-    { prop: 'id', label: '任务编号', width: 130 },
-    {
-      prop: 'title',
-      label: '随访事项',
-      minWidth: 180,
-      formatter: (row) => h('span', {}, row.title)
-    },
-    {
-      prop: 'planId',
-      label: '所属计划',
-      width: 180,
-      formatter: (row) =>
-        h('span', {}, FOLLOWUP_PLANS.find((item) => item.id === row.planId)?.name ?? row.planId)
-    },
-    { prop: 'status', label: '任务状态', width: 110 },
-    { prop: 'dueDate', label: '计划日期', width: 130 },
-    { prop: 'assignee', label: '负责人', width: 110 }
-  ]
-
-  const SAFETY_TYPES = ['药物相关肝酶升高', '间质性肺病加重', '感染', '皮疹', '其他']
-  const SAFETY_LEVELS: Array<SafetyEvent['level']> = ['轻度', '中度', '重度']
-  const safetyDialogVisible = ref(false)
-  const safetyForm = reactive({
-    type: '药物相关肝酶升高',
-    level: '轻度' as SafetyEvent['level']
-  })
-
-  const reportColumns: ColumnOption<PatientReport>[] = [
-    { prop: 'date', label: '上报日期', width: 130 },
-    { prop: 'type', label: '类型', width: 140 },
-    { prop: 'content', label: '内容', minWidth: 220, showOverflowTooltip: true },
-    {
-      prop: 'status',
-      label: '状态',
-      width: 110,
-      formatter: (row: PatientReport) =>
-        h(
-          ElTag,
-          {
-            type:
-              row.status === '已核对' ? 'success' : row.status === '已退回' ? 'danger' : 'warning',
-            effect: 'light'
-          },
-          () => row.status
-        )
-    },
-    {
-      prop: 'operation',
-      label: '操作',
-      width: 150,
-      formatter: (row: PatientReport) => {
-        if (row.status === '待核对' && canManage.value) {
-          return h('div', { class: 'flex-c gap-1' }, [
-            h(
-              ElButton,
-              { link: true, type: 'primary', onClick: () => reviewReport(row, '已核对') },
-              () => '通过'
-            ),
-            h(
-              ElButton,
-              { link: true, type: 'danger', onClick: () => reviewReport(row, '已退回') },
-              () => '退回'
-            )
-          ])
-        }
-        return h('span', { class: 'text-xs text-g-500' }, () => row.reviewer)
-      }
-    }
-  ]
-
-  const safetyColumns: ColumnOption<SafetyEvent>[] = [
-    { prop: 'date', label: '日期', width: 130 },
-    { prop: 'type', label: '事件类型', minWidth: 190, showOverflowTooltip: true },
-    { prop: 'level', label: '级别', width: 100 },
-    {
-      prop: 'confirmedBy',
-      label: '医生确认',
-      width: 130,
-      formatter: (row: SafetyEvent) =>
-        h(ElTag, { type: row.confirmed ? 'success' : 'warning', effect: 'light' }, () =>
-          row.confirmed ? row.confirmedBy : '待确认'
-        )
-    },
-    {
-      prop: 'operation',
-      label: '操作',
-      width: 110,
-      formatter: (row: SafetyEvent) => {
-        if (!row.confirmed && isDoctor.value) {
-          return h(
-            ElButton,
-            { link: true, type: 'primary', onClick: () => confirmSafetyEvent(row) },
-            () => '确认'
-          )
-        }
-        if (!row.confirmed) return h('span', { class: 'text-xs text-g-500' }, () => '仅医生可确认')
-        return h('span', { class: 'text-xs text-g-500' }, () => '已确认')
-      }
-    }
-  ]
-
   function showError(error: unknown) {
     ElMessage.error(error instanceof Error ? error.message : '操作失败')
-  }
-
-  function goFollowup() {
-    router.push({ name: 'DliFollowup', query: { patientId: props.patientId } })
   }
 
   async function load() {
     if (!props.patientId) return
     try {
-      const [reports, events, plans] = await Promise.all([
-        fetchGetPatientReports(props.patientId),
-        fetchGetPatientSafetyEvents(props.patientId),
-        fetchGetManagementPlans(props.patientId)
-      ])
-      reportList.value = reports
-      safetyList.value = events
-      managementList.value = plans
-    } catch (error) {
-      showError(error)
-    }
-  }
-
-  async function reviewReport(row: PatientReport, action: '已核对' | '已退回') {
-    try {
-      const updated = await fetchReviewPatientReport(row.id, action, operatorName.value)
-      const target = reportList.value.find((item) => item.id === row.id)
-      if (target) Object.assign(target, updated)
-      ElMessage.success(`上报已${action}`)
-    } catch (error) {
-      showError(error)
-    }
-  }
-
-  async function submitSafetyEvent() {
-    try {
-      await fetchAddSafetyEvent(props.patientId, { ...safetyForm })
-      safetyDialogVisible.value = false
-      safetyList.value = await fetchGetPatientSafetyEvents(props.patientId)
-      ElMessage.success('安全事件已登记，等待医生确认')
-    } catch (error) {
-      showError(error)
-    }
-  }
-
-  async function confirmSafetyEvent(row: SafetyEvent) {
-    try {
-      await fetchConfirmSafetyEvent(props.patientId, row.id, operatorName.value)
-      safetyList.value = await fetchGetPatientSafetyEvents(props.patientId)
-      ElMessage.success('医生已确认该安全事件')
+      managementList.value = await fetchGetManagementPlans(props.patientId)
     } catch (error) {
       showError(error)
     }

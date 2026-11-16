@@ -3,9 +3,6 @@
   <div class="dli-pane dli-own">
     <div class="dli-pane-bar">
       <ElButton v-if="canManage" type="primary" @click="openApply">申请入组</ElButton>
-      <span class="text-xs text-g-500 ml-2">
-        建档与自动纳入管理候选队列均不等于研究入组；确认入组仅医生可操作
-      </span>
     </div>
 
     <ArtTable

@@ -1,4 +1,4 @@
-<!-- DLI 患者详情独立页面 [批注 01/02]：五页签 + 顶部阶段区 -->
+<!-- DLI 患者详情独立页面 [批注 01/02]：顶部概览卡片（含档案信息）+ 四页签 -->
 <template>
   <div ref="scroller" class="dli-detail art-full-height overflow-y-auto pb-5">
     <!-- 面包屑 -->
@@ -10,18 +10,15 @@
       <span>患者详情</span>
     </div>
 
-    <!-- 患者概览：吸顶常驻，切换 Tab 或滚动都不丢失 -->
+    <!-- 患者概览：吸顶常驻，切换 Tab 或滚动都不丢失；基础资料已并入本卡片，不重复展示 -->
     <section class="dli-hero">
       <div class="dli-hero-main">
         <div class="dli-avatar"><ArtSvgIcon icon="ri:user-3-line" /></div>
         <div class="dli-hero-id">
           <div class="dli-hero-title">
             <h1>{{ patient?.id ?? patientId }}</h1>
-            <ElTag v-if="profile" effect="light" type="primary">
-              当前阶段 {{ profile.stage }}
-            </ElTag>
-            <ElTag v-if="profile && !profile.stageConfirmed" effect="plain" type="warning">
-              阶段待医生确认
+            <ElTag v-if="profile" effect="light" :type="stagePending ? 'warning' : 'primary'">
+              当前阶段 {{ stagePending ? '诊断后（待确认）' : profile.stage }}
             </ElTag>
             <ElTag v-if="patient" effect="plain" :type="STATUS_TAG[patient.status]">
               {{ patient.status }}
@@ -29,16 +26,25 @@
             <ElTag v-if="profile" effect="plain">{{ profile.initialEntry }}</ElTag>
           </div>
           <p class="dli-hero-sub">
-            {{ profile?.diagnosisDate ? `诊断日期 ${profile.diagnosisDate}` : '暂无诊断日期' }}
-            <span class="dli-dot">·</span>
-            {{ profile?.diagnosisBasis || '暂无诊断依据摘要' }}
-            <span class="dli-dot">·</span>
-            {{ patient?.center ?? '—' }}
-            <span class="dli-dot">·</span>
-            负责医生 {{ patient?.doctor ?? '—' }}
+            <template v-if="profile?.initialEntry === '已确诊DLI'">
+              诊断日期 {{ profile?.diagnosisDate || '—' }}
+              <span class="dli-dot">·</span>
+              诊断依据 {{ profile?.diagnosisBasis || '—' }}
+            </template>
+            <template v-else>非「已确诊DLI」入口，无诊断结论信息</template>
           </p>
         </div>
         <div class="dli-hero-actions">
+          <!-- 仅「已确诊DLI + 诊断后 + 未确认」且当前为医生时出现 -->
+          <ElButton
+            v-if="canConfirmDiagnosis"
+            type="primary"
+            plain
+            :loading="confirmBusy"
+            @click="confirmDiagnosis"
+          >
+            确认诊断
+          </ElButton>
           <ElDropdown :disabled="!patient" trigger="click" @command="handleShortcut">
             <ElButton> 快捷入口<ArtSvgIcon icon="ri:arrow-down-s-line" /> </ElButton>
             <template #dropdown>
@@ -54,40 +60,6 @@
         </div>
       </div>
 
-      <!-- 阶段区：确认后的阶段、诊断信息及阶段操作 [批注 02] -->
-      <div class="dli-stage-bar">
-        <div class="dli-stage-info">
-          <template v-if="profile?.diagnosisConfirmed">
-            诊断已确认 · {{ profile.stage }} · 生效 {{ profile.stageUpdatedAt || '—' }}
-            <span v-if="!hasReport" class="text-g-500">· 暂无报告</span>
-          </template>
-          <template v-else>
-            阶段 {{ profile?.stage ?? '—' }}
-            <span v-if="profile && !profile.stageConfirmed">（待医生核对确认）</span>
-            <span v-else-if="profile?.initialEntry === '已确诊DLI'">· 诊断结论待医生确认</span>
-          </template>
-        </div>
-        <ElButton v-if="isDoctor" @click="openStageDialog">更新阶段</ElButton>
-        <ElButton
-          v-if="isDoctor && profile?.initialEntry === '已确诊DLI' && !profile?.diagnosisConfirmed"
-          type="primary"
-          plain
-          @click="confirmDiagnosis"
-        >
-          确认诊断
-        </ElButton>
-        <ElButton v-if="profile?.diagnosisConfirmed && hasReport" @click="goReports">
-          查看诊断后评估
-        </ElButton>
-        <ElButton
-          v-if="profile?.diagnosisConfirmed && !hasReport && canManage"
-          @click="startAssessment"
-        >
-          发起评估
-        </ElButton>
-        <ElButton v-if="profile?.diagnosisConfirmed" @click="goFollowup">制定随访</ElButton>
-      </div>
-
       <div v-if="patient" class="dli-metrics">
         <div v-for="item in metrics" :key="item.label" class="dli-metric">
           <span class="dli-metric-label">{{ item.label }}</span>
@@ -98,15 +70,6 @@
 
     <ElCard class="dli-card art-table-card dli-tab-card" shadow="never">
       <ElTabs v-model="activeTab" class="dli-tabs">
-        <ElTabPane label="基础资料" name="basic">
-          <BasicPanel
-            ref="basicRef"
-            :patient-id="patientId"
-            :patient="patient"
-            @edit="openEditBasic"
-          />
-        </ElTabPane>
-
         <ElTabPane label="检查资料" name="exam">
           <div class="dli-pane dli-embed">
             <ExamView :key="patientId" :patient-id="patientId" />
@@ -132,38 +95,12 @@
             :focus-project-id="consentProjectId"
           />
         </ElTabPane>
+
+        <ElTabPane label="上报" name="report">
+          <ReportPanel :key="`report-${patientId}`" :patient-id="patientId" />
+        </ElTabPane>
       </ElTabs>
     </ElCard>
-
-    <!-- 更新阶段 -->
-    <ElDialog v-model="stageDialogVisible" title="更新阶段" width="480px" destroy-on-close>
-      <ElForm label-width="110px">
-        <ElFormItem label="调整后阶段">
-          <ElSelect v-model="stageForm.stage" class="w-full">
-            <ElOption v-for="item in STAGE_OPTIONS" :key="item" :label="item" :value="item" />
-          </ElSelect>
-        </ElFormItem>
-        <ElFormItem label="阶段生效时间">
-          <ElDatePicker
-            v-model="stageForm.effectiveAt"
-            type="date"
-            value-format="YYYY-MM-DD"
-            class="w-full"
-          />
-        </ElFormItem>
-        <ElFormItem label="调整说明">
-          <ElInput v-model="stageForm.note" type="textarea" :rows="2" placeholder="说明调整原因" />
-        </ElFormItem>
-      </ElForm>
-      <div class="text-xs text-g-500">医生确认后写入诊疗历程，初始入口保持不变</div>
-      <template #footer>
-        <ElButton @click="stageDialogVisible = false">取消</ElButton>
-        <ElButton type="primary" :loading="stageBusy" @click="submitStage">医生确认</ElButton>
-      </template>
-    </ElDialog>
-
-    <!-- 编辑基础资料：复用建档弹窗编辑模式，保存后刷新详情 [批注 02] -->
-    <ArchiveDialog v-model="editVisible" :patient-id="patientId" @saved="handleBasicSaved" />
 
     <!-- 医患对话 / 诊疗历程：与患者列表页共用同一套抽屉 -->
     <ChatDrawer v-model="chatVisible" :patient="patient" :readonly="!canManage" />
@@ -196,44 +133,30 @@
   import {
     ElButton,
     ElCard,
-    ElDatePicker,
-    ElDialog,
     ElDrawer,
     ElDropdown,
     ElDropdownItem,
     ElDropdownMenu,
-    ElForm,
-    ElFormItem,
-    ElInput,
     ElMessage,
-    ElOption,
-    ElSelect,
     ElTabPane,
     ElTabs,
     ElTag
   } from 'element-plus'
-  import { computed, onMounted, reactive, ref, watch } from 'vue'
+  import { computed, onMounted, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import { fetchGetPatientById } from '@/mock/dli/api'
-  import {
-    STAGE_OPTIONS,
-    fetchConfirmDiagnosis,
-    fetchGetPatientProfile,
-    fetchUpdatePatientStage,
-    hasDiagnosisReport
-  } from '@/mock/dli/patient-admin'
-  import type { PatientProfile, PatientStage, WebPatient } from '@/mock/dli/types'
+  import { fetchConfirmDiagnosis, fetchGetPatientProfile } from '@/mock/dli/patient-admin'
+  import type { PatientProfile, WebPatient } from '@/mock/dli/types'
   import { useUserStore } from '@/store/modules/user'
   import ExamView from '@/views/dli/exam/index.vue'
   import SampleRecordView from '@/views/dli/sample/record/index.vue'
   import SampleTestView from '@/views/dli/sample/test/index.vue'
   import ChatDrawer from './modules/chat-drawer.vue'
   import HistoryDrawer from './modules/history-drawer.vue'
-  import ArchiveDialog from './modules/archive-dialog.vue'
-  import BasicPanel from './modules/basic-panel.vue'
   import ManagementPanel from './modules/management-panel.vue'
   import EnrollmentPanel from './modules/enrollment-panel.vue'
   import ConsentPanel from './modules/consent-panel.vue'
+  import ReportPanel from './modules/report-panel.vue'
 
   defineOptions({ name: 'DliPatientDetail' })
 
@@ -241,8 +164,10 @@
   const router = useRouter()
   const userStore = useUserStore()
 
+  /** 基础资料已并入顶部卡片，默认落在检查资料；「上报」为患者端上报的独立页签 */
+  const TAB_NAMES = ['exam', 'plan', 'enrollment', 'consent', 'report']
   const patientId = computed(() => String(route.params.id ?? ''))
-  const activeTab = ref('basic')
+  const activeTab = ref('exam')
   const scroller = ref<HTMLElement>()
   const chatVisible = ref(false)
   const historyVisible = ref(false)
@@ -253,21 +178,10 @@
   const patient = ref<WebPatient>()
   const profile = ref<PatientProfile>()
   const consentProjectId = ref('')
-  const basicRef = ref<{ load: () => Promise<void> }>()
-  const stageDialogVisible = ref(false)
-  /** 基础资料编辑弹窗（复用建档弹窗编辑模式） [批注 02] */
-  const editVisible = ref(false)
-  const stageBusy = ref(false)
-  const stageForm = reactive({
-    stage: '治疗前' as PatientStage,
-    effectiveAt: new Date().toISOString().slice(0, 10),
-    note: ''
-  })
 
   const role = computed(() => userStore.getUserInfo.roles?.[0] ?? 'R_DOCTOR')
   const isDoctor = computed(() => role.value === 'R_DOCTOR')
   const canManage = computed(() => ['R_DOCTOR', 'R_ASSISTANT', 'R_NURSE'].includes(role.value))
-  const hasReport = computed(() => hasDiagnosisReport(patientId.value))
 
   const STATUS_TAG: Record<WebPatient['status'], 'success' | 'primary' | 'info' | 'warning'> = {
     待评估: 'warning',
@@ -276,19 +190,50 @@
     已结案: 'info'
   }
 
-  /** 概览指标：身份字段按 G1 不展示 */
+  /**
+   * 「诊断后」是否待医生确认。
+   * 只有初始入口为「已确诊DLI」才有这个状态，其他入口不出现待确认。
+   */
+  const stagePending = computed(() => {
+    const p = profile.value
+    if (!p) return false
+    return p.initialEntry === '已确诊DLI' && p.stage === '诊断后' && !p.diagnosisConfirmed
+  })
+
+  /** 仅医生可确认，且必须是「已确诊DLI + 诊断后 + 未确认」 */
+  const canConfirmDiagnosis = computed(() => stagePending.value && isDoctor.value)
+  const confirmBusy = ref(false)
+
+  /** 概览指标：身份字段按 G1 不展示；当前阶段 / 管理状态 / 初始入口已在标题标签里，这里不再重复 */
   const metrics = computed(() => {
     const p = patient.value
     if (!p) return []
     return [
       { label: '所属中心', value: p.center },
       { label: '负责医生', value: p.doctor },
-      { label: '初始入口', value: profile.value?.initialEntry ?? '—' },
-      { label: '管理状态', value: p.status },
       { label: '入组状态', value: p.enrolled ? '已入组' : '仅建档' },
+      { label: '关联项目', value: `${profile.value?.enrollments.length ?? 0} 个` },
+      {
+        label: '知情同意',
+        value: p.consent.signed ? p.consent.version : '未签署'
+      },
       { label: '最近更新', value: p.lastUpdate }
     ]
   })
+
+  /** 医生确认诊断：确认后阶段与诊断同时生效 */
+  async function confirmDiagnosis() {
+    confirmBusy.value = true
+    try {
+      await fetchConfirmDiagnosis(patientId.value, role.value)
+      await loadAll()
+      ElMessage.success('已确认诊断，阶段生效')
+    } catch (error) {
+      showError(error)
+    } finally {
+      confirmBusy.value = false
+    }
+  }
 
   function showError(error: unknown) {
     ElMessage.error(error instanceof Error ? error.message : '操作失败')
@@ -317,66 +262,6 @@
     } catch (error) {
       showError(error)
     }
-  }
-
-  function openStageDialog() {
-    stageForm.stage = profile.value?.stage ?? '治疗前'
-    stageForm.effectiveAt = new Date().toISOString().slice(0, 10)
-    stageForm.note = ''
-    stageDialogVisible.value = true
-  }
-
-  /** 基础资料右上角编辑入口：复用建档弹窗编辑模式 [批注 02] */
-  function openEditBasic() {
-    editVisible.value = true
-  }
-
-  /** 编辑保存成功：关闭弹窗并刷新当前详情（基础资料 + 概览指标 + 阶段区） */
-  async function handleBasicSaved() {
-    await loadAll()
-    await basicRef.value?.load()
-    ElMessage.success('基础资料已更新')
-  }
-
-  async function submitStage() {
-    stageBusy.value = true
-    try {
-      await fetchUpdatePatientStage(patientId.value, { ...stageForm }, role.value)
-      stageDialogVisible.value = false
-      await loadAll()
-      await basicRef.value?.load()
-      ElMessage.success('阶段已更新并写入诊疗历程')
-    } catch (error) {
-      showError(error)
-    } finally {
-      stageBusy.value = false
-    }
-  }
-
-  async function confirmDiagnosis() {
-    try {
-      await fetchConfirmDiagnosis(patientId.value, role.value)
-      await loadAll()
-      await basicRef.value?.load()
-      ElMessage.success('医生已确认诊断结论')
-    } catch (error) {
-      showError(error)
-    }
-  }
-
-  function goReports() {
-    router.push({ name: 'DliAssessmentReports', query: { patientId: patientId.value } })
-  }
-
-  function startAssessment() {
-    router.push({
-      name: 'DliAssessmentReports',
-      query: { patientId: patientId.value, openManual: '1' }
-    })
-  }
-
-  function goFollowup() {
-    router.push({ name: 'DliFollowup', query: { patientId: patientId.value } })
   }
 
   /** 从研究入组行内「办理知情同意」切页签并带项目 */
@@ -426,7 +311,8 @@
 
   onMounted(() => {
     const tab = route.query.tab
-    if (typeof tab === 'string' && tab) activeTab.value = tab
+    // 基础资料页签已合并到顶部卡片，旧链接带 basic 时回落到检查资料
+    if (typeof tab === 'string' && TAB_NAMES.includes(tab)) activeTab.value = tab
   })
 </script>
 
@@ -632,22 +518,7 @@
     overflow: visible !important;
   }
 
-  /* 阶段区：批注 02 新增，不改动上方既有 hero 样式 */
-  .dli-stage-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    padding: 12px 20px 14px;
-    border-top: 1px solid var(--art-gray-200);
-  }
-
-  .dli-stage-info {
-    flex: 0 1 auto;
-    margin-right: auto;
-    font-size: 12px;
-    color: var(--art-gray-600);
-  }
+  /* 阶段区样式已随顶部「阶段 · 更新阶段」条移除 [批注 02 调整] */
 
   @media (width <= 1180px) {
     .dli-metrics {
