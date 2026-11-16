@@ -1,11 +1,11 @@
 <!-- DLI 评估报告完整详情页：五分区 + 顶部返回按钮，关闭回列表不另建 Tab [批注 05] -->
 <template>
   <div class="art-full-height overflow-y-auto pb-6">
-    <ElCard shadow="never" class="mb-4">
+    <ElCard shadow="never" class="mb-4 shrink-0">
       <div class="flex-cb gap-3">
         <div class="flex-c gap-3">
           <ElButton @click="goBack">
-            <ElIcon class="mr-1"><i class="ri-arrow-left-line" /></ElIcon>返回
+            <ArtSvgIcon icon="ri:arrow-left-line" class="mr-1" />返回
           </ElButton>
           <span class="text-base font-semibold text-g-900">
             评估报告详情 · {{ report?.id ?? route.params.id }}
@@ -19,7 +19,7 @@
     </ElCard>
 
     <template v-if="report">
-      <ElCard shadow="never" class="mb-4">
+      <ElCard shadow="never" class="mb-4 shrink-0">
         <ElDescriptions :column="3" border>
           <ElDescriptionsItem label="患者编号">{{ report.patientId }}</ElDescriptionsItem>
           <ElDescriptionsItem label="评估阶段">
@@ -40,66 +40,72 @@
         </ElDescriptions>
       </ElCard>
 
-      <!-- 一、输入资料 [批注 05] -->
-      <ElCard shadow="never" class="mb-4">
-        <template #header><span class="font-semibold">输入资料</span></template>
-        <ElTable :data="tableOf(report.inputs)" border size="small">
-          <ElTableColumn prop="text" label="资料项" />
-        </ElTable>
-      </ElCard>
+      <!--
+        五分区改两栏：原来是单列上下堆叠，纵向长度超出后各卡片被 flex 压缩、
+        表格被裁成两三行。两栏 + 卡片不收缩，既缩短纵向长度，也保证表格完整显示。
+      -->
+      <div class="grid shrink-0 grid-cols-1 gap-4 xl:grid-cols-2">
+        <!-- 一、输入资料 [批注 05] -->
+        <ElCard shadow="never">
+          <template #header><span class="font-semibold">输入资料</span></template>
+          <ElTable :data="tableOf(report.inputs)" border size="small">
+            <ElTableColumn prop="text" label="资料项" />
+          </ElTable>
+        </ElCard>
 
-      <!-- 二、评估结果：具体字段以模型接口为准，不统一写成准确率 [批注 05] -->
-      <ElCard shadow="never" class="mb-4">
-        <template #header><span class="font-semibold">评估结果</span></template>
-        <div class="dli-rd-result">{{ report.result }}</div>
-      </ElCard>
+        <!-- 二、评估结果：具体字段以模型接口为准，不统一写成准确率 [批注 05] -->
+        <ElCard shadow="never">
+          <template #header><span class="font-semibold">评估结果</span></template>
+          <div class="dli-rd-result">{{ report.result }}</div>
+        </ElCard>
 
-      <!-- 三、依据来源 [批注 05] -->
-      <ElCard shadow="never" class="mb-4">
-        <template #header><span class="font-semibold">依据来源</span></template>
-        <ElTable :data="tableOf(report.evidence)" border size="small">
-          <ElTableColumn prop="text" label="依据项" />
-        </ElTable>
-      </ElCard>
+        <!-- 三、依据来源 [批注 05] -->
+        <ElCard shadow="never">
+          <template #header><span class="font-semibold">依据来源</span></template>
+          <ElTable :data="tableOf(report.evidence)" border size="small">
+            <ElTableColumn prop="text" label="依据项" />
+          </ElTable>
+        </ElCard>
 
-      <!-- 四、个体化建议 [批注 05] -->
-      <ElCard shadow="never" class="mb-4">
-        <template #header><span class="font-semibold">个体化建议</span></template>
-        <ElTable :data="tableOf(report.suggestions)" border size="small">
-          <ElTableColumn prop="text" label="建议项" />
-        </ElTable>
-      </ElCard>
+        <!-- 四、个体化建议 [批注 05] -->
+        <ElCard shadow="never">
+          <template #header><span class="font-semibold">个体化建议</span></template>
+          <ElTable :data="tableOf(report.suggestions)" border size="small">
+            <ElTableColumn prop="text" label="建议项" />
+          </ElTable>
+        </ElCard>
 
-      <!-- 五、医生意见：采纳结果、说明、确认医生、确认时间 [批注 05] -->
-      <ElCard shadow="never">
-        <template #header><span class="font-semibold">医生意见</span></template>
-        <template v-if="report.opinion">
-          <ElDescriptions :column="2" border>
-            <ElDescriptionsItem label="采纳结果">
-              <ElTag
-                :type="
-                  report.opinion.adoption === '采纳'
-                    ? 'success'
-                    : report.opinion.adoption === '修改后采纳'
-                      ? 'warning'
-                      : 'danger'
-                "
-                effect="light"
-              >
-                {{ report.opinion.adoption }}
-              </ElTag>
-            </ElDescriptionsItem>
-            <ElDescriptionsItem label="确认医生">{{ report.opinion.doctor }}</ElDescriptionsItem>
-            <ElDescriptionsItem label="医生说明" :span="2">{{
-              report.opinion.note
-            }}</ElDescriptionsItem>
-            <ElDescriptionsItem label="确认时间" :span="2">
-              {{ report.opinion.confirmedAt }}
-            </ElDescriptionsItem>
-          </ElDescriptions>
-        </template>
-        <p v-else class="text-sm text-g-500">暂无医生意见，待确认</p>
-      </ElCard>
+        <!-- 五、医生意见：采纳结果、说明、确认医生、确认时间 [批注 05] -->
+        <ElCard shadow="never" class="xl:col-span-2">
+          <template #header><span class="font-semibold">医生意见</span></template>
+          <template v-if="report.opinion">
+            <ElDescriptions :column="2" border>
+              <ElDescriptionsItem label="采纳结果">
+                <ElTag
+                  :type="
+                    report.opinion.adoption === '采纳'
+                      ? 'success'
+                      : report.opinion.adoption === '修改后采纳'
+                        ? 'warning'
+                        : 'danger'
+                  "
+                  effect="light"
+                >
+                  {{ report.opinion.adoption }}
+                </ElTag>
+              </ElDescriptionsItem>
+              <ElDescriptionsItem label="确认医生">{{ report.opinion.doctor }}</ElDescriptionsItem>
+              <ElDescriptionsItem label="医生说明" :span="2">{{
+                report.opinion.note
+              }}</ElDescriptionsItem>
+              <ElDescriptionsItem label="确认时间" :span="2">
+                {{ report.opinion.confirmedAt }}
+              </ElDescriptionsItem>
+            </ElDescriptions>
+          </template>
+          <p v-else class="text-sm text-g-500">暂无医生意见，待确认</p>
+        </ElCard>
+      </div>
     </template>
 
     <!-- 记录意见弹窗 [批注 05] -->

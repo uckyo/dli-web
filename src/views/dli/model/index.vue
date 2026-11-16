@@ -1,19 +1,19 @@
 <!-- DLI 模型管理（批注 20）：三卡片 + 详情弹窗补全 + 配置弹窗（输入映射/版本留痕）；接入与启用状态分开 -->
 <template>
   <div v-loading="loading" class="art-full-height overflow-y-auto pb-5">
-    <!-- 页面操作区：新建/编辑按钮按实际授权裁剪，普通医护默认查看和使用 [批注 20] -->
-    <div class="mb-4 flex" v-if="canConfigure">
-      <ElButton type="primary" @click="openCreate">
-        <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建模型
-      </ElButton>
+    <!--
+      页面操作区 [批注 20]：模型配置由平台管理员及获明确授权的角色维护。
+      控件对无权限角色仍然显示、只是禁用并给出原因，避免“按钮凭空消失”看不出是被权限挡住。
+    -->
+    <div class="mb-4 flex">
+      <ElTooltip :disabled="canConfigure" content="仅平台管理员及获授权角色可配置" placement="top">
+        <span>
+          <ElButton type="primary" :disabled="!canConfigure" @click="openCreate">
+            <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建模型
+          </ElButton>
+        </span>
+      </ElTooltip>
     </div>
-    <ElAlert
-      v-else
-      class="mb-4"
-      type="info"
-      :closable="false"
-      title="模型配置由平台管理员及获明确授权的角色维护，当前账号可查看与使用"
-    />
 
     <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
       <div v-for="model in models" :key="model.id" class="art-card flex flex-col p-5">
@@ -28,19 +28,24 @@
             </div>
             <p class="mt-1 text-xs text-g-500">{{ model.id }} · 版本 {{ model.version }}</p>
           </div>
-          <!-- 启用状态与接入状态分开；未接入不可启用 [批注 20] -->
-          <ElSwitch
-            v-if="canConfigure"
-            :model-value="model.enabled"
-            :disabled="!model.connected"
-            :before-change="() => toggleModel(model)"
-            inline-prompt
-            active-text="启用"
-            inactive-text="停用"
-          />
-          <ElTag v-else :type="model.enabled ? 'success' : 'info'" effect="light">
-            {{ model.enabled ? '启用' : '停用' }}
-          </ElTag>
+          <!-- 启用状态与接入状态分开；未接入不可启用 [批注 20]。无配置权限时禁用并说明原因 -->
+          <ElTooltip
+            :disabled="canConfigure && model.connected"
+            :content="canConfigure ? '未接入不可启用' : '仅平台管理员及获授权角色可配置'"
+            placement="top"
+          >
+            <span class="inline-flex shrink-0">
+              <ElSwitch
+                :model-value="model.enabled"
+                :disabled="!canConfigure || !model.connected"
+                :before-change="() => toggleModel(model)"
+                :width="54"
+                inline-prompt
+                active-text="启用"
+                inactive-text="停用"
+              />
+            </span>
+          </ElTooltip>
         </div>
 
         <div class="mt-5 space-y-3 text-sm">
@@ -77,9 +82,17 @@
 
         <div class="mt-auto flex justify-end gap-3 pt-4">
           <ElButton link type="primary" @click="openDetail(model)">查看详情</ElButton>
-          <ElButton v-if="canConfigure" link type="primary" @click="openEdit(model)">
-            编辑配置
-          </ElButton>
+          <ElTooltip
+            :disabled="canConfigure"
+            content="仅平台管理员及获授权角色可配置"
+            placement="top"
+          >
+            <span>
+              <ElButton link type="primary" :disabled="!canConfigure" @click="openEdit(model)">
+                编辑配置
+              </ElButton>
+            </span>
+          </ElTooltip>
         </div>
       </div>
     </div>
@@ -291,6 +304,7 @@
           <ElSwitch
             v-model="form.enabled"
             :disabled="!form.connected"
+            :width="54"
             inline-prompt
             active-text="启用"
             inactive-text="停用"

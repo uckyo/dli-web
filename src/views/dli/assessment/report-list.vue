@@ -1,4 +1,4 @@
-<!-- 评估预警 · 评估报告页签：列表 / 发起评估 / 记录意见 / 重新评估 [批注 05] -->
+<!-- 评估预警 · 评估报告页签：列表 / 发起评估；记录意见与重新评估在报告详情页 [批注 05] -->
 <template>
   <div class="pt-3">
     <ArtSearchBar
@@ -64,37 +64,6 @@
         </ElButton>
       </template>
     </ElDialog>
-
-    <!-- 记录意见弹窗：采纳结果 + 医生说明 [批注 05] -->
-    <ElDialog v-model="opinionVisible" title="记录意见" width="560px" destroy-on-close>
-      <ElDescriptions v-if="opinionRow" :column="2" border class="mb-4" size="small">
-        <ElDescriptionsItem label="报告编号">{{ opinionRow.id }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="患者编号">{{ opinionRow.patientId }}</ElDescriptionsItem>
-      </ElDescriptions>
-      <ElForm ref="opinionFormRef" :model="opinionForm" :rules="opinionRules" label-width="110px">
-        <ElFormItem label="采纳结果" prop="adoption">
-          <ElRadioGroup v-model="opinionForm.adoption">
-            <ElRadio v-for="item in ADOPTION_OPTIONS" :key="item" :value="item">{{ item }}</ElRadio>
-          </ElRadioGroup>
-        </ElFormItem>
-        <ElFormItem label="医生说明" prop="note">
-          <ElInput
-            v-model="opinionForm.note"
-            type="textarea"
-            :rows="3"
-            :placeholder="
-              opinionForm.adoption === '采纳'
-                ? '可补充说明（选填）'
-                : '修改或不采纳须写明内容 / 原因'
-            "
-          />
-        </ElFormItem>
-      </ElForm>
-      <template #footer>
-        <ElButton @click="opinionVisible = false">取消</ElButton>
-        <ElButton type="primary" :loading="savingOpinion" @click="submitOpinion">保存</ElButton>
-      </template>
-    </ElDialog>
   </div>
 </template>
 
@@ -103,15 +72,12 @@
     ElButton,
     ElTag,
     ElMessage,
-    ElMessageBox,
     ElDialog,
     ElForm,
     ElFormItem,
     ElInput,
     ElSelect,
-    ElOption,
-    ElRadioGroup,
-    ElRadio
+    ElOption
   } from 'element-plus'
   import type { FormInstance, FormRules } from 'element-plus'
   import { useRoute, useRouter } from 'vue-router'
@@ -121,16 +87,9 @@
     fetchGetAssessmentReports,
     fetchLaunchAssessment,
     fetchCheckAssessmentInputs,
-    fetchRecordReportOpinion,
-    fetchRerunAssessment,
     MODEL_OPTIONS
   } from '@/mock/dli/blueprint/api'
-  import type {
-    AssessmentReport,
-    AssessmentStage,
-    ModelUsage,
-    ReportAdoption
-  } from '@/mock/dli/blueprint/types'
+  import type { AssessmentReport, AssessmentStage, ModelUsage } from '@/mock/dli/blueprint/types'
 
   defineOptions({ name: 'DliAssessmentReportList' })
 
@@ -139,7 +98,7 @@
   const route = useRoute()
   const userStore = useUserStore()
 
-  /** 医生发起评估、记录意见、重新评估 [批注 05] */
+  /** 医生可发起评估；记录意见 / 重新评估在报告详情页操作 [批注 05] */
   const isDoctor = computed(() => (userStore.getUserInfo.roles?.[0] ?? 'R_DOCTOR') === 'R_DOCTOR')
   const operatorName = computed(() => {
     const info = userStore.getUserInfo as { userName?: string; username?: string }
@@ -148,7 +107,6 @@
 
   const STAGE_OPTIONS: AssessmentStage[] = ['治疗前', '治疗中', '诊断后']
   const USAGE_OPTIONS: ModelUsage[] = ['早筛预警', '早诊预警', '转归预测']
-  const ADOPTION_OPTIONS: ReportAdoption[] = ['采纳', '修改后采纳', '不采纳']
 
   const STAGE_TAG: Record<AssessmentStage, 'warning' | 'primary' | 'success'> = {
     治疗前: 'warning',
@@ -274,31 +232,16 @@
         {
           prop: 'operation',
           label: '操作',
-          width: 210,
+          width: 120,
           fixed: 'right' as const,
           align: 'center' as const,
+          // 记录意见 / 重新评估只在报告详情页操作，列表只保留查看入口
           formatter: (row: AssessmentReport) =>
-            h('div', { class: 'flex-c justify-center gap-1' }, [
-              h(
-                ElButton,
-                { link: true, type: 'primary', onClick: () => openReportDetail(row) },
-                () => '查看报告'
-              ),
-              ...(isDoctor.value
-                ? [
-                    h(
-                      ElButton,
-                      { link: true, type: 'primary', onClick: () => openOpinion(row) },
-                      () => '记录意见'
-                    ),
-                    h(
-                      ElButton,
-                      { link: true, type: 'primary', onClick: () => rerunReport(row) },
-                      () => '重新评估'
-                    )
-                  ]
-                : [])
-            ])
+            h(
+              ElButton,
+              { link: true, type: 'primary', onClick: () => openReportDetail(row) },
+              () => '查看报告'
+            )
         }
       ]
     }
@@ -368,72 +311,6 @@
       ElMessage.error(error instanceof Error ? error.message : '提交失败，请稍后重试')
     } finally {
       launching.value = false
-    }
-  }
-
-  /* ---------------- 记录意见 [批注 05] ---------------- */
-  const opinionVisible = ref(false)
-  const savingOpinion = ref(false)
-  const opinionRow = ref<AssessmentReport>()
-  const opinionFormRef = ref<FormInstance>()
-  const opinionForm = reactive({ adoption: '采纳' as ReportAdoption, note: '' })
-  const opinionRules: FormRules = {
-    note: [
-      {
-        validator: (_rule, value: string, callback) => {
-          if (opinionForm.adoption !== '采纳' && !(value ?? '').trim()) {
-            callback(new Error('修改或不采纳必须写明内容 / 原因'))
-          } else callback()
-        },
-        trigger: 'blur'
-      }
-    ]
-  }
-
-  function openOpinion(row: AssessmentReport) {
-    opinionRow.value = row
-    opinionForm.adoption = row.opinion?.adoption ?? '采纳'
-    opinionForm.note = row.opinion?.note ?? ''
-    opinionVisible.value = true
-  }
-
-  async function submitOpinion() {
-    if (!opinionFormRef.value || !opinionRow.value) return
-    const valid = await opinionFormRef.value.validate().catch(() => false)
-    if (!valid) return
-    savingOpinion.value = true
-    try {
-      await fetchRecordReportOpinion(opinionRow.value.id, {
-        adoption: opinionForm.adoption,
-        note: opinionForm.note,
-        doctor: operatorName.value
-      })
-      ElMessage.success('医生意见已保存，确认状态已更新')
-      opinionVisible.value = false
-      await getReportData()
-    } catch (error) {
-      ElMessage.error(error instanceof Error ? error.message : '保存失败')
-    } finally {
-      savingOpinion.value = false
-    }
-  }
-
-  /* ---------------- 重新评估：生成新报告，原报告保留 [批注 05] ---------------- */
-  async function rerunReport(row: AssessmentReport) {
-    const ok = await ElMessageBox.confirm(
-      `将基于报告 ${row.id} 重新评估，生成新报告并保留原报告。是否继续？`,
-      '重新评估',
-      { confirmButtonText: '发起重新评估', cancelButtonText: '取消', type: 'info' }
-    )
-      .then(() => true)
-      .catch(() => false)
-    if (!ok) return
-    try {
-      await fetchRerunAssessment(row.id, operatorName.value)
-      ElMessage.success('已生成新报告，原报告保留')
-      await getReportData()
-    } catch (error) {
-      ElMessage.error(error instanceof Error ? error.message : '重新评估失败')
     }
   }
 

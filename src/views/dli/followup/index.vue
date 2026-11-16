@@ -6,7 +6,7 @@
       <ElCard shadow="never" class="mb-4">
         <div class="flex-cb">
           <ElButton @click="goBackFromPlan">
-            <ElIcon class="mr-1"><i class="ri-arrow-left-line" /></ElIcon>返回随访列表
+            <ArtSvgIcon icon="ri:arrow-left-line" class="mr-1" />返回随访列表
           </ElButton>
           <span class="text-base font-semibold text-g-900">
             {{ planMode === 'create' ? '新建计划' : planMode === 'edit' ? '编辑计划' : '查看计划' }}
@@ -333,7 +333,6 @@
     ElButton,
     ElCard,
     ElTag,
-    ElIcon,
     ElMessage,
     ElMessageBox,
     ElTabPane,
