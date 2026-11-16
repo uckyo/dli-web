@@ -411,11 +411,18 @@ export interface PatientEndpointRecord {
 
 /** 患者研究记录 · 安全事件 [批注 15] */
 export interface PatientSafetyEvent {
+  id: string
+  /** 事件名称 */
   name: string
+  /** 发生时间 */
   occurredAt: string
+  /** 事件说明 */
   description: string
+  /** 关联资料 */
   source: string
+  /** 医生确认状态 */
   doctorConfirmed: boolean
+  confirmedBy: string
 }
 
 /** 患者研究记录抽屉数据 [批注 15] */
@@ -423,7 +430,6 @@ export interface PatientResearchRecord {
   patientId: string
   projectId: string
   endpoints: PatientEndpointRecord[]
-  safetyEvents: PatientSafetyEvent[]
 }
 
 /** 研究项目详情：临时分析筛选不改变患者正式入组组别 [批注 05-1] */

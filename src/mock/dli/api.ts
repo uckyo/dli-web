@@ -505,20 +505,23 @@ export async function fetchVerifyLinkedRecord(recordId: string): Promise<ExamRec
   return { ...record }
 }
 
-/** 登记安全事件（普通预警不自动转为不良事件，须医生确认） */
+/** 登记安全事件（普通预警不自动转为不良事件，须医生确认）[批注 15] */
 export async function fetchAddSafetyEvent(
   patientId: string,
-  input: { type: string; level: SafetyEvent['level'] }
+  input: { type: string; level: SafetyEvent['level']; description: string; source: string }
 ): Promise<SafetyEvent> {
   await delay()
   const patient = requirePatient(patientId)
-  if (!input.type.trim()) throw new Error('请选择安全事件类型')
+  if (!input.type.trim()) throw new Error('请填写安全事件名称')
+  if (!input.description.trim()) throw new Error('请填写事件说明')
   const event: SafetyEvent = {
     id: `SE-${Date.now()}`,
     patientId,
-    type: input.type,
+    type: input.type.trim(),
     level: input.level,
     date: todayStr(),
+    description: input.description.trim(),
+    source: input.source.trim(),
     confirmed: false,
     confirmedBy: ''
   }

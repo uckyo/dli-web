@@ -151,6 +151,8 @@ export const PATIENTS: WebPatient[] = NAMES.map((name, index) => {
               type: '药物相关肝酶升高',
               level: '中度' as const,
               date: day(index % 9),
+              description: 'ALT 升至正常上限 2 倍，无黄疸，已按方案复评',
+              source: `检验报告 EX-${String(index + 1).padStart(4, '0')}`,
               confirmed: index % 14 === 0,
               confirmedBy: index % 14 === 0 ? DOCTORS[index % DOCTORS.length] : ''
             }

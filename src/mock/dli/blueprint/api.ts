@@ -1643,8 +1643,13 @@ function findProjectDetail(id: string): ResearchProjectDetail | undefined {
 
 function requireProjectDetail(id: string): ResearchProjectDetail {
   const project = findProjectDetail(id)
-  if (!project) throw new Error('研究项目详情不存在')
-  return project
+  if (project) return project
+  // 患者详情里可能先于「研究管理」打开研究记录，此时详情尚未按列表行生成，按需补建
+  const row = RESEARCHES.find((item) => item.id === id)
+  if (!row) throw new Error('研究项目详情不存在')
+  const created = createResearchProjectDetailFromRow(row)
+  RESEARCH_PROJECT_DETAILS.push(created)
+  return created
 }
 
 function conditionToQuery(condition: AnalysisCondition): ResearchAnalysisQuery {
@@ -1913,23 +1918,8 @@ export async function fetchGetPatientResearchRecord(
       status: index % 3 === 0 ? ('待核对' as const) : ('已核对' as const)
     }
   })
-  const safetyEvents = [
-    {
-      name: '肝功能异常',
-      occurredAt: '2026-08-12',
-      description: '轻度转氨酶升高，已按方案复评',
-      source: '检验报告 EX-0013',
-      doctorConfirmed: true
-    },
-    {
-      name: '随访逾期',
-      occurredAt: '2026-09-20',
-      description: '随访反馈待补充，未自动判定为不良事件',
-      source: '随访任务记录',
-      doctorConfirmed: false
-    }
-  ]
-  return { patientId, projectId, endpoints, safetyEvents }
+  // 安全事件统一由 fetchGetPatientSafetyEvents 提供（登记 / 医生确认同源），此处只返回终点资料
+  return { patientId, projectId, endpoints }
 }
 
 /** 研究资料表 */
