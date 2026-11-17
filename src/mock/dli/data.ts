@@ -18,6 +18,8 @@ import type {
   AutomationTask,
   EnrollEntry,
   ExamCategory,
+  ExamCheckStatus,
+  ExamParseStatus,
   ExamProcessStatus,
   ExamRecognitionField,
   ExamRecord,
@@ -252,7 +254,7 @@ export const PATIENT_DETAILS: Record<string, WebPatientDetail> = PATIENTS.reduce
   {} as Record<string, WebPatientDetail>
 )
 
-/** 检查记录 */
+/** 检查记录：解析状态与核对状态按批注 06 拆开，status/verified 仅作兼容投影 */
 export const EXAMS: ExamRecord[] = PATIENTS.slice(0, 16).flatMap((patient, index) => {
   const categories: ExamCategory[] = ['影像', '病理', '检验', '病历', '其他']
   const items: Record<ExamCategory, string> = {
@@ -264,36 +266,90 @@ export const EXAMS: ExamRecord[] = PATIENTS.slice(0, 16).flatMap((patient, index
   }
   const category = categories[index % categories.length]
   const date = day(index % 20)
-  // EX-0013 对应 WN-0003「识别结果未核对，暂缓评估」，保持待核对用于联动演示 [批注 03-3]
-  const status: ExamProcessStatus =
-    index === 12
+  const needsParse = category === '病理' || category === '检验' || category === '病历'
+
+  let parseStatus: ExamParseStatus = '无需解析'
+  if (needsParse) {
+    // EX-0013 对应 WN-0003「识别结果未核对，暂缓评估」；EX-0014 保持未解析用于演示「发起解析」 [批注 03-3/06]
+    if (index === 12) parseStatus = '解析完成'
+    else if (index === 13) parseStatus = '未解析'
+    else if (index % 9 === 0) parseStatus = '解析失败'
+    else if (index % 7 === 0) parseStatus = '解析中'
+    else if (index % 5 === 0) parseStatus = '未解析'
+    else parseStatus = '解析完成'
+  }
+
+  const checkStatus: ExamCheckStatus =
+    index === 12 ||
+    parseStatus === '解析失败' ||
+    parseStatus === '解析中' ||
+    parseStatus === '未解析'
       ? '待核对'
-      : index % 9 === 0
+      : '已核对'
+  const verified = checkStatus === '已核对'
+  const status: ExamProcessStatus =
+    checkStatus === '已核对'
+      ? '已核对归档'
+      : parseStatus === '解析失败'
         ? '识别失败'
-        : index % 7 === 0
+        : parseStatus === '解析中'
           ? '识别中'
-          : index % 5 === 0
+          : parseStatus === '未解析'
             ? '待识别'
-            : '已核对归档'
-  const verified = status === '已核对归档'
-  // 只有报告图片 / PDF 类按需生成识别字段；影像与其他类不补造字段 [批注 03-3]
+            : '待核对'
+
+  const source: ExamSource =
+    index % 4 === 0
+      ? '院内同步'
+      : index % 4 === 1
+        ? '医护上传'
+        : index % 4 === 2
+          ? '患者上传'
+          : '院内同步'
+
+  const withCheckState = (
+    fields: Array<Omit<ExamRecognitionField, 'checkedValue' | 'hint'>>
+  ): ExamRecognitionField[] =>
+    fields.map((field) => ({
+      ...field,
+      checkedValue: verified ? field.extracted : '',
+      hint: field.extracted
+        ? field.range
+          ? `请核对，参考范围 ${field.range}`
+          : '请核对识别值'
+        : '识别值缺失，需人工录入'
+    }))
+
+  // 只有报告图片 / PDF 类按需生成识别字段；影像与其他类不补造字段 [批注 03-3/06]
   let recognitionFields: ExamRecognitionField[] = []
   if (category === '检验') {
-    recognitionFields = [
+    recognitionFields = withCheckState([
       { name: '白细胞计数', raw: 'WBC 6.8', extracted: '6.8', unit: '×10⁹/L', range: '3.5–9.5' },
       { name: '血红蛋白', raw: 'Hb 132', extracted: '132', unit: 'g/L', range: '115–150' },
-      { name: '血小板计数', raw: 'PLT 210', extracted: '210', unit: '×10⁹/L', range: '125–350' }
-    ]
+      {
+        name: '血小板计数',
+        raw: index === 12 ? 'PLT' : 'PLT 210',
+        extracted: index === 12 ? '' : '210',
+        unit: '×10⁹/L',
+        range: '125–350'
+      }
+    ])
   } else if (category === '病理') {
-    // 原文缺失的提取值留空，由人工核对补录
-    recognitionFields = [
-      { name: '病理诊断', raw: '镜下见异型细胞', extracted: '', unit: '', range: '' }
-    ]
+    recognitionFields = withCheckState([
+      {
+        name: '病理诊断',
+        raw: '镜下见异型细胞',
+        extracted: '镜下见异型细胞，建议免疫组化',
+        unit: '',
+        range: ''
+      }
+    ])
   } else if (category === '病历') {
-    recognitionFields = [
+    recognitionFields = withCheckState([
       { name: '主诉', raw: '咳嗽 2 周', extracted: '咳嗽 2 周', unit: '', range: '' }
-    ]
+    ])
   }
+
   return [
     {
       id: `EX-${String(index + 1).padStart(4, '0')}`,
@@ -304,11 +360,13 @@ export const EXAMS: ExamRecord[] = PATIENTS.slice(0, 16).flatMap((patient, index
       center: patient.center,
       date,
       status,
-      source: '院内同步' as ExamSource,
+      parseStatus,
+      checkStatus,
+      source,
       verified,
       checkedBy: verified ? '医护' : '',
       checkedAt: verified ? date : '',
-      uploader: '院内系统同步',
+      uploader: source === '院内同步' ? '院内系统同步' : source === '患者上传' ? '患者端' : '医护',
       uploadedAt: date,
       attachment:
         category === '影像'
@@ -319,10 +377,10 @@ export const EXAMS: ExamRecord[] = PATIENTS.slice(0, 16).flatMap((patient, index
       logs: [
         {
           id: `EL-${index + 1}-1`,
-          action: '院内同步',
-          operator: '系统',
+          action: source === '院内同步' ? '院内同步' : source,
+          operator: source === '院内同步' ? '系统' : source === '患者上传' ? '患者端' : '医护',
           time: date,
-          detail: '院内系统同步入库'
+          detail: source === '院内同步' ? '院内系统同步入库' : `${source}入库`
         }
       ]
     }

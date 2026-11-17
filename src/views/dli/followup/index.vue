@@ -26,6 +26,20 @@
           <ElDescriptionsItem label="计划来源">{{ planForm.source }}</ElDescriptionsItem>
           <ElDescriptionsItem label="计划版本">{{ activePlan?.version ?? '—' }}</ElDescriptionsItem>
         </ElDescriptions>
+        <ElTable
+          v-if="planMode === 'view' && activePlan?.versionHistory?.length"
+          :data="activePlan.versionHistory"
+          border
+          size="small"
+          class="mt-3"
+          max-height="220"
+        >
+          <ElTableColumn prop="version" label="历史版本" width="120" />
+          <ElTableColumn prop="reason" label="变更原因" min-width="220" />
+          <ElTableColumn prop="operator" label="操作人" width="110" />
+          <ElTableColumn prop="savedAt" label="留存时间" width="170" />
+          <ElTableColumn prop="snapshot.status" label="当时状态" width="100" />
+        </ElTable>
         <ElForm
           v-else
           ref="planFormRef"
@@ -40,6 +54,23 @@
           <ElFormItem label="计划名称" prop="name">
             <ElInput v-model="planForm.name" placeholder="例如：抗肿瘤治疗后 4 周随访计划" />
           </ElFormItem>
+          <ElFormItem label="计划来源" prop="source">
+            <ElSelect v-model="planForm.source" class="w-full">
+              <ElOption
+                v-for="item in PLAN_SOURCE_OPTIONS"
+                :key="item"
+                :label="item"
+                :value="item"
+              />
+            </ElSelect>
+          </ElFormItem>
+          <ElFormItem label="计划版本">
+            <ElInput
+              :model-value="activePlan?.version ?? '保存后生成草稿版本'"
+              readonly
+              placeholder="保存后生成草稿版本"
+            />
+          </ElFormItem>
           <ElFormItem label="负责医生" prop="doctor">
             <ElInput v-model="planForm.doctor" placeholder="负责医生" />
           </ElFormItem>
@@ -51,15 +82,15 @@
               class="w-full"
             />
           </ElFormItem>
-          <ElFormItem label="生效模板">
+          <ElFormItem label="生效模板（已发布）">
             <ElSelect
               v-model="planForm.templateId"
               class="w-full"
               clearable
-              placeholder="选择生效模板（可选）"
+              placeholder="选择已发布模板（可选）"
             >
               <ElOption
-                v-for="tpl in templates"
+                v-for="tpl in publishedTemplates"
                 :key="tpl.id"
                 :label="`${tpl.name}（${tpl.version}）`"
                 :value="tpl.id"
@@ -78,7 +109,7 @@
           <div class="flex-cb">
             <span class="font-semibold">计划任务</span>
             <ElButton
-              v-if="planMode !== 'view' && planForm.id && activePlan?.status === '草稿'"
+              v-if="isDoctor && planMode !== 'view' && planForm.id && activePlan?.status === '草稿'"
               size="small"
               type="primary"
               plain
@@ -337,6 +368,8 @@
     ElMessageBox,
     ElTabPane,
     ElTabs,
+    ElTable,
+    ElTableColumn,
     ElDialog,
     ElDescriptions,
     ElDescriptionsItem,
@@ -385,10 +418,9 @@
   const userStore = useUserStore()
 
   /** 医生确认发布；助理／护士可核对、人工随访，不能代医生发布 [批注 10] */
-  const isDoctor = computed(() => (userStore.getUserInfo.roles?.[0] ?? 'R_DOCTOR') === 'R_DOCTOR')
-  const canAssist = computed(() =>
-    ['R_DOCTOR', 'R_ASSISTANT', 'R_NURSE'].includes(userStore.getUserInfo.roles?.[0] ?? 'R_DOCTOR')
-  )
+  const role = computed(() => userStore.getUserInfo.roles?.[0] ?? 'R_DOCTOR')
+  const isDoctor = computed(() => role.value === 'R_DOCTOR')
+  const canAssist = computed(() => ['R_DOCTOR', 'R_ASSISTANT', 'R_NURSE'].includes(role.value))
   const operatorName = computed(() => {
     const info = userStore.getUserInfo as { userName?: string; username?: string }
     return info.userName ?? info.username ?? '当前医护'
@@ -400,6 +432,7 @@
   )
 
   const PLAN_STATUS_OPTIONS: FollowupPlanStatus[] = ['草稿', '已发布', '已完成', '已取消']
+  const PLAN_SOURCE_OPTIONS: FollowupPlanSource[] = ['医生创建', '模型建议', '自动规则']
   const PLAN_STATUS_TAG: Record<FollowupPlanStatus, 'info' | 'success' | 'primary' | 'danger'> = {
     草稿: 'info',
     已发布: 'success',
@@ -594,7 +627,7 @@
       .catch(() => false)
     if (!ok) return
     try {
-      await fetchCancelFollowupPlan(row.id, operatorName.value)
+      await fetchCancelFollowupPlan(row.id, operatorName.value, role.value)
       ElMessage.success('计划已取消，已停止后续提醒')
       await loadPlans()
     } catch (error) {
@@ -633,7 +666,10 @@
       planForm.name = ''
       planForm.doctor = operatorName.value
       planForm.dateRange = []
-      planForm.source = '医生创建'
+      const querySource = route.query.source
+      planForm.source = PLAN_SOURCE_OPTIONS.includes(querySource as FollowupPlanSource)
+        ? (querySource as FollowupPlanSource)
+        : '医生创建'
       planForm.templateId = ''
       activePlan.value = undefined
       planTasks.value = []
@@ -684,7 +720,9 @@
         startDate: planForm.dateRange[0] as string,
         endDate: planForm.dateRange[1] as string,
         source: planForm.source,
-        templateId: planForm.templateId || undefined
+        templateId: planForm.templateId || undefined,
+        templateVersion: publishedTemplates.value.find((item) => item.id === planForm.templateId)
+          ?.version
       })
       ElMessage.success('已存为草稿，医生确认发布后生成患者任务')
       planMode.value = 'edit'
@@ -711,7 +749,7 @@
     if (!ok) return
     publishingPlan.value = true
     try {
-      await fetchPublishFollowupPlan(planForm.id, operatorName.value)
+      await fetchPublishFollowupPlan(planForm.id, operatorName.value, role.value)
       ElMessage.success('计划已发布并生成患者任务')
       planMode.value = 'view'
       await loadPlanDetail(planForm.id)
@@ -790,7 +828,12 @@
             )
           )
         }
-        if (row.status !== '已取消' && row.status !== '已完成' && planMode.value === 'edit') {
+        if (
+          isDoctor.value &&
+          row.status !== '已取消' &&
+          row.status !== '已完成' &&
+          planMode.value === 'edit'
+        ) {
           btns.push(
             h(
               ElButton,
@@ -936,13 +979,20 @@
     if (!valid) return
     savingTask.value = true
     try {
-      await fetchSaveFollowupTask({
-        planId: planForm.id,
-        patientId: planForm.patientId,
-        title: taskForm.title.trim(),
-        type: '人工随访',
-        dueDate: taskForm.executeAt.slice(0, 10)
-      })
+      await fetchSaveFollowupTask(
+        {
+          planId: planForm.id,
+          patientId: planForm.patientId,
+          title: taskForm.title.trim(),
+          type: '人工随访',
+          dueDate: taskForm.executeAt.slice(0, 10),
+          itemName: taskForm.itemName.trim(),
+          executeAt: taskForm.executeAt,
+          requirement: taskForm.requirement.trim(),
+          completeWay: taskForm.completeWay
+        },
+        role.value
+      )
       ElMessage.success('任务已加入计划')
       taskDialogVisible.value = false
       await loadPlanDetail(planForm.id)
@@ -962,7 +1012,7 @@
       .then(() => true)
       .catch(() => false)
     if (!ok) return
-    await fetchCancelFollowupTask(row.id)
+    await fetchCancelFollowupTask(row.id, role.value)
     ElMessage.success('任务已取消，变更已留痕')
     await loadPlanDetail(planForm.id)
     await loadPlans()
@@ -970,6 +1020,9 @@
 
   /* ==================== 随访模板 [批注 10] ==================== */
   const templates = ref<FollowupTemplate[]>([])
+  const publishedTemplates = computed(() =>
+    templates.value.filter((item) => item.status === '已发布')
+  )
   const templateLoading = ref(false)
   const templateDialogVisible = ref(false)
   const savingTemplate = ref(false)
@@ -1018,25 +1071,28 @@
     if (!valid) return
     savingTemplate.value = true
     try {
-      await fetchSaveFollowupTemplate({
-        id: templateForm.id || undefined,
-        name: templateForm.name.trim(),
-        stage: templateForm.stage,
-        version: templateForm.id
-          ? (templates.value.find((t) => t.id === templateForm.id)?.version ?? 'V1.0')
-          : 'V1.0（草稿）',
-        status: templateForm.id
-          ? (templates.value.find((t) => t.id === templateForm.id)?.status ?? '草稿')
-          : '草稿',
-        items: templateForm.itemsText
-          .split('\n')
-          .map((line) => line.trim())
-          .filter(Boolean),
-        timePoints: templateForm.timePoints.trim(),
-        requirement: templateForm.requirement.trim(),
-        completeWay: templateForm.completeWay,
-        operator: operatorName.value
-      })
+      await fetchSaveFollowupTemplate(
+        {
+          id: templateForm.id || undefined,
+          name: templateForm.name.trim(),
+          stage: templateForm.stage,
+          version: templateForm.id
+            ? (templates.value.find((t) => t.id === templateForm.id)?.version ?? 'V1.0')
+            : 'V1.0（草稿）',
+          status: templateForm.id
+            ? (templates.value.find((t) => t.id === templateForm.id)?.status ?? '草稿')
+            : '草稿',
+          items: templateForm.itemsText
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean),
+          timePoints: templateForm.timePoints.trim(),
+          requirement: templateForm.requirement.trim(),
+          completeWay: templateForm.completeWay,
+          operator: operatorName.value
+        },
+        role.value
+      )
       ElMessage.success(templateForm.id ? '模板已保存' : '模板已存为草稿，获授权医生确认版本后发布')
       templateDialogVisible.value = false
       await loadTemplates()
@@ -1049,7 +1105,7 @@
 
   async function publishTemplate(row: FollowupTemplate) {
     try {
-      await fetchPublishFollowupTemplate(row.id, operatorName.value)
+      await fetchPublishFollowupTemplate(row.id, operatorName.value, role.value)
       ElMessage.success('模板已发布；更新模板不覆盖已发布计划')
       await loadTemplates()
     } catch (error) {

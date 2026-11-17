@@ -33,7 +33,7 @@
           </p>
         </div>
         <div class="dli-rd-actions">
-          <ElButton @click="openChat">Agent 对话</ElButton>
+          <ElButton v-if="isClinical" @click="openChat">Agent 对话</ElButton>
           <ElButton v-if="isClinical" type="primary" @click="openShare">共享设置</ElButton>
         </div>
       </div>

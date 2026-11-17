@@ -21,7 +21,8 @@
     />
 
     <p class="dli-research-hint">
-      演示环境仅保存资料名称、版本与文件信息，不接真实文件服务；入组清单需医生确认版本后才供患者详情研究入组使用。
+      演示环境仅保存资料名称、版本与文件信息；医生维护正式资料，助理 /
+      护士可协助草稿，待医生确认后生效。入组清单需医生确认版本后才供患者详情研究入组使用。
     </p>
 
     <!-- 上传 / 更新资料 -->
@@ -58,6 +59,9 @@
           </ElUpload>
         </ElFormItem>
       </ElForm>
+      <p v-if="!isDoctor" class="mt-2 text-xs leading-5 text-g-500">
+        当前账号将以「协助草稿」保存，不会直接覆盖医生维护的正式资料，需医生确认后生效。
+      </p>
       <template #footer>
         <ElButton @click="materialVisible = false">取消</ElButton>
         <ElButton type="primary" :loading="saving" @click="submitMaterial">保存</ElButton>
@@ -85,7 +89,10 @@
       <div class="dli-research-criteria-head">
         <div class="dli-research-section-head">
           <span class="dli-research-section-title">版本记录</span>
-          <ElTag effect="plain" size="small">当前生效 {{ effectiveVersion || '—' }}</ElTag>
+          <ElTag effect="plain" size="small">方案版本 {{ planVersion }}</ElTag>
+          <ElTag effect="plain" size="small" class="ml-2">
+            当前清单版本 {{ effectiveVersion || '—' }}
+          </ElTag>
         </div>
         <div class="flex-c gap-2">
           <ElButton v-if="!readonly" @click="addItem">新增条目</ElButton>
@@ -158,9 +165,22 @@
             <ElInput v-model="row.content" size="small" :disabled="readonly" />
           </template>
         </ElTableColumn>
-        <ElTableColumn label="依据" minWidth="220">
+        <ElTableColumn label="所需依据资料" minWidth="220">
           <template #default="{ row }">
             <ElInput v-model="row.basis" size="small" :disabled="readonly" />
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="显示顺序" width="110" align="center">
+          <template #default="{ row }">
+            <ElInputNumber
+              v-model="row.displayOrder"
+              size="small"
+              :min="1"
+              :max="999"
+              controls-position="right"
+              :disabled="readonly"
+              class="w-full"
+            />
           </template>
         </ElTableColumn>
         <ElTableColumn label="操作" width="90" align="center">
@@ -193,6 +213,7 @@
     ElForm,
     ElFormItem,
     ElInput,
+    ElInputNumber,
     ElMessage,
     ElMessageBox,
     ElOption,
@@ -203,10 +224,11 @@
     ElUpload
   } from 'element-plus'
   import type { UploadFile, UploadUserFile } from 'element-plus'
-  import { computed, onMounted, reactive, ref } from 'vue'
+  import { computed, h, onMounted, reactive, ref } from 'vue'
   import type { ColumnOption } from '@/types/component'
   import {
     fetchConfirmCriteriaList,
+    fetchConfirmResearchMaterialDraft,
     fetchGetCriteriaLists,
     fetchGetResearchMaterials,
     fetchSaveCriteriaList,
@@ -240,38 +262,53 @@
   const saving = ref(false)
   const materials = ref<ResearchMaterial[]>([])
 
-  const columns: ColumnOption<ResearchMaterial>[] = [
-    { prop: 'id', label: '资料编号', width: 160 },
-    { prop: 'name', label: '资料名称', minWidth: 190 },
-    { prop: 'type', label: '资料类型', width: 120 },
-    { prop: 'version', label: '资料版本', width: 100 },
+  const columns = computed<ColumnOption<ResearchMaterial>[]>(() => [
     {
-      prop: 'fileName',
-      label: '文件名',
-      minWidth: 170,
-      formatter: (row: ResearchMaterial) => h('span', {}, row.fileName || '—')
+      prop: 'name',
+      label: '资料名称',
+      minWidth: 220,
+      formatter: (row: ResearchMaterial) =>
+        h('span', { class: 'flex-c gap-2' }, [
+          h('span', {}, row.name),
+          row.maintainStatus === '草稿'
+            ? h(ElTag, { effect: 'plain', size: 'small', type: 'warning' }, () => '草稿待确认')
+            : null
+        ])
     },
-    { prop: 'updatedAt', label: '更新时间', width: 170 },
-    { prop: 'updatedBy', label: '更新人', width: 110 },
+    { prop: 'type', label: '资料类型', width: 130 },
+    { prop: 'version', label: '资料版本', width: 120 },
+    { prop: 'updatedAt', label: '更新时间', width: 180 },
     {
       prop: 'operation',
       label: '操作',
-      width: 150,
+      width: 210,
       fixed: 'right' as const,
       align: 'center' as const,
-      formatter: (row: ResearchMaterial) =>
-        h('div', { class: 'flex-c justify-center gap-2' }, [
-          h(ElButton, { link: true, type: 'primary', onClick: () => preview(row) }, () => '预览'),
-          props.readonly
-            ? null
-            : h(
-                ElButton,
-                { link: true, type: 'primary', onClick: () => openMaterial(row) },
-                () => '更新'
-              )
-        ])
+      formatter: (row: ResearchMaterial) => {
+        const actions = [
+          h(ElButton, { link: true, type: 'primary', onClick: () => preview(row) }, () => '预览')
+        ]
+        if (props.readonly) return h('div', { class: 'flex-c justify-center gap-2' }, actions)
+        actions.push(
+          h(
+            ElButton,
+            { link: true, type: 'primary', onClick: () => openMaterial(row) },
+            () => '更新'
+          )
+        )
+        if (isDoctor.value && row.maintainStatus === '草稿') {
+          actions.push(
+            h(
+              ElButton,
+              { link: true, type: 'primary', onClick: () => confirmDraft(row) },
+              () => '确认草稿'
+            )
+          )
+        }
+        return h('div', { class: 'flex-c justify-center gap-2' }, actions)
+      }
     }
-  ]
+  ])
 
   /* ---------------- 资料上传 / 更新 / 预览 ---------------- */
 
@@ -334,6 +371,20 @@
     }
   }
 
+  async function confirmDraft(row: ResearchMaterial) {
+    if (props.readonly || !isDoctor.value || row.maintainStatus !== '草稿') return
+    saving.value = true
+    try {
+      await fetchConfirmResearchMaterialDraft(props.projectId, row.id, role.value)
+      ElMessage.success(`${row.name} 草稿已确认为正式资料`)
+      await loadMaterials()
+    } catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : '确认失败')
+    } finally {
+      saving.value = false
+    }
+  }
+
   /* ---------------- 入组清单 ---------------- */
 
   const criteriaVisible = ref(false)
@@ -345,6 +396,7 @@
   const effectiveVersion = computed(
     () => criteriaLists.value.find((item) => item.status === '已确认')?.version ?? ''
   )
+  const planVersion = computed(() => criteriaLists.value[0]?.planVersion ?? 'V1.0')
   const canConfirm = computed(
     () => !!activeList.value && activeList.value.status === '草稿' && draftItems.value.length > 0
   )

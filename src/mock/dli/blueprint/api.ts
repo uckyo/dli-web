@@ -29,8 +29,8 @@ import {
   getEffectiveConsentTemplates,
   getIndicatorMeta
 } from './data'
-import { PATIENTS, RESEARCHES, CENTERS_DATA } from '@/mock/dli/data'
-import type { ResearchItem } from '@/mock/dli/types'
+import { EXAMS, PATIENTS, RESEARCHES, CENTERS_DATA } from '@/mock/dli/data'
+import type { ExamCategory, ResearchItem } from '@/mock/dli/types'
 import type {
   AnalysisCondition,
   AnalysisDataRow,
@@ -47,6 +47,7 @@ import type {
   FieldConfigVersion,
   FollowupPlan,
   FollowupPlanStatus,
+  FollowupPlanVersion,
   FollowupStatus,
   FollowupTemplate,
   FollowupTask,
@@ -156,7 +157,16 @@ const MODEL_PATIENT_KEY: Record<ModelUsage, 'earlyScreen' | 'earlyDiagnosis' | '
   转归预测: 'outcome'
 }
 
-/** 输入完整性检查：选择患者与模型后只读展示 [批注 05] */
+/** 模型输入项对应的检查资料分类；未核对的同分类资料不进入模型 [批注 06] */
+const EXAM_INPUT_CATEGORIES: Record<string, ExamCategory[]> = {
+  基线影像: ['影像'],
+  基线检验: ['检验'],
+  检验识别结果: ['检验'],
+  病理报告: ['病理'],
+  'HRCT 影像': ['影像']
+}
+
+/** 输入完整性检查：选择患者与模型后只读展示 [批注 05/06] */
 export async function fetchCheckAssessmentInputs(
   patientId: string,
   modelUsage: ModelUsage
@@ -165,11 +175,34 @@ export async function fetchCheckAssessmentInputs(
   const model = MODEL_OPTIONS.find((item) => item.usage === modelUsage)
   const patient = PATIENTS.find((item) => item.id === patientId.trim())
   if (!model || !patient) return { complete: false, missing: [], text: '请先填写患者编号与模型' }
-  const missing = patient[MODEL_PATIENT_KEY[modelUsage]] ? [] : model.requiredInputs
+
+  const profileReady = Boolean(patient[MODEL_PATIENT_KEY[modelUsage]])
+  const missing = model.requiredInputs.filter((input) => {
+    if (!profileReady) return true
+    const categories = EXAM_INPUT_CATEGORIES[input]
+    if (!categories) return false
+    return !EXAMS.some(
+      (item) =>
+        item.patientId === patientId &&
+        categories.includes(item.category) &&
+        item.checkStatus === '已核对'
+    )
+  })
+  const missingLabels = missing.map((input) => {
+    const categories = EXAM_INPUT_CATEGORIES[input]
+    if (!categories) return input
+    const hasPending = EXAMS.some(
+      (item) =>
+        item.patientId === patientId &&
+        categories.includes(item.category) &&
+        item.checkStatus === '待核对'
+    )
+    return hasPending ? `${input}（未核对，不进入模型）` : `${input}（未提供）`
+  })
   return {
     complete: !missing.length,
     missing,
-    text: missing.length ? `缺 ${missing.length} 项：${missing.join('、')}` : '输入完整'
+    text: missing.length ? `缺 ${missing.length} 项：${missingLabels.join('、')}` : '输入完整'
   }
 }
 
@@ -542,7 +575,68 @@ export async function fetchGetFollowupPlans(
 export async function fetchGetFollowupPlanById(id: string): Promise<FollowupPlan | undefined> {
   await delay(160)
   const plan = FOLLOWUP_PLANS.find((item) => item.id === id)
-  return plan ? { ...plan } : undefined
+  return plan ? { ...plan, versionHistory: [...(plan.versionHistory ?? [])] } : undefined
+}
+
+/** 随访计划时间格式统一，便于历史版本排序与展示 */
+function followupNow(): string {
+  return new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-')
+}
+
+/** 计划变更 / 取消时保存独立快照，不只改 version 字段 [批注 10] */
+function appendFollowupPlanVersion(
+  plan: FollowupPlan,
+  reason: string,
+  operator: string
+): FollowupPlanVersion {
+  const version: FollowupPlanVersion = {
+    version: plan.version,
+    savedAt: followupNow(),
+    operator,
+    reason,
+    snapshot: {
+      patientId: plan.patientId,
+      name: plan.name,
+      doctor: plan.doctor,
+      startDate: plan.startDate,
+      endDate: plan.endDate,
+      status: plan.status,
+      source: plan.source,
+      templateId: plan.templateId,
+      templateVersion: plan.templateVersion
+    }
+  }
+  plan.versionHistory = [version, ...(plan.versionHistory ?? [])]
+  return version
+}
+
+/** 模板更新一律另存草稿版本，不覆盖已发布版本 [批注 10] */
+function nextTemplateDraftVersion(version: string): string {
+  const num = Number.parseFloat(version.replace(/[^\d.]/g, ''))
+  return `V${Number.isFinite(num) ? (num + 0.1).toFixed(1) : '1.1'}（草稿）`
+}
+
+/** 全部有效任务完成后计划自动结案；全部取消不置为已完成 [批注 10] */
+function syncFollowupPlanCompletion(planId: string, operator: string): void {
+  const plan = FOLLOWUP_PLANS.find((item) => item.id === planId)
+  if (!plan || plan.status !== '已发布') return
+  const effective = FOLLOWUP_TASKS.filter(
+    (task) => task.planId === planId && task.status !== '已取消'
+  )
+  if (!effective.length || !effective.every((task) => task.status === '已完成')) return
+  plan.status = '已完成'
+  appendFollowupPlanVersion(plan, '全部有效任务完成，计划自动结案', operator)
+  appendSystemLog({
+    category: '重要数据',
+    action: '随访计划自动结案',
+    operator,
+    role: 'R_DOCTOR',
+    scope: '随访管理',
+    objectType: '随访计划',
+    objectId: plan.id,
+    target: plan.patientId,
+    detail: `${plan.name} 全部有效任务已完成`
+  })
 }
 
 /** 保存计划：新建 / 编辑均为草稿（模型或规则产生的计划也先为草稿）[批注 10] */
@@ -552,11 +646,12 @@ export async function fetchSaveFollowupPlan(
   }
 ): Promise<FollowupPlan> {
   await delay(260)
-  const now = new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-')
+  const now = followupNow()
   if (input.id) {
     const plan = FOLLOWUP_PLANS.find((item) => item.id === input.id)
     if (!plan) throw new Error('计划不存在')
     if (plan.status !== '草稿') throw new Error('仅草稿计划可编辑；历史版本保留')
+    appendFollowupPlanVersion(plan, '编辑草稿计划', input.doctor)
     Object.assign(plan, {
       patientId: input.patientId,
       name: input.name,
@@ -564,16 +659,20 @@ export async function fetchSaveFollowupPlan(
       startDate: input.startDate,
       endDate: input.endDate,
       source: input.source,
-      templateId: input.templateId
+      templateId: input.templateId,
+      templateVersion: input.templateVersion
     })
     plan.version = plan.version.replace(/（草稿）$/, '') + '（草稿）'
     return { ...plan }
   }
+  const template = FOLLOWUP_TEMPLATES.find((item) => item.id === input.templateId)
   const plan: FollowupPlan = {
     ...input,
     id: `FP-${String(Date.now()).slice(-4)}`,
     status: '草稿',
+    source: input.source ?? '医生创建',
     version: 'V1.0（草稿）',
+    templateVersion: template?.version,
     createdAt: now
   }
   FOLLOWUP_PLANS.unshift(plan)
@@ -583,44 +682,97 @@ export async function fetchSaveFollowupPlan(
 /** 医生确认发布计划：生成患者任务（同一任务在各入口引用），全部取消不能算已完成 [批注 10] */
 export async function fetchPublishFollowupPlan(
   id: string,
-  operator: string
+  operator: string,
+  role = 'R_DOCTOR'
 ): Promise<FollowupPlan> {
   await delay(280)
+  if (role !== 'R_DOCTOR') throw new Error('仅医生可发布随访计划')
   const plan = FOLLOWUP_PLANS.find((item) => item.id === id)
   if (!plan) throw new Error('计划不存在')
   if (plan.status !== '草稿') throw new Error('仅草稿计划可发布')
-  plan.status = '已发布'
-  plan.version = plan.version.replace(/（草稿）$/, '')
-  plan.publishedAt = new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-')
-  FOLLOWUP_TASKS.filter((task) => task.planId === id).forEach((task) => {
+
+  const template = plan.templateId
+    ? FOLLOWUP_TEMPLATES.find((item) => item.id === plan.templateId)
+    : undefined
+  if (template && template.status !== '已发布') {
+    throw new Error('仅已发布模板可用于新建计划')
+  }
+  if (template) plan.templateVersion = template.version
+
+  const publishedAt = followupNow()
+  let generated = 0
+  if (template) {
+    template.items.forEach((item, index) => {
+      const sourceTaskKey = `${plan.id}:${template.id}:${template.version}:${index}`
+      if (FOLLOWUP_TASKS.some((task) => task.sourceTaskKey === sourceTaskKey)) return
+      const executeAt = `${plan.startDate} 09:00`
+      FOLLOWUP_TASKS.unshift({
+        id: `FT-${Date.now()}-${index + 1}`,
+        planId: plan.id,
+        patientId: plan.patientId,
+        title: item,
+        itemName: item,
+        executeAt,
+        requirement: template.requirement,
+        completeWay: template.completeWay,
+        status: '待完成',
+        overdue: false,
+        type: '自动任务',
+        dueDate: plan.startDate,
+        assignee: plan.doctor,
+        result: '',
+        resultSource: '',
+        doctorConfirmed: true,
+        changeLog: [
+          { action: '医生发布计划，按生效模板生成患者任务', operator, createdAt: publishedAt }
+        ],
+        sourceTaskKey,
+        templateVersion: template.version
+      })
+      generated += 1
+    })
+  }
+  const planTasks = FOLLOWUP_TASKS.filter((task) => task.planId === id)
+  if (!planTasks.length) throw new Error('请先选择已发布模板或添加计划任务后再发布')
+  appendFollowupPlanVersion(plan, '医生确认发布计划', operator)
+  planTasks.forEach((task) => {
     task.doctorConfirmed = true
     task.changeLog.push({
-      action: '医生确认计划并发布，生成患者任务',
+      action: generated ? '医生确认计划并发布，生成患者任务' : '医生确认计划并发布',
       operator,
-      createdAt: plan.publishedAt!
+      createdAt: publishedAt
     })
   })
+  plan.status = '已发布'
+  plan.version = plan.version.replace(/（草稿）$/, '')
+  plan.publishedAt = publishedAt
   appendSystemLog({
     category: '重要数据',
     action: '发布随访计划并生成患者任务',
     operator,
-    role: 'R_DOCTOR',
+    role,
     scope: '随访管理',
     objectType: '随访计划',
     objectId: plan.id,
     target: plan.patientId,
-    detail: `计划 ${plan.name} 已发布（${plan.version}），患者与家属引用同一任务，家属仅查看`
+    detail: `计划 ${plan.name} 已发布（${plan.version}），生成 ${generated} 项模板任务；患者与家属引用同一任务，家属仅查看`
   })
   return { ...plan }
 }
 
 /** 取消计划须确认并停后续提醒，历史版本保留 [批注 10] */
-export async function fetchCancelFollowupPlan(id: string, operator: string): Promise<FollowupPlan> {
+export async function fetchCancelFollowupPlan(
+  id: string,
+  operator: string,
+  role = 'R_DOCTOR'
+): Promise<FollowupPlan> {
   await delay(220)
+  if (role !== 'R_DOCTOR') throw new Error('仅医生可取消随访计划')
   const plan = FOLLOWUP_PLANS.find((item) => item.id === id)
   if (!plan) throw new Error('计划不存在')
   if (plan.status === '已取消') throw new Error('计划已取消')
   if (plan.status === '已完成') throw new Error('已完成计划不可取消')
+  appendFollowupPlanVersion(plan, '医生取消计划并停止后续提醒', operator)
   plan.status = '已取消'
   FOLLOWUP_TASKS.filter(
     (task) => task.planId === id && (task.status === '待完成' || task.status === '待补充')
@@ -633,7 +785,7 @@ export async function fetchCancelFollowupPlan(id: string, operator: string): Pro
     category: '重要数据',
     action: '取消随访计划',
     operator,
-    role: 'R_DOCTOR',
+    role,
     scope: '随访管理',
     objectType: '随访计划',
     objectId: plan.id,
@@ -673,8 +825,9 @@ export async function fetchCheckFollowupTask(
   task.changeLog.push({
     action: `核对${input.result}${input.note.trim() ? `：${input.note.trim()}` : ''}`,
     operator: input.operator,
-    createdAt: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-')
+    createdAt: followupNow()
   })
+  syncFollowupPlanCompletion(task.planId, input.operator)
   return { ...task }
 }
 
@@ -703,6 +856,7 @@ export async function fetchManualFollowup(
     operator: input.operator,
     createdAt: input.contactAt
   })
+  syncFollowupPlanCompletion(task.planId, input.operator)
   return { ...task }
 }
 
@@ -715,19 +869,48 @@ export async function fetchGetFollowupTemplates(): Promise<FollowupTemplate[]> {
 
 /** 新增 / 编辑模板：获授权医生按方案确认版本，助理／护士可协助草稿 [批注 10] */
 export async function fetchSaveFollowupTemplate(
-  input: Omit<FollowupTemplate, 'updatedAt' | 'id'> & { id?: string }
+  input: Omit<FollowupTemplate, 'updatedAt' | 'id'> & { id?: string },
+  role = 'R_ASSISTANT'
 ): Promise<FollowupTemplate> {
   await delay(240)
-  const now = new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-')
+  if (!['R_DOCTOR', 'R_ASSISTANT', 'R_NURSE'].includes(role)) {
+    throw new Error('仅医护可按授权维护随访模板草稿')
+  }
+  const now = followupNow()
   if (input.id) {
     const tpl = FOLLOWUP_TEMPLATES.find((item) => item.id === input.id)
     if (!tpl) throw new Error('模板不存在')
-    Object.assign(tpl, { ...input, updatedAt: now })
+    if (tpl.status !== '草稿') {
+      const draft: FollowupTemplate = {
+        ...tpl,
+        ...input,
+        id: `FUT-${String(Date.now()).slice(-4)}`,
+        version: nextTemplateDraftVersion(tpl.version),
+        status: '草稿',
+        operator: input.operator,
+        updatedAt: now
+      }
+      FOLLOWUP_TEMPLATES.unshift(draft)
+      appendSystemLog({
+        category: '配置变更',
+        action: '另存随访模板新版本草稿',
+        operator: input.operator,
+        role,
+        scope: '随访管理',
+        objectType: '随访模板',
+        objectId: draft.id,
+        target: draft.name,
+        detail: `${tpl.version} → ${draft.version}，不覆盖已发布版本`
+      })
+      return { ...draft }
+    }
+    Object.assign(tpl, { ...input, status: '草稿', updatedAt: now })
     return { ...tpl }
   }
   const tpl: FollowupTemplate = {
     ...input,
     id: `FUT-${String(Date.now()).slice(-4)}`,
+    status: '草稿',
     updatedAt: now
   }
   FOLLOWUP_TEMPLATES.unshift(tpl)
@@ -737,9 +920,11 @@ export async function fetchSaveFollowupTemplate(
 /** 医生按方案确认模板版本；更新模板不覆盖已发布计划 [批注 10] */
 export async function fetchPublishFollowupTemplate(
   id: string,
-  operator: string
+  operator: string,
+  role = 'R_DOCTOR'
 ): Promise<FollowupTemplate> {
   await delay(240)
+  if (role !== 'R_DOCTOR') throw new Error('仅获授权医生可确认并发布模板版本')
   const tpl = FOLLOWUP_TEMPLATES.find((item) => item.id === id)
   if (!tpl) throw new Error('模板不存在')
   if (tpl.status !== '草稿') throw new Error('仅草稿模板可发布')
@@ -751,7 +936,7 @@ export async function fetchPublishFollowupTemplate(
     category: '配置变更',
     action: '发布随访模板',
     operator,
-    role: 'R_DOCTOR',
+    role,
     scope: '随访管理',
     objectType: '随访模板',
     objectId: tpl.id,
@@ -761,14 +946,22 @@ export async function fetchPublishFollowupTemplate(
   return { ...tpl }
 }
 
-export async function fetchSaveFollowupTask(payload: {
-  planId: string
-  patientId: string
-  title: string
-  type: FollowupTask['type']
-  dueDate: string
-}): Promise<void> {
+export async function fetchSaveFollowupTask(
+  payload: {
+    planId: string
+    patientId: string
+    title: string
+    type: FollowupTask['type']
+    dueDate: string
+    itemName?: string
+    executeAt?: string
+    requirement?: string
+    completeWay?: string
+  },
+  role = 'R_DOCTOR'
+): Promise<void> {
   await delay(300)
+  if (role !== 'R_DOCTOR') throw new Error('仅医生可添加计划任务')
   FOLLOWUP_TASKS.unshift({
     id: `FT-${String(Date.now()).slice(-4)}`,
     ...payload,
@@ -778,19 +971,20 @@ export async function fetchSaveFollowupTask(payload: {
     resultSource: '',
     doctorConfirmed: false,
     changeLog: [
-      { action: '手动新建任务', operator: '医护', createdAt: new Date().toISOString().slice(0, 10) }
+      { action: '医生添加计划任务，待发布后下发', operator: '医生', createdAt: followupNow() }
     ]
   })
 }
 
-export async function fetchCancelFollowupTask(id: string): Promise<void> {
+export async function fetchCancelFollowupTask(id: string, role = 'R_DOCTOR'): Promise<void> {
   await delay(220)
+  if (role !== 'R_DOCTOR') throw new Error('仅医生可取消计划任务')
   const task = FOLLOWUP_TASKS.find((item) => item.id === id)
   if (!task) return
   task.changeLog.push({
-    action: '取消任务',
+    action: '医生取消任务',
     operator: '医生',
-    createdAt: new Date().toISOString().slice(0, 10)
+    createdAt: followupNow()
   })
   task.status = '已取消'
 }
@@ -1875,6 +2069,21 @@ export async function fetchGetResearchProgress(
   let list = [...requireProjectDetail(projectId).progress]
   if (filters.center) list = list.filter((item) => item.center === filters.center)
   if (filters.group) list = list.filter((item) => item.group === filters.group)
+  const range = filters.timeRange || '全研究周期'
+  if (range !== '全研究周期') {
+    const times = list
+      .map((item) => Date.parse(item.observedAt ?? ''))
+      .filter((time) => Number.isFinite(time))
+    if (times.length) {
+      const latest = Math.max(...times)
+      const days = range.includes('30') ? 30 : 90
+      const min = latest - days * 24 * 60 * 60 * 1000
+      list = list.filter((item) => {
+        const time = Date.parse(item.observedAt ?? '')
+        return Number.isFinite(time) && time >= min
+      })
+    }
+  }
   return list
 }
 
@@ -1882,9 +2091,11 @@ export async function fetchGetResearchProgress(
 export async function fetchGetProgressIssues(
   projectId: string,
   center: string,
-  group: string
+  group: string,
+  role = ''
 ): Promise<ResearchProgressIssue[]> {
   await delay(160)
+  if (role && !CLINICAL_ROLES.includes(role)) throw new Error('无明细权限者只看汇总')
   const project = requireProjectDetail(projectId)
   const row = project.progress.find((item) => item.center === center && item.group === group)
   const count = Math.min(row?.missingCount ?? 4, 6)
@@ -1949,15 +2160,42 @@ export async function fetchSaveResearchMaterial(
   if (!input.name.trim() || !input.version.trim() || !input.fileName.trim()) {
     throw new Error('资料名称、版本和资料文件不能为空')
   }
+  const isDoctor = role === 'R_DOCTOR'
+  const maintainStatus: ResearchMaterial['maintainStatus'] = isDoctor ? '正式' : '草稿'
+  const common = {
+    ...input,
+    updatedAt: nowStr(),
+    updatedBy: roleName(role),
+    maintainStatus,
+    previewNote: isDoctor
+      ? '演示环境仅展示文件信息，不存真实文件'
+      : '助理 / 护士协助草稿，待医生确认后生效'
+  }
+
   if (input.id) {
     const item = project.materials.find((row) => row.id === input.id)
     if (!item) throw new Error('研究资料不存在')
-    Object.assign(item, input, {
-      id: item.id,
-      updatedAt: nowStr(),
-      updatedBy: roleName(role),
-      previewNote: '演示环境仅展示文件信息，不存真实文件'
-    })
+    if (!isDoctor) {
+      // 助理 / 护士不直接覆盖医生维护的正式资料，只提交草稿版本
+      const draft: ResearchMaterial = {
+        ...common,
+        id: `RM-DRAFT-${String(Date.now()).slice(-6)}`,
+        draftOfId: item.id
+      }
+      project.materials.unshift(draft)
+      appendSystemLog({
+        category: '重要数据',
+        action: '提交研究资料协助草稿',
+        operator: roleName(role),
+        role,
+        scope: project.center ?? '项目范围',
+        target: project.id,
+        detail: `${draft.name} ${draft.version} 待医生确认`
+      })
+      return { ...draft }
+    }
+    Object.assign(item, common, { id: item.id })
+    item.draftOfId = undefined
     appendSystemLog({
       category: '重要数据',
       action: '更新研究资料',
@@ -1969,22 +2207,49 @@ export async function fetchSaveResearchMaterial(
     })
     return { ...item }
   }
+
   const item: ResearchMaterial = {
-    ...input,
-    id: `RM-${String(Date.now()).slice(-6)}`,
-    updatedAt: nowStr(),
-    updatedBy: roleName(role),
-    previewNote: '演示环境仅展示文件信息，不存真实文件'
+    ...common,
+    id: `RM-${String(Date.now()).slice(-6)}`
   }
   project.materials.unshift(item)
   appendSystemLog({
     category: '重要数据',
-    action: '上传研究资料',
+    action: isDoctor ? '上传研究资料' : '提交研究资料协助草稿',
     operator: roleName(role),
     role,
     scope: project.center ?? '项目范围',
     target: project.id,
-    detail: `${item.name} ${item.version}`
+    detail: `${item.name} ${item.version}${isDoctor ? '' : ' 待医生确认'}`
+  })
+  return { ...item }
+}
+
+/** 医生确认助理 / 护士提交的研究资料草稿 */
+export async function fetchConfirmResearchMaterialDraft(
+  projectId: string,
+  id: string,
+  role: string
+): Promise<ResearchMaterial> {
+  await delay(180)
+  if (role !== 'R_DOCTOR') throw new Error('仅医生可确认研究资料草稿')
+  const project = requireProjectDetail(projectId)
+  const item = project.materials.find((row) => row.id === id)
+  if (!item) throw new Error('研究资料不存在')
+  if (item.maintainStatus !== '草稿') throw new Error('该资料不是待确认草稿')
+  item.maintainStatus = '正式'
+  item.draftOfId = undefined
+  item.updatedAt = nowStr()
+  item.updatedBy = roleName(role)
+  item.previewNote = '演示环境仅展示文件信息，不存真实文件'
+  appendSystemLog({
+    category: '重要数据',
+    action: '确认研究资料草稿',
+    operator: roleName(role),
+    role,
+    scope: project.center ?? '项目范围',
+    target: project.id,
+    detail: `${item.name} ${item.version} 已转为正式资料`
   })
   return { ...item }
 }
@@ -2008,13 +2273,20 @@ export async function fetchSaveCriteriaList(
   if (!CLINICAL_ROLES.includes(role)) throw new Error('仅临床项目成员可维护入组清单')
   if (!items.length) throw new Error('入组清单至少需要一条条件')
   const version = `V1.${RESEARCH_CRITERIA_LISTS.filter((item) => item.projectId === projectId).length}`
+  const orderedItems = items
+    .map((item, index) => {
+      const order = Number(item.displayOrder)
+      return { ...item, displayOrder: Number.isFinite(order) && order > 0 ? order : index + 1 }
+    })
+    .sort((a, b) => a.displayOrder - b.displayOrder)
+    .map((item, index) => ({ ...item, displayOrder: index + 1 }))
   const list: ResearchCriteriaList = {
     id: `CL-${projectId}-${version}`,
     projectId,
     planVersion: 'V1.0',
     version,
     status: '草稿',
-    items: items.map((item, index) => ({ ...item, displayOrder: index + 1 })),
+    items: orderedItems,
     confirmedBy: '',
     confirmedAt: '',
     updatedAt: nowStr()

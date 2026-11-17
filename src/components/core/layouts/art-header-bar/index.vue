@@ -50,7 +50,7 @@
 
         <!-- 面包屑 -->
         <ArtBreadcrumb
-          v-if="(shouldShowBreadcrumb && isLeftMenu) || (shouldShowBreadcrumb && isDualMenu)"
+          v-if="shouldShowBreadcrumb && !route.meta.hideBreadcrumb && (isLeftMenu || isDualMenu)"
         />
 
         <!-- 顶部菜单 -->
@@ -170,7 +170,7 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n'
-  import { useRouter } from 'vue-router'
+  import { useRoute, useRouter } from 'vue-router'
   import { useFullscreen, useWindowSize } from '@vueuse/core'
   import { LanguageEnum, MenuTypeEnum } from '@/enums/appEnum'
   import { useSettingStore } from '@/store/modules/setting'
@@ -190,6 +190,7 @@
   const isWindows = navigator.userAgent.includes('Windows')
 
   const router = useRouter()
+  const route = useRoute()
   const { locale } = useI18n()
   const { width } = useWindowSize()
 

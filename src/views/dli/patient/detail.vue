@@ -45,6 +45,17 @@
           >
             确认诊断
           </ElButton>
+          <ElButton v-if="diagnosisReady" @click="goPostDiagnosisAssessment">
+            查看诊断后评估
+          </ElButton>
+          <ElButton
+            v-if="diagnosisReady && isClinical"
+            type="primary"
+            plain
+            @click="goCreateFollowup"
+          >
+            制定随访
+          </ElButton>
           <ElDropdown :disabled="!patient" trigger="click" @command="handleShortcut">
             <ElButton> 快捷入口<ArtSvgIcon icon="ri:arrow-down-s-line" /> </ElButton>
             <template #dropdown>
@@ -202,6 +213,12 @@
 
   /** 仅医生可确认，且必须是「已确诊DLI + 诊断后 + 未确认」 */
   const canConfirmDiagnosis = computed(() => stagePending.value && isDoctor.value)
+  const isClinical = computed(() => ['R_DOCTOR', 'R_ASSISTANT', 'R_NURSE'].includes(role.value))
+  /** 医生已确认「已确诊DLI + 诊断后」，才出现诊断后评估与制定随访入口 */
+  const diagnosisReady = computed(() => {
+    const p = profile.value
+    return !!p && p.initialEntry === '已确诊DLI' && p.stage === '诊断后' && p.diagnosisConfirmed
+  })
   const confirmBusy = ref(false)
 
   /** 概览指标：身份字段按 G1 不展示；当前阶段 / 管理状态 / 初始入口已在标题标签里，这里不再重复 */
@@ -268,6 +285,22 @@
   function goConsent(projectId: string) {
     consentProjectId.value = projectId
     activeTab.value = 'consent'
+  }
+
+  /** 医生确认诊断后：查看诊断后评估报告 [批注 02] */
+  function goPostDiagnosisAssessment() {
+    void router.push({
+      name: 'DliAssessment',
+      query: { patientId: patientId.value, stage: '诊断后' }
+    })
+  }
+
+  /** 医生确认诊断后：制定随访并带入患者编号 [批注 02/10] */
+  function goCreateFollowup() {
+    void router.push({
+      name: 'DliFollowup',
+      query: { patientId: patientId.value }
+    })
   }
 
   /** 右上角快捷入口：复用原有抽屉 / 列表，不新增侧栏栏目 */

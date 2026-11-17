@@ -704,7 +704,8 @@ export const RESEARCH_PROJECT_DETAILS: ResearchProjectDetail[] = [
         enrolled: 96,
         target: 120,
         followupDone: 88,
-        endpointDone: 81
+        endpointDone: 81,
+        observedAt: '2026-11-12'
       },
       {
         center: '中心 A',
@@ -712,7 +713,8 @@ export const RESEARCH_PROJECT_DETAILS: ResearchProjectDetail[] = [
         enrolled: 90,
         target: 120,
         followupDone: 80,
-        endpointDone: 74
+        endpointDone: 74,
+        observedAt: '2026-11-08'
       },
       {
         center: '中心 B',
@@ -720,7 +722,8 @@ export const RESEARCH_PROJECT_DETAILS: ResearchProjectDetail[] = [
         enrolled: 62,
         target: 100,
         followupDone: 55,
-        endpointDone: 49
+        endpointDone: 49,
+        observedAt: '2026-10-24'
       },
       {
         center: '中心 C',
@@ -728,7 +731,8 @@ export const RESEARCH_PROJECT_DETAILS: ResearchProjectDetail[] = [
         enrolled: 48,
         target: 80,
         followupDone: 41,
-        endpointDone: 38
+        endpointDone: 38,
+        observedAt: '2026-09-28'
       }
     ],
     endpoints: [
@@ -790,7 +794,8 @@ export const RESEARCH_PROJECT_DETAILS: ResearchProjectDetail[] = [
         enrolled: 74,
         target: 90,
         followupDone: 68,
-        endpointDone: 60
+        endpointDone: 60,
+        observedAt: '2026-11-02'
       },
       {
         center: '中心 D',
@@ -798,7 +803,8 @@ export const RESEARCH_PROJECT_DETAILS: ResearchProjectDetail[] = [
         enrolled: 36,
         target: 60,
         followupDone: 30,
-        endpointDone: 27
+        endpointDone: 27,
+        observedAt: '2026-09-18'
       }
     ],
     endpoints: [{ name: '转归预测准确率', value: '83.3%', safetyEventConfirmed: false }],
@@ -956,6 +962,7 @@ export function createResearchProjectDetailFromRow(row: ResearchItem): ResearchP
     : ['观察组', '对照组', '全部入组']
   const groupNames = groups.filter((item) => item !== '全部入组')
   const centers = Array.from(new Set([row.center, '中心 B', '中心 C'])).slice(0, 3)
+  const progressObservationDates = ['2026-11-12', '2026-11-05', '2026-10-21', '2026-09-26']
   const progress = centers.flatMap((center, centerIndex) =>
     groupNames.map((group, groupIndex) => {
       const target = 60 + centerIndex * 12 + groupIndex * 8
@@ -970,7 +977,11 @@ export function createResearchProjectDetailFromRow(row: ResearchItem): ResearchP
         exited: 2 + centerIndex + groupIndex,
         followupExpected: enrolled,
         endpointExpected: enrolled,
-        missingCount: 3 + centerIndex + groupIndex
+        missingCount: 3 + centerIndex + groupIndex,
+        observedAt:
+          progressObservationDates[
+            (centerIndex * groupNames.length + groupIndex) % progressObservationDates.length
+          ]
       }
     })
   )

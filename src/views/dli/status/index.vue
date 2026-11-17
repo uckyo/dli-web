@@ -125,7 +125,7 @@
         <div v-if="activeTask.note" class="dli-s-block dli-s-warn">{{ activeTask.note }}</div>
 
         <!-- 抽屉操作 [批注 09] -->
-        <div class="mt-4 flex-c gap-2">
+        <div class="mt-4 flex-c gap-2 flex-wrap">
           <ElButton
             v-if="activeTask.status === '待补资料'"
             type="primary"
@@ -143,9 +143,21 @@
           >
             确认重新评估
           </ElButton>
+          <ElButton
+            v-if="
+              isSystemAdmin && activeTask.type === '资料同步' && activeTask.status === '执行失败'
+            "
+            type="warning"
+            plain
+            @click="resolveTask(activeTask)"
+          >
+            处理接口运行
+          </ElButton>
           <ElButton @click="goSource(activeTask)">查看来源</ElButton>
         </div>
-        <p class="mt-2 text-xs text-g-500"> 同一记录在现有诊疗历程中也能查看，复用同一执行记录 </p>
+        <p class="mt-2 text-xs leading-5 text-g-500">
+          数据经患者匹配、核对、必需输入和组别规则检查后触发；同一来源记录版本不重复调用。缺资料不会显示为低风险，同一记录在诊疗历程中复用展示。
+        </p>
       </template>
     </ElDrawer>
   </div>
@@ -171,7 +183,9 @@
   import {
     fetchGetAutomation,
     fetchGetAutomationTasks,
+    fetchResolveAutomationTask,
     fetchRerunAutomationTask,
+    fetchSaveAutomation,
     fetchSupplementAutomationTask
   } from '@/mock/dli/api'
   import type {
@@ -188,7 +202,9 @@
   const userStore = useUserStore()
 
   /** 配置开关只给明确获授权医生等现有角色 [批注 09] */
-  const isDoctor = computed(() => (userStore.getUserInfo.roles?.[0] ?? 'R_DOCTOR') === 'R_DOCTOR')
+  const role = computed(() => userStore.getUserInfo.roles?.[0] ?? 'R_DOCTOR')
+  const isDoctor = computed(() => role.value === 'R_DOCTOR')
+  const isSystemAdmin = computed(() => role.value === 'R_SYS')
   const canConfigure = isDoctor
   const operatorName = computed(() => {
     const info = userStore.getUserInfo as { userName?: string; username?: string }
@@ -241,15 +257,29 @@
   const loading = ref(true)
 
   function handleToggle(item: AutomationItem) {
-    ElMessage.success(`「${item.label}」已${item.enabled ? '开启' : '关闭'}`)
+    ElMessage.success(`「${item.label}」已${item.enabled ? '开启' : '关闭'}，点击保存配置后生效`)
   }
 
-  function saveConfig() {
-    const enabled = GROUPS.reduce(
-      (count, group) => count + group.items.filter((item) => item.enabled).length,
-      0
-    )
-    ElMessage.success(`已保存配置，当前启用 ${enabled} 项自动化规则`)
+  async function saveConfig() {
+    if (!canConfigure.value) return
+    try {
+      await fetchSaveAutomation(
+        {
+          patient: GROUPS[0].items,
+          exam: GROUPS[1].items,
+          followup: GROUPS[2].items
+        },
+        role.value,
+        operatorName.value
+      )
+      const enabled = GROUPS.reduce(
+        (count, group) => count + group.items.filter((item) => item.enabled).length,
+        0
+      )
+      ElMessage.success(`已保存配置，当前启用 ${enabled} 项自动化规则`)
+    } catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : '保存配置失败')
+    }
   }
 
   /* ---------------- 页签二：执行记录 [批注 09] ---------------- */
@@ -324,7 +354,9 @@
         patientId: '',
         type: '',
         timeRange: [] as string[],
-        status: ''
+        status: '',
+        role: role.value,
+        operator: operatorName.value
       },
       columnsFactory: () => [
         { prop: 'id', label: '任务编号', width: 110 },
@@ -388,9 +420,10 @@
   async function supplementTask(row: AutomationTask) {
     try {
       await fetchSupplementAutomationTask(row.id)
-      ElMessage.success('资料已补充，任务重新进入执行队列')
+      ElMessage.success('已记录资料补充，正在跳转原检查或患者记录')
       detailVisible.value = false
       await refreshTaskData()
+      navigateToSource(row)
     } catch (error) {
       ElMessage.error(error instanceof Error ? error.message : '操作失败')
     }
@@ -407,9 +440,29 @@
     }
   }
 
+  /** 系统管理员处理同步 / 接口运行故障 */
+  async function resolveTask(row: AutomationTask) {
+    try {
+      await fetchResolveAutomationTask(row.id, role.value, operatorName.value)
+      ElMessage.success('接口运行故障已记录，任务重新进入待执行')
+      await refreshTaskData()
+    } catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : '操作失败')
+    }
+  }
+
   /** 补充资料跳原检查或患者记录 [批注 09] */
   function goSource(row: AutomationTask) {
     detailVisible.value = false
+    navigateToSource(row)
+  }
+
+  function navigateToSource(row: AutomationTask) {
+    const examRelated = /检查|报告|解析|PACS|LIS|EX-|影像|检验/.test(row.sourceRecord)
+    if (examRelated) {
+      void router.push({ name: 'DliExam', query: { patientId: row.patientId } })
+      return
+    }
     void router.push({
       name: 'DliPatientDetail',
       params: { id: row.patientId },

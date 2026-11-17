@@ -78,9 +78,10 @@
     ElSelect,
     ElTag
   } from 'element-plus'
-  import { computed, onMounted, reactive, ref, watch } from 'vue'
+  import { computed, h, onMounted, reactive, ref, watch } from 'vue'
   import type { ColumnOption } from '@/types/component'
   import type { ResearchItem } from '@/mock/dli/types'
+  import { getIndicatorMeta } from '@/mock/dli/blueprint/data'
   import {
     fetchGetResearchAnalysisData,
     fetchGetResearchProjectDetailByResearchId,
@@ -149,19 +150,22 @@
     { prop: 'researchNo', label: '研究受试者编号', width: 165 },
     { prop: 'groupValue', label: '分组取值', width: 130 },
     { prop: 'observedAt', label: '观察时间 / 日期', width: 155 },
-    ...query.indicators.map((indicator, index) => ({
-      prop: `indicator_${index}`,
-      label: indicator,
-      minWidth: 160,
-      formatter: (row: AnalysisDataRow) => h('span', {}, row[`indicator_${index}`] || '—')
-    }))
+    ...query.indicators.map((indicator, index) => {
+      const unit = getIndicatorMeta(indicator).unit
+      return {
+        prop: `indicator_${index}`,
+        label: unit ? `${indicator}（${unit}）` : indicator,
+        minWidth: 170,
+        formatter: (row: AnalysisDataRow) => h('span', {}, row[`indicator_${index}`] || '—')
+      }
+    })
   ])
 
   const summaryColumns: ColumnOption<AnalysisSummaryRow>[] = [
-    { prop: 'groupName', label: '分组取值', width: 140 },
-    { prop: 'indicator', label: '观察指标', minWidth: 180 },
-    { prop: 'validCount', label: '有效数据量', width: 120 },
-    { prop: 'missingCount', label: '缺失情况', width: 110 },
+    { prop: 'groupName', label: '分组名称', width: 140 },
+    { prop: 'indicator', label: '指标名称', minWidth: 180 },
+    { prop: 'validCount', label: '有效样本数', width: 120 },
+    { prop: 'missingCount', label: '缺失数', width: 100 },
     { prop: 'result', label: '统计结果', width: 120 },
     { prop: 'unit', label: '单位', width: 100 },
     { prop: 'statisticalMethod', label: '统计方式', minWidth: 200 }

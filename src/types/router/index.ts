@@ -39,6 +39,8 @@ export interface RouteMeta extends Record<string | number | symbol, unknown> {
   isHide?: boolean
   /** 是否在标签页中隐藏 */
   isHideTab?: boolean
+  /** 是否在顶部栏隐藏全局面包屑 */
+  hideBreadcrumb?: boolean
   /** 外部链接 */
   link?: string
   /** 是否为iframe */

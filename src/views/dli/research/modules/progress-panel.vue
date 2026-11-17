@@ -12,7 +12,7 @@
           <ElOption v-for="item in groupOptions" :key="item" :label="item" :value="item" />
         </ElSelect>
       </ElFormItem>
-      <ElFormItem label="观察时间范围">
+      <ElFormItem label="统计时间范围">
         <ElSelect v-model="filters.timeRange" style="width: 155px">
           <ElOption label="近 30 天" value="近 30 天" />
           <ElOption label="近 90 天" value="近 90 天" />
@@ -59,10 +59,11 @@
 
 <script setup lang="ts">
   import { ElButton, ElDrawer, ElForm, ElFormItem, ElOption, ElSelect, ElTag } from 'element-plus'
-  import { computed, onMounted, reactive, ref } from 'vue'
+  import { computed, h, onMounted, reactive, ref } from 'vue'
   import type { ColumnOption } from '@/types/component'
   import { fetchGetProgressIssues, fetchGetResearchProgress } from '@/mock/dli/blueprint/api'
   import type { ResearchProgress, ResearchProgressIssue } from '@/mock/dli/blueprint/types'
+  import { useUserStore } from '@/store/modules/user'
   import PatientResearchRecordDrawer from './patient-research-record-drawer.vue'
 
   defineOptions({ name: 'ResearchProgressPanel' })
@@ -71,6 +72,9 @@
     projectId: string
     readonly: boolean
   }>()
+
+  const userStore = useUserStore()
+  const role = computed(() => userStore.getUserInfo.roles?.[0] ?? 'R_DOCTOR')
 
   const loading = ref(false)
   const rows = ref<ResearchProgress[]>([])
@@ -87,67 +91,73 @@
   const recordVisible = ref(false)
   const recordPatientId = ref('')
 
-  const columns: ColumnOption<ResearchProgress>[] = [
-    { prop: 'center', label: '所属中心', width: 130 },
-    { prop: 'group', label: '研究组别', width: 160 },
-    {
-      prop: 'enrolled',
-      label: '已入组人数',
-      width: 120,
-      formatter: (row: ResearchProgress) => h('span', {}, `${row.enrolled} / ${row.target}`)
-    },
-    {
-      prop: 'followupDone',
-      label: '随访完成数 / 应完成数',
-      width: 175,
-      formatter: (row: ResearchProgress) =>
-        h('span', {}, `${row.followupDone} / ${row.followupExpected ?? row.enrolled}`)
-    },
-    {
-      prop: 'endpointDone',
-      label: '终点资料完整数 / 应有数',
-      width: 185,
-      formatter: (row: ResearchProgress) =>
-        h('span', {}, `${row.endpointDone} / ${row.endpointExpected ?? row.enrolled}`)
-    },
-    {
-      prop: 'exited',
-      label: '已退出人数',
-      width: 105,
-      formatter: (row: ResearchProgress) => h('span', {}, String(row.exited ?? 0))
-    },
-    {
-      prop: 'missingCount',
-      label: '缺失 / 异常',
-      width: 120,
-      formatter: (row: ResearchProgress) =>
-        h(
-          ElTag,
-          { effect: 'plain', size: 'small', type: row.missingCount ? 'warning' : 'success' },
-          () => `${row.missingCount ?? 0} 项`
-        )
-    },
-    {
-      prop: 'operation',
-      label: '操作',
-      width: 220,
-      fixed: 'right' as const,
-      align: 'center' as const,
-      formatter: (row: ResearchProgress) =>
-        h('div', { class: 'flex-c justify-center gap-2' }, [
+  const columns = computed<ColumnOption<ResearchProgress>[]>(() => {
+    const base: ColumnOption<ResearchProgress>[] = [
+      { prop: 'center', label: '所属中心', width: 130 },
+      { prop: 'group', label: '研究组别', width: 160 },
+      {
+        prop: 'enrolled',
+        label: '已入组人数',
+        width: 120,
+        formatter: (row: ResearchProgress) => h('span', {}, `${row.enrolled} / ${row.target}`)
+      },
+      {
+        prop: 'exited',
+        label: '已退出人数',
+        width: 105,
+        formatter: (row: ResearchProgress) => h('span', {}, String(row.exited ?? 0))
+      },
+      {
+        prop: 'followupDone',
+        label: '随访完成数 / 应完成数',
+        width: 175,
+        formatter: (row: ResearchProgress) =>
+          h('span', {}, `${row.followupDone} / ${row.followupExpected ?? row.enrolled}`)
+      },
+      {
+        prop: 'endpointDone',
+        label: '终点资料完整数 / 应有数',
+        width: 185,
+        formatter: (row: ResearchProgress) =>
+          h('span', {}, `${row.endpointDone} / ${row.endpointExpected ?? row.enrolled}`)
+      },
+      {
+        prop: 'missingCount',
+        label: '缺失 / 异常',
+        width: 120,
+        formatter: (row: ResearchProgress) =>
           h(
-            ElButton,
-            { link: true, type: 'primary', onClick: () => openIssues(row) },
-            () => '缺失 / 异常'
-          ),
-          h(
-            ElButton,
-            { link: true, type: 'primary', onClick: () => openRecord(row) },
-            () => '研究记录'
+            ElTag,
+            { effect: 'plain', size: 'small', type: row.missingCount ? 'warning' : 'success' },
+            () => `${row.missingCount ?? 0} 项`
           )
-        ])
-    }
-  ]
+      }
+    ]
+    if (props.readonly) return base
+    return [
+      ...base,
+      {
+        prop: 'operation',
+        label: '操作',
+        width: 220,
+        fixed: 'right' as const,
+        align: 'center' as const,
+        formatter: (row: ResearchProgress) =>
+          h('div', { class: 'flex-c justify-center gap-2' }, [
+            h(
+              ElButton,
+              { link: true, type: 'primary', onClick: () => openIssues(row) },
+              () => '缺失 / 异常'
+            ),
+            h(
+              ElButton,
+              { link: true, type: 'primary', onClick: () => openRecord(row) },
+              () => '研究记录'
+            )
+          ])
+      }
+    ]
+  })
 
   const issueColumns: ColumnOption<ResearchProgressIssue>[] = [
     { prop: 'patientId', label: '患者编号', width: 155 },
@@ -198,13 +208,15 @@
   }
 
   async function openIssues(row: ResearchProgress) {
+    if (props.readonly) return
     issueTitle.value = `${row.center} · ${row.group}`
-    issues.value = await fetchGetProgressIssues(props.projectId, row.center, row.group)
+    issues.value = await fetchGetProgressIssues(props.projectId, row.center, row.group, role.value)
     issueVisible.value = true
   }
 
   async function openRecord(row: ResearchProgress) {
-    const list = await fetchGetProgressIssues(props.projectId, row.center, row.group)
+    if (props.readonly) return
+    const list = await fetchGetProgressIssues(props.projectId, row.center, row.group, role.value)
     recordPatientId.value = list[0]?.patientId ?? ''
     recordVisible.value = true
   }

@@ -86,12 +86,13 @@
 
   defineOptions({ name: 'DliLog' })
 
-  /** 留痕类别：重要数据、权限、导入导出、配置变更（抽屉内展示） */
+  /** 留痕类别：重要数据、权限、导入导出、配置变更、系统运维（抽屉内展示） */
   const CATEGORY_TAG: Record<LogCategory, 'danger' | 'warning' | 'primary' | 'info'> = {
     重要数据: 'danger',
     权限变更: 'warning',
     导入导出: 'primary',
-    配置变更: 'info'
+    配置变更: 'info',
+    系统运维: 'info'
   }
 
   /** 操作者角色中文映射 [批注 23] */

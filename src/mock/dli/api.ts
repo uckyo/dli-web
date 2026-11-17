@@ -56,6 +56,7 @@ import type {
   AgentPayload,
   AgentSession,
   AiModel,
+  AutomationItem,
   AutomationTask,
   AutomationTaskStatus,
   AutomationTaskType,
@@ -63,7 +64,10 @@ import type {
   EnrollEntry,
   ExamAttachment,
   ExamCategory,
+  HistoryEvent,
+  ExamCheckStatus,
   ExamModifyRecord,
+  ExamParseStatus,
   ExamProcessStatus,
   ExamRecognitionField,
   ExamRecord,
@@ -138,8 +142,11 @@ export interface ExamQueryParams {
   keyword?: string
   category?: ExamCategory | ''
   source?: ExamSource | ''
+  /** 兼容旧查询；新页面按解析/核对状态分别筛选 */
   status?: ExamProcessStatus | ''
-  /** 患者详情页嵌入模式：只返回该患者的检查资料 */
+  parseStatus?: ExamParseStatus | ''
+  checkStatus?: ExamCheckStatus | ''
+  /** 患者编号独立筛选；不再用患者姓名参与页面检索 */
   patientId?: string
 }
 
@@ -255,7 +262,28 @@ export async function fetchGetPatientDetail(id: string): Promise<WebPatientDetai
   await delay()
   const detail = PATIENT_DETAILS[id]
   if (!detail) throw new Error('患者不存在')
-  return detail
+  // 执行记录复用同一数据源，诊疗历程只做展示映射，不复制出第二套记录 [批注 09]
+  const taskHistory: HistoryEvent[] = AUTOMATION_TASKS.filter((task) => task.patientId === id)
+    .filter((task) => !detail.history.some((event) => event.id === task.id))
+    .map((task) => ({
+      id: task.id,
+      date: task.triggeredAt.slice(0, 10),
+      category: '执行记录',
+      title: `${task.type} · ${task.status}`,
+      detail: [
+        `来源记录：${task.sourceRecord}`,
+        `输入资料：${task.inputs.join('、') || '—'}`,
+        `模型／规则版本：${task.modelVersion}`,
+        `关联结果：${task.relatedResult || '—'}`,
+        task.note ? `说明：${task.note}` : ''
+      ]
+        .filter(Boolean)
+        .join('；')
+    }))
+  return {
+    ...detail,
+    history: [...taskHistory, ...detail.history]
+  }
 }
 
 /** 按编号读取患者档案（患者详情独立页面） */
@@ -343,7 +371,7 @@ export interface EnrollCheckItem {
 function checkEnrollment(id: string, entry: EnrollEntry): EnrollCheckItem[] {
   const patient = requirePatient(id)
   const baseline = EXAMS.filter(
-    (item) => item.patientId === id && item.status === '已核对归档'
+    (item) => item.patientId === id && item.checkStatus === '已核对'
   ).length
   return [
     { label: '患者档案已建立', passed: Boolean(patient.id), detail: patient.id },
@@ -399,6 +427,8 @@ export async function fetchAddBaselineExam(patientId: string): Promise<ExamRecor
     center: patient.center,
     date: todayStr(),
     status: '已核对归档',
+    parseStatus: '解析完成',
+    checkStatus: '已核对',
     source: '院内同步',
     verified: true,
     checkedBy: '医护',
@@ -407,7 +437,15 @@ export async function fetchAddBaselineExam(patientId: string): Promise<ExamRecor
     uploadedAt: todayStr(),
     attachment: { name: `基线血常规_${patientId}.pdf`, type: 'PDF 报告', size: '1.0 MB' },
     recognitionFields: [
-      { name: '白细胞计数', raw: 'WBC 6.8', extracted: '6.8', unit: '×10⁹/L', range: '3.5–9.5' }
+      {
+        name: '白细胞计数',
+        raw: 'WBC 6.8',
+        extracted: '6.8',
+        checkedValue: '6.8',
+        unit: '×10⁹/L',
+        range: '3.5–9.5',
+        hint: '请核对，参考范围 3.5–9.5'
+      }
     ],
     modifyRecords: [],
     logs: [
@@ -499,9 +537,12 @@ export async function fetchVerifyLinkedRecord(recordId: string): Promise<ExamRec
   await delay()
   const record = EXAMS.find((item) => item.id === recordId)
   if (!record) throw new Error('关联记录不存在')
-  if (record.status === '已核对归档') throw new Error('该记录已归档，无需重复核对')
+  if (record.checkStatus === '已核对') throw new Error('该记录已核对，无需重复核对')
+  record.checkStatus = '已核对'
   record.status = '已核对归档'
   record.verified = true
+  record.checkedBy = record.checkedBy || '医护'
+  record.checkedAt = record.checkedAt || examNowStr()
   return { ...record }
 }
 
@@ -636,16 +677,21 @@ export async function fetchGetExamList(
 ): Promise<Api.Common.PaginatedResponse<ExamRecord>> {
   await delay()
   let list = EXAMS.filter((item) => !params.category || item.category === params.category)
-  if (params.patientId) list = list.filter((item) => item.patientId === params.patientId)
+  if (params.patientId) {
+    const patientId = params.patientId.trim().toLowerCase()
+    list = list.filter((item) => item.patientId.toLowerCase().includes(patientId))
+  }
   if (params.source) list = list.filter((item) => item.source === params.source)
+  if (params.parseStatus) list = list.filter((item) => item.parseStatus === params.parseStatus)
+  if (params.checkStatus) list = list.filter((item) => item.checkStatus === params.checkStatus)
   if (params.status) list = list.filter((item) => item.status === params.status)
   if (params.keyword) {
     const keyword = params.keyword.trim().toLowerCase()
     list = list.filter(
       (item) =>
-        item.patientName.includes(keyword) ||
         item.id.toLowerCase().includes(keyword) ||
-        item.item.includes(keyword)
+        item.item.toLowerCase().includes(keyword) ||
+        item.patientId.toLowerCase().includes(keyword)
     )
   }
   return paginate(list, params.current, params.size)
@@ -676,27 +722,73 @@ export interface ExamUploadPayload {
   patientId: string
   category: ExamCategory
   item: string
-  center: string
+  /** 所属中心由患者档案带入，上传弹窗不再重复填写 */
+  center?: string
   date: string
   attachment: ExamAttachment
   operator: string
 }
 
-/** 授权上传：直接写入共享数据源，两个入口立即可见 [批注 03-1] */
+function deriveExamStatus(
+  parseStatus: ExamParseStatus,
+  checkStatus: ExamCheckStatus
+): ExamProcessStatus {
+  if (checkStatus === '已核对') return '已核对归档'
+  if (parseStatus === '解析失败') return '识别失败'
+  if (parseStatus === '解析中') return '识别中'
+  if (parseStatus === '未解析') return '待识别'
+  return '待核对'
+}
+
+function fieldHint(field: Pick<ExamRecognitionField, 'extracted' | 'range'>): string {
+  if (!field.extracted.trim()) return '识别值缺失，需人工录入'
+  return field.range.trim() ? `请核对，参考范围 ${field.range}` : '请核对识别值'
+}
+
+function buildPendingRecognitionFields(category: ExamCategory): ExamRecognitionField[] {
+  const names: Partial<Record<ExamCategory, string[]>> = {
+    病理: ['病理诊断'],
+    检验: ['主要检验指标'],
+    病历: ['主诉']
+  }
+  return (names[category] ?? []).map((name) => ({
+    name,
+    raw: '',
+    extracted: '',
+    checkedValue: '',
+    unit: '',
+    range: '',
+    hint: '识别值缺失，需人工录入'
+  }))
+}
+
+function resetFieldsForCheck(fields: ExamRecognitionField[]): ExamRecognitionField[] {
+  return fields.map((field) => ({
+    ...field,
+    checkedValue: '',
+    hint: fieldHint(field)
+  }))
+}
+
+/** 上传资料：来源由系统按操作端记录，不由上传弹窗手工指定 [批注 06] */
 export async function fetchCreateExamUpload(payload: ExamUploadPayload): Promise<ExamRecord> {
   await delay()
   const patient = requirePatient(payload.patientId)
+  const parseStatus: ExamParseStatus = isReportExam(payload.category) ? '未解析' : '无需解析'
+  const checkStatus: ExamCheckStatus = '待核对'
+  const source: ExamSource = payload.operator === '患者端' ? '患者上传' : '医护上传'
   const record: ExamRecord = {
     id: examId('EX'),
     patientId: payload.patientId,
     patientName: patient.name,
     category: payload.category,
     item: payload.item,
-    center: payload.center,
+    center: payload.center || patient.center,
     date: payload.date,
-    // 影像类无需识别，直接进入人工核对；报告类先待识别
-    status: isReportExam(payload.category) ? '待识别' : '待核对',
-    source: '授权上传',
+    parseStatus,
+    checkStatus,
+    status: deriveExamStatus(parseStatus, checkStatus),
+    source,
     verified: false,
     checkedBy: '',
     checkedAt: '',
@@ -707,33 +799,54 @@ export async function fetchCreateExamUpload(payload: ExamUploadPayload): Promise
     modifyRecords: [],
     logs: []
   }
-  addExamLog(
-    record,
-    '授权上传',
-    payload.operator,
-    `${payload.attachment.name} · ${payload.category}`
-  )
+  addExamLog(record, source, payload.operator, `${payload.attachment.name} · ${payload.category}`)
   EXAMS.unshift(record)
   return { ...record }
 }
 
-/** 资料详情：附件 + 上传 / 核对记录，已有字段复用 [批注 03-2] */
+/** 资料详情：附件 + 上传 / 核对记录，完整详情页与患者详情共用同一份数据 [批注 06] */
 export async function fetchGetExamDetail(id: string): Promise<ExamRecord> {
   await delay(120)
-  return { ...requireExam(id) }
+  const record = requireExam(id)
+  return {
+    ...record,
+    recognitionFields: record.recognitionFields.map((field) => ({ ...field })),
+    modifyRecords: record.modifyRecords.map((item) => ({ ...item })),
+    logs: record.logs.map((item) => ({ ...item }))
+  }
 }
 
-/** 重试识别：失败后重新识别，不补造缺失字段值 [批注 03-3] */
-export async function fetchRetryExamRecognition(id: string, operator: string): Promise<ExamRecord> {
-  await delay(400)
+/** 发起解析：完成后进入待核对，不自动写入核对后值 [批注 06] */
+export async function fetchStartExamRecognition(id: string, operator: string): Promise<ExamRecord> {
+  await delay(120)
   const record = requireExam(id)
-  if (!isReportExam(record.category)) throw new Error('影像原图不参与字段识别，请使用影像查看入口')
-  record.status = '待核对'
-  addExamLog(record, '重试识别', operator, '识别完成，等待人工核对')
+  if (!isReportExam(record.category)) {
+    throw new Error('无需解析的资料请使用查看影像或直接核对')
+  }
+  if (record.checkStatus === '已核对') throw new Error('该资料已核对，无需重复解析')
+  record.parseStatus = '解析中'
+  record.checkStatus = '待核对'
+  record.status = deriveExamStatus(record.parseStatus, record.checkStatus)
+  record.verified = false
+  addExamLog(record, '发起解析', operator, '识别任务进行中')
+  await delay(420)
+  if (!record.recognitionFields.length) {
+    record.recognitionFields = buildPendingRecognitionFields(record.category)
+  } else {
+    record.recognitionFields = resetFieldsForCheck(record.recognitionFields)
+  }
+  record.parseStatus = '解析完成'
+  record.status = deriveExamStatus(record.parseStatus, record.checkStatus)
+  addExamLog(record, '解析完成', operator, '进入待核对，请逐项确认识别结果')
   return { ...record }
 }
 
-/** 人工录入：仅留痕，字段由医护自行填写，缺失值不自动填充 [批注 03-3] */
+/** 重试识别：失败后重新解析，不补造缺失字段值 [批注 03-3/06] */
+export async function fetchRetryExamRecognition(id: string, operator: string): Promise<ExamRecord> {
+  return fetchStartExamRecognition(id, operator)
+}
+
+/** 人工录入：仅留痕，字段由医护自行填写，缺失值不自动填充 [批注 03-3/06] */
 export async function fetchManualExamEntry(id: string, operator: string): Promise<ExamRecord> {
   await delay(120)
   const record = requireExam(id)
@@ -749,7 +862,7 @@ export interface ExamConfirmPayload {
 
 /**
  * 确认核对完成：写回共享数据 + 联动预警 sourceVerified
- * 识别结果核对后才能用于评估 [批注 03-3 / G7]
+ * 核对状态与归档状态分开，未核对结果不进入模型 [批注 03-3 / 06 / G7]
  */
 export async function fetchConfirmExamRecognition(
   id: string,
@@ -757,20 +870,24 @@ export async function fetchConfirmExamRecognition(
 ): Promise<ExamRecord> {
   await delay()
   const record = requireExam(id)
-  if (record.verified) throw new Error('该资料已核对，无需重复操作')
+  if (record.checkStatus === '已核对') throw new Error('该资料已核对，无需重复操作')
+  if (isReportExam(record.category) && record.parseStatus !== '解析完成') {
+    throw new Error('请先发起解析，解析完成后再确认核对')
+  }
   if (isReportExam(record.category)) {
-    const missing = payload.fields.filter((field) => !field.extracted.trim() || !field.raw.trim())
+    const missing = payload.fields.filter((field) => !field.checkedValue.trim())
     if (missing.length || payload.fields.length === 0) {
       throw new Error('存在未核对的识别字段，请重试识别或人工录入，不得补造缺失内容')
     }
   }
   record.recognitionFields = payload.fields
   record.modifyRecords = payload.modifyRecords
+  record.checkStatus = '已核对'
+  record.status = deriveExamStatus(record.parseStatus, record.checkStatus)
   record.verified = true
   record.checkedBy = payload.operator
   record.checkedAt = examNowStr()
-  record.status = '已核对归档'
-  addExamLog(record, '核对完成', payload.operator, '识别结果已核对，可用于评估')
+  addExamLog(record, '确认核对', payload.operator, '识别结果已核对，可用于评估')
 
   // 同一患者因识别未核对而暂缓的预警，核对后同步放行 [批注 03-3]
   const linked = WARNING_TICKETS.filter(
@@ -2156,6 +2273,44 @@ export async function fetchGetAutomation() {
   }
 }
 
+/** 自动化配置落库：仅明确获授权医生可保存医学规则 [批注 09] */
+export async function fetchSaveAutomation(
+  config: {
+    patient: AutomationItem[]
+    exam: AutomationItem[]
+    followup: AutomationItem[]
+  },
+  role: string,
+  operator: string
+): Promise<void> {
+  await delay(220)
+  if (role !== 'R_DOCTOR') throw new Error('仅获授权医生可保存自动化配置')
+  const groups = [
+    { name: '患者自动化', source: PATIENT_AUTOMATION, items: config.patient },
+    { name: '检查自动化', source: EXAM_AUTOMATION, items: config.exam },
+    { name: '智能随访', source: FOLLOWUP_AUTOMATION, items: config.followup }
+  ]
+  let enabled = 0
+  groups.forEach((group) => {
+    group.items.forEach((item) => {
+      const target = group.source.find((row) => row.key === item.key)
+      if (target) target.enabled = item.enabled
+      if (item.enabled) enabled += 1
+    })
+  })
+  appendSystemLog({
+    category: '配置变更',
+    action: '保存自动化配置',
+    operator,
+    role,
+    scope: '状态管理',
+    objectType: '自动化配置',
+    objectId: 'AUTO-CONFIG',
+    target: '自动化规则',
+    detail: `已启用 ${enabled} 项；候选队列不等于研究入组，随访规则只生成草稿`
+  })
+}
+
 /* ---------------- 状态管理 · 执行记录 [批注 09] ---------------- */
 
 /** 执行记录筛选：患者编号 / 任务类型 / 触发时间范围 / 执行状态 [批注 09] */
@@ -2164,6 +2319,20 @@ export interface AutomationTaskQueryParams {
   type?: AutomationTaskType | ''
   timeRange?: string[]
   status?: AutomationTaskStatus | ''
+  /** 医护按本人负责患者范围查看 */
+  role?: string
+  operator?: string
+}
+
+/** 演示账号与负责医生的映射，用于模拟医护患者范围；管理员不传则不限制 */
+const OPERATOR_SCOPE_DOCTOR: Record<string, string> = {
+  doctor: '陈明远',
+  assistant: '陈明远',
+  nurse: '周雅琴',
+  陈明远: '陈明远',
+  周雅琴: '周雅琴',
+  刘志远: '刘志远',
+  孙可欣: '孙可欣'
 }
 
 export async function fetchGetAutomationTasks(
@@ -2179,6 +2348,19 @@ export async function fetchGetAutomationTasks(
       return date >= params.timeRange![0] && date <= params.timeRange![1]
     })
   if (params.status) list = list.filter((item) => item.status === params.status)
+  if (
+    params.role &&
+    ['R_DOCTOR', 'R_ASSISTANT', 'R_NURSE'].includes(params.role) &&
+    params.operator
+  ) {
+    const doctor = OPERATOR_SCOPE_DOCTOR[params.operator]
+    if (doctor) {
+      const scopedPatients = new Set(
+        PATIENTS.filter((patient) => patient.doctor === doctor).map((patient) => patient.id)
+      )
+      list = list.filter((item) => scopedPatients.has(item.patientId))
+    }
+  }
   return list.map((item) => ({ ...item, inputs: [...item.inputs] }))
 }
 
@@ -2193,6 +2375,16 @@ export async function fetchRerunAutomationTask(
   if (item.status === '执行成功' || item.status === '执行中') {
     throw new Error('该任务已成功或正在执行，无需重新评估')
   }
+  const sourceKey = item.sourceKey || item.sourceRecord
+  const version = item.sourceVersion || 1
+  const duplicate = AUTOMATION_TASKS.some(
+    (row) =>
+      row.id !== item.id &&
+      (row.sourceKey || row.sourceRecord) === sourceKey &&
+      (row.sourceVersion || 1) === version &&
+      row.status === '执行中'
+  )
+  if (duplicate) throw new Error('同一来源记录版本正在执行，不重复调用')
   item.status = '执行中'
   item.note = ''
   item.relatedResult = `${item.relatedResult}；医生已确认重新评估`
@@ -2218,6 +2410,36 @@ export async function fetchSupplementAutomationTask(id: string): Promise<Automat
   if (item.status !== '待补资料') throw new Error('仅待补资料任务可补充')
   item.status = '执行中'
   item.note = '资料已补充，重新进入执行队列'
+  return { ...item, inputs: [...item.inputs] }
+}
+
+/** 系统管理员处理同步 / 接口运行故障，不代替医护确认医学结果 [批注 09] */
+export async function fetchResolveAutomationTask(
+  id: string,
+  role: string,
+  operator: string
+): Promise<AutomationTask> {
+  await delay(200)
+  if (role !== 'R_SYS') throw new Error('仅系统管理员可处理接口运行故障')
+  const item = AUTOMATION_TASKS.find((row) => row.id === id)
+  if (!item) throw new Error('执行记录不存在')
+  if (item.type !== '资料同步' || item.status !== '执行失败') {
+    throw new Error('仅失败的资料同步任务可处理接口运行')
+  }
+  item.status = '待执行'
+  item.note = '系统管理员已处理接口运行故障，等待重新同步'
+  item.relatedResult = '接口已恢复，待重新执行同步'
+  appendSystemLog({
+    category: '系统运维',
+    action: '处理自动化接口运行故障',
+    operator,
+    role,
+    scope: '状态管理',
+    objectType: '执行记录',
+    objectId: id,
+    target: item.patientId,
+    detail: item.sourceRecord
+  })
   return { ...item, inputs: [...item.inputs] }
 }
 

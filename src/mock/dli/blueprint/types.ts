@@ -152,6 +152,25 @@ export type FollowupPlanStatus = '草稿' | '已发布' | '已完成' | '已取�
 /** 计划来源 [批注 10] */
 export type FollowupPlanSource = '医生创建' | '模型建议' | '自动规则'
 
+/** 计划历史版本：取消 / 变更单独留痕，不只改 version 字段 [批注 10] */
+export interface FollowupPlanVersion {
+  version: string
+  savedAt: string
+  operator: string
+  reason: string
+  snapshot: {
+    patientId: string
+    name: string
+    doctor: string
+    startDate: string
+    endDate: string
+    status: FollowupPlanStatus
+    source: FollowupPlanSource
+    templateId?: string
+    templateVersion?: string
+  }
+}
+
 /** 随访计划 [批注 10] */
 export interface FollowupPlan {
   id: string
@@ -168,6 +187,10 @@ export interface FollowupPlan {
   version: string
   /** 生效模板 */
   templateId?: string
+  /** 计划保存时固化的模板版本，后续模板更新不覆盖已发布计划 */
+  templateVersion?: string
+  /** 取消 / 变更时留存独立历史版本 */
+  versionHistory?: FollowupPlanVersion[]
   publishedAt?: string
   createdAt: string
 }
@@ -232,8 +255,11 @@ export interface FollowupTask {
   contactAt?: string
   contactWay?: string
   contactResult?: '已联系' | '未联系上'
-  /** 变更通知患者并留痕 [批注 06-3] */
+  /** 取消计划须确认并停后续提醒，历史版本保留 [批注 10] */
   changeLog: Array<{ action: string; operator: string; createdAt: string }>
+  /** 模板生成任务的去重键：同一计划 + 模板版本 + 条目只生成一次 */
+  sourceTaskKey?: string
+  templateVersion?: string
 }
 
 /* --------------------------- P08 研究管理 / 项目详情 --------------------------- */
@@ -345,6 +371,8 @@ export interface ResearchProgress {
   followupExpected?: number
   endpointExpected?: number
   missingCount?: number
+  /** 统计时间范围筛选用的最新统计日期，不单独占列 [批注 15] */
+  observedAt?: string
 }
 
 /** 研究进度缺失 / 异常核对项 [批注 15] */
@@ -375,6 +403,10 @@ export interface ResearchMaterial {
   fileSize?: string
   previewNote?: string
   updatedBy?: string
+  /** 医生维护为正式版本，助理 / 护士协助维护为草稿 [批注 15] */
+  maintainStatus?: '正式' | '草稿'
+  /** 协助草稿对应的正式资料编号，确认后回到正式版本 */
+  draftOfId?: string
 }
 
 /** 入组清单条目 [批注 15] */
@@ -593,7 +625,7 @@ export interface CodeRule {
 /* -------------------------------- P18 系统日志 -------------------------------- */
 
 /** 重要数据、权限、导入导出和配置变更留痕 [批注 16-1] */
-export type LogCategory = '重要数据' | '权限变更' | '导入导出' | '配置变更'
+export type LogCategory = '重要数据' | '权限变更' | '导入导出' | '配置变更' | '系统运维'
 
 /** 执行结果（成功 / 失败）[批注 23] */
 export type LogResult = '成功' | '失败'

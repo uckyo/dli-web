@@ -177,6 +177,19 @@ export const dliRoutes: AppRouteRecord[] = [
     }
   },
   {
+    path: '/dli/exam/report/:id',
+    name: 'DliExamReportDetail',
+    component: '/dli/exam/report-detail',
+    meta: {
+      title: '检查报告详情',
+      isHide: true,
+      hideBreadcrumb: true,
+      keepAlive: false,
+      activePath: '/dli/exam',
+      roles: ALL_ROLES
+    }
+  },
+  {
     path: '/dli/sample',
     name: 'DliSample',
     component: '/index/index',

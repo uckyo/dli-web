@@ -41,7 +41,7 @@ export interface ChatMessage {
 export interface HistoryEvent {
   id: string
   date: string
-  category: '现病史' | '既往史' | '用药' | '检查' | '诊断' | '随访'
+  category: '现病史' | '既往史' | '用药' | '检查' | '诊断' | '随访' | '执行记录'
   title: string
   detail: string
 }
@@ -141,11 +141,15 @@ export interface ExamRecord {
   item: string
   center: string
   date: string
-  /** 检查资料处理状态 [批注 06/07] */
+  /** 兼容旧调用方的合并状态；页面以 parseStatus + checkStatus 为准 [批注 06] */
   status: ExamProcessStatus
-  /** 资料来源：院内同步 / 授权上传 [批注 06] */
+  /** 解析状态：未解析 / 解析中 / 解析完成 / 解析失败 / 无需解析 [批注 06] */
+  parseStatus: ExamParseStatus
+  /** 核对状态：待核对 / 已核对 [批注 06] */
+  checkStatus: ExamCheckStatus
+  /** 资料来源：院内同步 / 医护上传 / 患者上传等实际来源 [批注 06] */
   source: ExamSource
-  /** 识别结果是否已核对；核对后才能用于评估 [批注 03-3] */
+  /** 识别结果是否已核对；与 checkStatus 同步保留 [批注 03-3/06] */
   verified: boolean
   checkedBy: string
   checkedAt: string
@@ -160,11 +164,17 @@ export interface ExamRecord {
   logs: ExamLog[]
 }
 
-/** 检查资料处理状态 [批注 06/07] */
+/** 兼容旧调用方的合并状态；新页面不再直接展示 [批注 06] */
 export type ExamProcessStatus = '待识别' | '识别中' | '识别失败' | '待核对' | '已核对归档'
 
+/** 解析状态 [批注 06] */
+export type ExamParseStatus = '未解析' | '解析中' | '解析完成' | '解析失败' | '无需解析'
+
+/** 核对状态；归档不等于核对 [批注 06] */
+export type ExamCheckStatus = '待核对' | '已核对'
+
 /** 资料来源 [批注 06] */
-export type ExamSource = '院内同步' | '授权上传'
+export type ExamSource = '院内同步' | '医护上传' | '患者上传' | '授权上传'
 
 /** 检查附件文件 */
 export interface ExamAttachment {
@@ -173,13 +183,22 @@ export interface ExamAttachment {
   size: string
 }
 
-/** AI 识别字段：原文 / 提取值 / 单位 / 参考范围 [批注 06] */
+/** AI 识别字段：批注 06 五列对照，raw/extracted/range 为兼容字段 [批注 06] */
 export interface ExamRecognitionField {
+  /** 字段／指标名称 */
   name: string
+  /** 原文片段，兼容旧调用方 */
   raw: string
+  /** 识别值 */
   extracted: string
+  /** 核对后值；未核对时为空 */
+  checkedValue: string
+  /** 单位 */
   unit: string
+  /** 参考范围，兼容旧调用方 */
   range: string
+  /** 核对提示；缺项标在对应行 */
+  hint: string
 }
 
 /** 核对修改留痕 [批注 06] */
@@ -1028,6 +1047,9 @@ export interface AutomationTask {
   relatedResult: string
   /** 可跳转的关联报告编号 */
   relatedReportId?: string
+  /** 去重来源键：同一来源记录版本不重复调用 [批注 09] */
+  sourceKey?: string
+  sourceVersion?: number
 }
 
 /* ---------------- 患者管理 V2 · 档案 / 研究入组 [批注 01-04 / 03] ---------------- */
