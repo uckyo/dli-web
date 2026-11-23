@@ -145,13 +145,35 @@ export const dliRoutes: AppRouteRecord[] = [
   {
     path: '/dli/assessment',
     name: 'DliAssessment',
-    component: '/dli/assessment/index',
+    component: '/index/index',
+    redirect: '/dli/assessment/reports',
     meta: {
       title: 'menus.dli.assessment.title',
       icon: 'ri:alarm-warning-line',
-      keepAlive: true,
       roles: CLINICAL_ROLES
-    }
+    },
+    children: [
+      {
+        path: 'reports',
+        name: 'DliAssessmentReports',
+        component: '/dli/assessment/reports',
+        meta: {
+          title: 'menus.dli.assessment.reports',
+          icon: 'ri:file-list-3-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'warnings',
+        name: 'DliAssessmentWarnings',
+        component: '/dli/assessment/warnings',
+        meta: {
+          title: 'menus.dli.assessment.warnings',
+          icon: 'ri:alarm-warning-line',
+          keepAlive: true
+        }
+      }
+    ]
   },
   {
     path: '/dli/assessment/report/:id',
@@ -161,7 +183,7 @@ export const dliRoutes: AppRouteRecord[] = [
       title: 'menus.dli.assessment.reportDetail',
       isHide: true,
       keepAlive: false,
-      activePath: '/dli/assessment',
+      activePath: '/dli/assessment/reports',
       roles: CLINICAL_ROLES
     }
   },
@@ -247,24 +269,68 @@ export const dliRoutes: AppRouteRecord[] = [
   {
     path: '/dli/status',
     name: 'DliStatus',
-    component: '/dli/status',
+    component: '/index/index',
+    redirect: '/dli/status/config',
     meta: {
-      title: 'menus.dli.status',
+      title: 'menus.dli.status.title',
       icon: 'ri:loop-left-line',
-      keepAlive: true,
       roles: CLINICAL_ROLES
-    }
+    },
+    children: [
+      {
+        path: 'config',
+        name: 'DliStatusConfig',
+        component: '/dli/status/config',
+        meta: {
+          title: 'menus.dli.status.config',
+          icon: 'ri:settings-4-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'tasks',
+        name: 'DliStatusTasks',
+        component: '/dli/status/tasks',
+        meta: {
+          title: 'menus.dli.status.tasks',
+          icon: 'ri:file-list-3-line',
+          keepAlive: true
+        }
+      }
+    ]
   },
   {
     path: '/dli/followup',
     name: 'DliFollowup',
-    component: '/dli/followup',
+    component: '/index/index',
+    redirect: '/dli/followup/plans',
     meta: {
-      title: 'menus.dli.followup',
+      title: 'menus.dli.followup.title',
       icon: 'ri:calendar-check-line',
-      keepAlive: true,
       roles: CLINICAL_ROLES
-    }
+    },
+    children: [
+      {
+        path: 'plans',
+        name: 'DliFollowupPlans',
+        component: '/dli/followup/plans',
+        meta: {
+          title: 'menus.dli.followup.plans',
+          icon: 'ri:calendar-check-line',
+          keepAlive: true
+        }
+      },
+      {
+        path: 'templates',
+        name: 'DliFollowupTemplates',
+        component: '/dli/followup/templates',
+        meta: {
+          title: 'menus.dli.followup.templates',
+          icon: 'ri:file-list-3-line',
+          keepAlive: true
+        }
+      }
+    ]
   },
   {
     path: '/dli/staff',

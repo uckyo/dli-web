@@ -243,7 +243,7 @@
   // 表头背景颜色样式
   const headerCellStyle = computed(() => ({
     background: isHeaderBackground.value
-      ? 'var(--el-fill-color-lighter)'
+      ? 'var(--el-color-primary-light-9)'
       : 'var(--default-box-color)',
     ...(props.headerCellStyle || {}) // 合并用户传入的样式
   }))

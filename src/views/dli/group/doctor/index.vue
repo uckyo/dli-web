@@ -1,6 +1,6 @@
 <!-- DLI 课题组管理 · 医生管理：同一课题组内医生的在管患者与启停 -->
 <template>
-  <div class="art-full-height overflow-y-auto pb-5">
+  <div class="art-full-height">
     <ArtSearchBar
       v-model="searchParams"
       :items="searchItems"

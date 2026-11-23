@@ -84,8 +84,12 @@
         "menuWidth": "Menu width",
         "tabStyle": "Tab style",
         "pageTransition": "Page animation",
-        "borderRadius": "Custom radius"
+        "borderRadius": "Custom radius",
+        "cardGap": "Card gap"
       }
+    },
+    "cardGap": {
+      "list": ["Compact", "Default", "Loose"]
     },
     "tabStyle": {
       "default": "Default",
@@ -248,6 +252,8 @@
       },
       "assessment": {
         "title": "Assessment & Alerts",
+        "reports": "Reports",
+        "warnings": "Alerts",
         "reportDetail": "Assessment Report Detail"
       },
       "exam": "Examinations",
@@ -259,8 +265,16 @@
       "research": "Research",
       "researchDetail": "Project Detail",
       "profile": "Profile",
-      "status": "Automation",
-      "followup": "Follow-up",
+      "status": {
+        "title": "Automation",
+        "config": "Configuration",
+        "tasks": "Run History"
+      },
+      "followup": {
+        "title": "Follow-up",
+        "plans": "Plans",
+        "templates": "Templates"
+      },
       "staff": "Staff",
       "log": "System Logs",
       "platform": {

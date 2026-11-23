@@ -49,6 +49,11 @@
     containerWidth: {
       '100%': 'ContainerWidthEnum.FULL',
       '1200px': 'ContainerWidthEnum.BOXED'
+    },
+    cardGap: {
+      compact: 'CardGapEnum.COMPACT',
+      default: 'CardGapEnum.DEFAULT',
+      loose: 'CardGapEnum.LOOSE'
     }
   } as const
 
@@ -89,6 +94,7 @@
     { comment: '标签页样式', key: 'tabStyle' },
     { comment: '自定义圆角', key: 'customRadius' },
     { comment: '容器宽度', key: 'containerWidth', enumMap: ENUM_MAPS.containerWidth },
+    { comment: '页面一级卡片间距', key: 'cardGap', enumMap: ENUM_MAPS.cardGap },
     { comment: '节日日期', key: 'festivalDate', forceValue: '' }
   ]
 
@@ -221,6 +227,7 @@
       settingStore.setTabStyle(config.tabStyle)
       settingStore.setCustomRadius(config.customRadius)
       settingStore.setContainerWidth(config.containerWidth)
+      settingStore.setCardGap(config.cardGap)
 
       // 节日相关
       settingStore.setFestivalDate(config.festivalDate)

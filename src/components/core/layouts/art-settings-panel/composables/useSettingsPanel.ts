@@ -203,6 +203,9 @@ export function useSettingsPanel() {
       const boxMode = settingStore.boxBorderMode ? 'border-mode' : 'shadow-mode'
       domOperations.setRootAttribute('data-box-mode', boxMode)
 
+      // 设置页面一级卡片间距
+      domOperations.setRootAttribute('data-card-gap', settingStore.cardGap)
+
       themeHandlers.initSystemTheme()
       openFestival()
     }

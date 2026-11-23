@@ -64,15 +64,13 @@
       v-show="menuList.length > 0"
       class="menu-left"
       :class="`menu-left-${getMenuTheme.theme} menu-left-${!menuOpen ? 'close' : 'open'}`"
-      :style="{ background: getMenuTheme.background }"
+      :style="{ background: menuBackground }"
     >
       <!-- Logo、系统名称 -->
       <div
         class="header"
+        :class="{ 'menu-header-shadow': !isDarkMenuSurface }"
         @click="navigateToHome"
-        :style="{
-          background: getMenuTheme.background
-        }"
       >
         <ArtLogo v-if="!isDualMenu" class="logo" />
 
@@ -93,7 +91,7 @@
           :default-active="routerPath"
           :text-color="getMenuTheme.textColor"
           :unique-opened="uniqueOpened"
-          :background-color="getMenuTheme.background"
+          :background-color="elMenuBackground"
           :default-openeds="defaultOpenedMenus"
           :popper-class="`menu-left-popper menu-left-${getMenuTheme.theme}-popper`"
           :show-timeout="50"
@@ -131,7 +129,7 @@
 <script setup lang="ts">
   import AppConfig from '@/config'
   import { useSettingStore } from '@/store/modules/setting'
-  import { MenuTypeEnum, MenuWidth } from '@/enums/appEnum'
+  import { MenuThemeEnum, MenuTypeEnum, MenuWidth } from '@/enums/appEnum'
   import { useMenuStore } from '@/store/modules/menu'
   import { isIframe } from '@/utils/navigation'
   import { handleMenuJump } from '@/utils/navigation'
@@ -149,8 +147,15 @@
   const router = useRouter()
   const settingStore = useSettingStore()
 
-  const { getMenuOpenWidth, menuType, uniqueOpened, dualMenuShowText, menuOpen, getMenuTheme } =
-    storeToRefs(settingStore)
+  const {
+    getMenuOpenWidth,
+    menuType,
+    uniqueOpened,
+    dualMenuShowText,
+    menuOpen,
+    getMenuTheme,
+    isDark
+  } = storeToRefs(settingStore)
 
   // 组件内部状态
   const defaultOpenedMenus = ref<string[]>([])
@@ -170,6 +175,24 @@
     () => menuType.value === MenuTypeEnum.LEFT || menuType.value === MenuTypeEnum.TOP_LEFT
   )
   const isDualMenu = computed(() => menuType.value === MenuTypeEnum.DUAL_MENU)
+
+  // 暗黑菜单风格或系统暗色模式均保持原背景，不叠加亮色渐变
+  const isDarkMenuSurface = computed(
+    () => isDark.value || getMenuTheme.value.theme === MenuThemeEnum.DARK
+  )
+
+  // 仅设计风格和浅色菜单风格叠加极浅的主题色渐变
+  const menuBackground = computed(() => {
+    if (isDarkMenuSurface.value) {
+      return getMenuTheme.value.background
+    }
+    return `linear-gradient(180deg, var(--el-color-primary-light-9) 0%, #ffffff 42%, #ffffff 100%)`
+  })
+
+  // 渐变只由外层菜单容器绘制，ElMenu 自身透明，避免标题区与菜单区出现两段渐变
+  const elMenuBackground = computed(() =>
+    isDarkMenuSurface.value ? getMenuTheme.value.background : 'transparent'
+  )
 
   // 移动端屏幕判断（使用 computed 避免重复计算）
   const isMobileScreen = computed(() => width.value < MOBILE_BREAKPOINT)

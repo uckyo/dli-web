@@ -1,6 +1,6 @@
 <!-- DLI 患者字段配置（批注 17）：字段表 + 预览效果宽弹窗 + 草稿→提交平台→发布流转；平台/中心/课题组三路由复用 -->
 <template>
-  <div class="art-full-height overflow-y-auto pb-5">
+  <div class="art-full-height">
     <ArtSearchBar
       v-model="fieldSearchParams"
       :items="fieldSearchItems"

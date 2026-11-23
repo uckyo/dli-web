@@ -1,6 +1,6 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ContainerWidthEnum } from '@/enums/appEnum'
+import { CardGapEnum, ContainerWidthEnum } from '@/enums/appEnum'
 import AppConfig from '@/config'
 import { headerBarConfig } from '@/config/modules/headerBar'
 
@@ -58,6 +58,22 @@ export function useSettingsConfig() {
     { value: '0.75', label: '0.75' },
     { value: '1', label: '1' }
   ]
+
+  // 页面一级卡片间距选项
+  const cardGapOptions = computed(() => [
+    {
+      value: CardGapEnum.COMPACT,
+      label: t('setting.cardGap.list[0]')
+    },
+    {
+      value: CardGapEnum.DEFAULT,
+      label: t('setting.cardGap.list[1]')
+    },
+    {
+      value: CardGapEnum.LOOSE,
+      label: t('setting.cardGap.list[2]')
+    }
+  ])
 
   // 容器宽度选项
   const containerWidthOptions = computed(() => [
@@ -212,6 +228,15 @@ export function useSettingsConfig() {
         options: customRadiusOptions,
         style: { width: '120px' },
         headerBarKey: null // 不依赖headerBar配置
+      },
+      {
+        key: 'cardGap',
+        label: t('setting.basics.list.cardGap'),
+        type: 'select' as const,
+        handler: 'cardGap',
+        options: cardGapOptions.value,
+        style: { width: '120px' },
+        headerBarKey: null // 不依赖headerBar配置
       }
     ]
 
@@ -238,6 +263,7 @@ export function useSettingsConfig() {
     tabStyleOptions,
     pageTransitionOptions,
     customRadiusOptions,
+    cardGapOptions,
     containerWidthOptions,
     boxStyleOptions,
     configOptions,

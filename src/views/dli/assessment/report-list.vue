@@ -1,6 +1,6 @@
 <!-- 评估预警 · 评估报告页签：列表 / 发起评估；记录意见与重新评估在报告详情页 [批注 05] -->
 <template>
-  <div class="pt-3">
+  <div class="art-full-height">
     <ArtSearchBar
       v-model="reportSearchParams"
       :items="reportSearchItems"
@@ -8,7 +8,7 @@
       @reset="handleReportReset"
     />
 
-    <ElCard class="art-table-card" shadow="never">
+    <ElCard class="art-table-card">
       <ArtTableHeader
         v-model:columns="reportColumnChecks"
         :loading="reportLoading"

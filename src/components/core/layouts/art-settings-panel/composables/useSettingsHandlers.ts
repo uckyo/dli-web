@@ -1,6 +1,6 @@
 import { useSettingStore } from '@/store/modules/setting'
 import { storeToRefs } from 'pinia'
-import type { ContainerWidthEnum } from '@/enums/appEnum'
+import type { CardGapEnum, ContainerWidthEnum } from '@/enums/appEnum'
 
 /**
  * 设置项通用处理逻辑
@@ -113,6 +113,12 @@ export function useSettingsHandlers() {
     // 圆角大小
     customRadius: createValueHandler<string>((radius: string) =>
       settingStore.setCustomRadius(radius)
+    ),
+
+    // 页面一级卡片间距
+    cardGap: createValueHandler<CardGapEnum>(
+      (gap: CardGapEnum) => settingStore.setCardGap(gap),
+      (gap: CardGapEnum) => domOperations.setRootAttribute('data-card-gap', gap)
     )
   }
 

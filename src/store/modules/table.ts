@@ -39,8 +39,8 @@ export const useTableStore = defineStore(
     const isZebra = ref(false)
     // 边框
     const isBorder = ref(false)
-    // 表头背景
-    const isHeaderBackground = ref(false)
+    // 表头背景（默认开启，使用很淡的主题色）
+    const isHeaderBackground = ref(true)
 
     // 是否全屏
     const isFullScreen = ref(false)

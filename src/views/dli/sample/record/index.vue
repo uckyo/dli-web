@@ -1,6 +1,6 @@
 <!-- DLI 生物样本 · 样本管理：只读展示样本库数据 [批注 07] -->
 <template>
-  <div class="art-full-height overflow-y-auto pb-5">
+  <div class="art-full-height">
     <ArtSearchBar
       v-if="!props.patientId"
       v-model="searchParams"

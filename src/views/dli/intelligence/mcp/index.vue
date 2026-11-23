@@ -1,6 +1,6 @@
 <!-- DLI MCP 管理：平台统一维护，只读查看与授权下载，不提供测试/新增/编辑/删除 [批注 21] -->
 <template>
-  <div class="art-full-height overflow-y-auto pb-5">
+  <div class="art-full-height">
     <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <ArtStatsCard
         title="MCP 服务"

@@ -84,8 +84,12 @@
         "menuWidth": "菜单宽度",
         "tabStyle": "标签页风格",
         "pageTransition": "页面切换动画",
-        "borderRadius": "自定义圆角"
+        "borderRadius": "自定义圆角",
+        "cardGap": "卡片间距"
       }
+    },
+    "cardGap": {
+      "list": ["紧凑", "默认", "宽松"]
     },
     "tabStyle": {
       "default": "默认",
@@ -248,6 +252,8 @@
       },
       "assessment": {
         "title": "评估预警",
+        "reports": "评估报告",
+        "warnings": "预警处理",
         "reportDetail": "评估报告详情"
       },
       "exam": "检查管理",
@@ -259,8 +265,16 @@
       "research": "研究管理",
       "researchDetail": "项目详情",
       "profile": "个人中心",
-      "status": "状态管理",
-      "followup": "随访管理",
+      "status": {
+        "title": "状态管理",
+        "config": "自动化配置",
+        "tasks": "执行记录"
+      },
+      "followup": {
+        "title": "随访管理",
+        "plans": "计划列表",
+        "templates": "随访模板"
+      },
       "staff": "人员管理",
       "log": "系统日志",
       "platform": {

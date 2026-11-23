@@ -139,6 +139,7 @@
 
   .header {
     position: relative;
+    z-index: 2;
     box-sizing: border-box;
     display: flex;
     align-items: center;
@@ -147,6 +148,10 @@
     overflow: hidden;
     line-height: 60px;
     cursor: pointer;
+
+    &.menu-header-shadow {
+      box-shadow: 0 1px 5px rgb(31 45 61 / 5%);
+    }
 
     .logo {
       margin-left: 22px;

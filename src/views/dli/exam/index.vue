@@ -1,6 +1,6 @@
 <!-- DLI 检查管理：分类筛选 + 上传资料 + 查看报告 / 发起解析 [批注 06] -->
 <template>
-  <div class="art-full-height overflow-y-auto pb-5">
+  <div class="art-full-height">
     <!-- 患者详情页嵌入模式不显示筛选栏 -->
     <ArtSearchBar
       v-if="!props.patientId"

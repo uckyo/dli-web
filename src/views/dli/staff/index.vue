@@ -1,6 +1,6 @@
 <!-- DLI 人员管理：医生维护助理与护士（仅临床角色） -->
 <template>
-  <div class="art-full-height overflow-y-auto pb-5">
+  <div class="art-full-height">
     <ArtSearchBar
       v-model="searchParams"
       :items="searchItems"

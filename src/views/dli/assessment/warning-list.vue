@@ -1,6 +1,6 @@
 <!-- 评估预警 · 预警处理页签：列表 / 处理抽屉（触发依据 · 关联报告 · 跟进记录 · 双跳转）[批注 05] -->
 <template>
-  <div class="pt-3">
+  <div class="art-full-height">
     <ArtSearchBar
       v-model="warningSearchParams"
       :items="warningSearchItems"
@@ -8,7 +8,7 @@
       @reset="handleWarningReset"
     />
 
-    <ElCard class="art-table-card" shadow="never">
+    <ElCard class="art-table-card">
       <ArtTableHeader
         v-model:columns="warningColumnChecks"
         :loading="warningLoading"
@@ -373,7 +373,7 @@
   /** 安排随访 → 随访计划页（批注 10）[批注 05] */
   function goFollowupPlan(row: WarningTicket) {
     handleVisible.value = false
-    void router.push({ name: 'DliFollowup', query: { patientId: row.patientId } })
+    void router.push({ name: 'DliFollowupPlans', query: { patientId: row.patientId } })
   }
 
   onMounted(() => {

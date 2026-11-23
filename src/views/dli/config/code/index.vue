@@ -1,6 +1,6 @@
 <!-- DLI 编码规则配置（批注 18）：规则表 5 列 + 编辑弹窗（7 段 + 编号预览）+ 校验并发布；平台/中心/课题组三路由复用 -->
 <template>
-  <div class="art-full-height overflow-y-auto pb-5">
+  <div class="art-full-height">
     <ArtSearchBar
       v-model="ruleSearchParams"
       :items="ruleSearchItems"

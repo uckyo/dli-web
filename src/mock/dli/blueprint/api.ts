@@ -862,9 +862,38 @@ export async function fetchManualFollowup(
 
 /* ---------------- 随访模板 [批注 10] ---------------- */
 
-export async function fetchGetFollowupTemplates(): Promise<FollowupTemplate[]> {
+export interface FollowupTemplateQuery {
+  /** 模板名称 / 编号关键词 */
+  keyword?: string
+  stage?: FollowupTemplate['stage'] | ''
+  status?: FollowupTemplate['status'] | ''
+  /** 最近更新时间范围 */
+  dateRange?: string[]
+}
+
+export async function fetchGetFollowupTemplates(
+  params: FollowupTemplateQuery = {}
+): Promise<FollowupTemplate[]> {
   await delay(180)
-  return [...FOLLOWUP_TEMPLATES]
+  const keyword = params.keyword?.trim().toLowerCase() ?? ''
+  const [startDate, endDate] = params.dateRange ?? []
+
+  return [...FOLLOWUP_TEMPLATES].filter((item) => {
+    if (
+      keyword &&
+      !item.name.toLowerCase().includes(keyword) &&
+      !item.id.toLowerCase().includes(keyword)
+    ) {
+      return false
+    }
+    if (params.stage && item.stage !== params.stage) return false
+    if (params.status && item.status !== params.status) return false
+
+    const updatedDate = item.updatedAt.slice(0, 10)
+    if (startDate && updatedDate < startDate) return false
+    if (endDate && updatedDate > endDate) return false
+    return true
+  })
 }
 
 /** 新增 / 编辑模板：获授权医生按方案确认版本，助理／护士可协助草稿 [批注 10] */

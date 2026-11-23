@@ -1,6 +1,6 @@
 <!-- DLI 知识库管理：文档资产、检索测试与召回参数 -->
 <template>
-  <div class="art-full-height overflow-y-auto pb-5">
+  <div class="art-full-height">
     <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <ArtStatsCard
         title="知识库数"

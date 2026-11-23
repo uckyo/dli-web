@@ -1,4 +1,18 @@
 // 全局样式
+
+// 页面一级卡片间距（紧凑 / 默认 / 宽松）
+:root {
+  --art-card-gap: 16px;
+}
+
+html[data-card-gap='compact'] {
+  --art-card-gap: 8px;
+}
+
+html[data-card-gap='loose'] {
+  --art-card-gap: 24px;
+}
+
 // 顶部进度条颜色
 #nprogress .bar {
   z-index: 2400;
@@ -197,6 +211,43 @@
 
   @media (max-width: 640px) {
     height: auto;
+  }
+}
+
+// 页面一级卡片之间使用全局间距，卡片内部间距不受影响
+.art-page-view.art-full-height:not(.dash-screen) {
+  row-gap: var(--art-card-gap);
+
+  > .el-card,
+  > .art-card,
+  > .art-table-card {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
+  // 一级卡片网格也使用同一间距
+  > .grid {
+    gap: var(--art-card-gap) !important;
+    margin-bottom: 0 !important;
+  }
+
+  // 部分页面用 pt-3/pt-4/pt-5 包裹一级卡片，这里保持一致
+  > :is(.pt-3, .pt-4, .pt-5) {
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--art-card-gap);
+
+    > .el-card,
+    > .art-card,
+    > .art-table-card {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+
+    > .grid {
+      gap: var(--art-card-gap) !important;
+      margin-bottom: 0 !important;
+    }
   }
 }
 

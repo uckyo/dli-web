@@ -2,7 +2,7 @@
 <template>
   <div class="art-full-height">
     <!-- 搜索区 -->
-    <div class="art-card px-5 pt-4 pb-0">
+    <div class="art-card-xs px-5 pt-4 pb-0">
       <ElForm :inline="true" class="dli-filter-form" @submit.prevent>
         <div
           ref="filterItemsRef"

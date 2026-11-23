@@ -1,6 +1,6 @@
 <!-- DLI 系统日志：按授权范围查询重要数据、权限、导入导出及配置变更留痕（蓝图 P18）[批注 23] -->
 <template>
-  <div class="art-full-height overflow-y-auto pb-5">
+  <div class="art-full-height">
     <ArtSearchBar
       v-model="searchParams"
       :items="searchItems"

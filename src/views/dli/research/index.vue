@@ -2,7 +2,7 @@
 <template>
   <div class="art-full-height">
     <!-- 搜索区 -->
-    <div class="art-card px-5 pt-4 pb-0">
+    <div class="art-card-xs px-5 pt-4 pb-0">
       <ElForm :inline="true" @submit.prevent>
         <ElFormItem label="关键词">
           <ElInput
@@ -42,12 +42,7 @@
     </div>
 
     <ElCard class="art-table-card">
-      <ArtTableHeader
-        v-model:columns="columnChecks"
-        :loading="loading"
-        class="mb-2"
-        @refresh="refreshData"
-      >
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
         <template #left>
           <ElButton v-if="isClinical" type="primary" @click="openCreate">
             <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建研究

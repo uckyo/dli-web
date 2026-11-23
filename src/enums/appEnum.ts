@@ -79,3 +79,15 @@ export enum ContainerWidthEnum {
   /** 固定宽度 */
   BOXED = '1200px'
 }
+
+/**
+ * 页面一级卡片间距
+ */
+export enum CardGapEnum {
+  /** 紧凑 */
+  COMPACT = 'compact',
+  /** 默认 */
+  DEFAULT = 'default',
+  /** 宽松 */
+  LOOSE = 'loose'
+}

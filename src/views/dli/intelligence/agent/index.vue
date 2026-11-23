@@ -1,6 +1,6 @@
 <!-- DLI 智能体管理：台账、配置、版本发布与回滚、会话记录 -->
 <template>
-  <div class="art-full-height overflow-y-auto pb-5">
+  <div class="art-full-height">
     <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <ArtStatsCard
         title="智能体总数"

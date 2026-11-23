@@ -34,7 +34,13 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { MenuThemeType } from '@/types/store'
 import AppConfig from '@/config'
-import { SystemThemeEnum, MenuThemeEnum, MenuTypeEnum, ContainerWidthEnum } from '@/enums/appEnum'
+import {
+  SystemThemeEnum,
+  MenuThemeEnum,
+  MenuTypeEnum,
+  ContainerWidthEnum,
+  CardGapEnum
+} from '@/enums/appEnum'
 import { setElementThemeColor } from '@/utils/ui'
 import { useCeremony } from '@/hooks/core/useCeremony'
 import { StorageConfig } from '@/utils'
@@ -112,6 +118,8 @@ export const useSettingStore = defineStore(
     const customRadius = ref(SETTING_DEFAULT_CONFIG.customRadius)
     /** 容器宽度 */
     const containerWidth = ref(SETTING_DEFAULT_CONFIG.containerWidth)
+    /** 页面一级卡片间距 */
+    const cardGap = ref(SETTING_DEFAULT_CONFIG.cardGap)
 
     // 节日相关
     /** 节日日期 */
@@ -216,6 +224,14 @@ export const useSettingStore = defineStore(
      */
     const setContainerWidth = (width: ContainerWidthEnum) => {
       containerWidth.value = width
+    }
+
+    /**
+     * 设置页面一级卡片间距
+     * @param gap 卡片间距枚举值
+     */
+    const setCardGap = (gap: CardGapEnum) => {
+      cardGap.value = gap
     }
 
     /**
@@ -405,6 +421,7 @@ export const useSettingStore = defineStore(
       festivalDate,
       dualMenuShowText,
       containerWidth,
+      cardGap,
       getMenuTheme,
       isDark,
       getMenuOpenWidth,
@@ -417,6 +434,7 @@ export const useSettingStore = defineStore(
       setElementTheme,
       setBorderMode,
       setContainerWidth,
+      setCardGap,
       setUniqueOpened,
       setButton,
       setFastEnter,

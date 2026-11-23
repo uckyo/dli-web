@@ -1,6 +1,6 @@
 <!-- DLI 技能管理：资产台账、调用质量、配置与版本 -->
 <template>
-  <div class="art-full-height overflow-y-auto pb-5">
+  <div class="art-full-height">
     <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <ArtStatsCard
         title="技能总数"

@@ -290,7 +290,7 @@
   /** 医生确认诊断后：查看诊断后评估报告 [批注 02] */
   function goPostDiagnosisAssessment() {
     void router.push({
-      name: 'DliAssessment',
+      name: 'DliAssessmentReports',
       query: { patientId: patientId.value, stage: '诊断后' }
     })
   }
@@ -298,7 +298,7 @@
   /** 医生确认诊断后：制定随访并带入患者编号 [批注 02/10] */
   function goCreateFollowup() {
     void router.push({
-      name: 'DliFollowup',
+      name: 'DliFollowupPlans',
       query: { patientId: patientId.value }
     })
   }

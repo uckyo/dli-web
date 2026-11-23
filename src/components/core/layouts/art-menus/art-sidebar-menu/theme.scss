@@ -4,7 +4,8 @@
 $menu-height: 42px;
 $menu-icon-size: 20px;
 $menu-font-size: 14px;
-$hover-bg-color: var(--art-gray-200);
+// 设计风格与浅色菜单的 hover 使用主题色浅底，不再使用灰色
+$hover-bg-color: var(--el-color-primary-light-9);
 $popup-menu-height: 40px;
 $popup-menu-padding: 8px;
 $popup-menu-margin: 5px;

@@ -5,7 +5,7 @@
       页面操作区 [批注 20]：模型配置由平台管理员及获明确授权的角色维护。
       控件对无权限角色仍然显示、只是禁用并给出原因，避免“按钮凭空消失”看不出是被权限挡住。
     -->
-    <div class="mb-4 flex">
+    <div class="flex">
       <ElTooltip :disabled="canConfigure" content="仅平台管理员及获授权角色可配置" placement="top">
         <span>
           <ElButton type="primary" :disabled="!canConfigure" @click="openCreate">

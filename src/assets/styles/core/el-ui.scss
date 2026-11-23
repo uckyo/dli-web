@@ -98,6 +98,26 @@ html.dark .el-card {
   }
 }
 
+// 输入框、文本域 hover 态与聚焦态保持一致
+.el-input:not(.is-disabled) .el-input__wrapper:hover,
+.el-textarea__inner:not(:disabled):hover {
+  box-shadow: 0 0 0 1px var(--el-input-focus-border-color) inset;
+}
+
+// 选择器 hover 态与聚焦态保持一致
+// Element Plus 选择器用 .is-hovering 标记悬停，聚焦色直接取 --el-color-primary
+.el-select:not(.is-disabled) .el-select__wrapper.is-hovering:not(.is-focused) {
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+}
+
+// 日期 / 时间选择器（含范围选择）hover 态与聚焦态保持一致
+// 范围选择器根节点本身就是 .el-input__wrapper，普通选择器是它的子元素，两种结构都要覆盖
+.el-date-editor:not(.is-disabled):hover .el-input__wrapper,
+.el-date-editor.el-input__wrapper:not(.is-disabled):hover,
+.el-input__wrapper.el-range-editor:not(.is-disabled):hover {
+  box-shadow: 0 0 0 1px var(--el-input-focus-border-color) inset;
+}
+
 // 修改 el-checkbox-button 高度
 .el-checkbox-button--default .el-checkbox-button__inner,
 // 修改 el-radio-button 高度

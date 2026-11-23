@@ -21,7 +21,13 @@
  */
 
 import AppConfig from '@/config'
-import { SystemThemeEnum, MenuThemeEnum, MenuTypeEnum, ContainerWidthEnum } from '@/enums/appEnum'
+import {
+  SystemThemeEnum,
+  MenuThemeEnum,
+  MenuTypeEnum,
+  ContainerWidthEnum,
+  CardGapEnum
+} from '@/enums/appEnum'
 
 /**
  * 系统设置默认值配置
@@ -30,15 +36,15 @@ export const SETTING_DEFAULT_CONFIG = {
   /** 菜单类型 */
   menuType: MenuTypeEnum.LEFT,
   /** 菜单展开宽度 */
-  menuOpenWidth: 230,
+  menuOpenWidth: 260,
   /** 菜单是否展开 */
   menuOpen: true,
   /** 双菜单是否显示文本 */
   dualMenuShowText: false,
-  /** 系统主题类型 */
-  systemThemeType: SystemThemeEnum.AUTO,
-  /** 系统主题模式 */
-  systemThemeMode: SystemThemeEnum.AUTO,
+  /** 系统主题类型（默认浅色） */
+  systemThemeType: SystemThemeEnum.LIGHT,
+  /** 系统主题模式（默认浅色） */
+  systemThemeMode: SystemThemeEnum.LIGHT,
   /** 菜单风格 */
   menuThemeType: MenuThemeEnum.DESIGN,
   /** 系统主题颜色 */
@@ -51,12 +57,12 @@ export const SETTING_DEFAULT_CONFIG = {
   showRefreshButton: true,
   /** 是否显示面包屑 */
   showCrumbs: true,
-  /** 是否显示工作台标签 */
-  showWorkTab: true,
+  /** 是否显示工作台标签（默认关闭多标签栏） */
+  showWorkTab: false,
   /** 是否显示语言切换 */
   showLanguage: true,
-  /** 是否显示进度条 */
-  showNprogress: false,
+  /** 是否显示进度条（默认开启顶部进度条） */
+  showNprogress: true,
   /** 是否显示设置引导 */
   showSettingGuide: true,
   /** 是否显示节日文本 */
@@ -77,12 +83,14 @@ export const SETTING_DEFAULT_CONFIG = {
   boxBorderMode: true,
   /** 页面过渡效果 */
   pageTransition: 'slide-left',
-  /** 标签页样式 */
-  tabStyle: 'tab-default',
+  /** 标签页样式（默认卡片） */
+  tabStyle: 'tab-card',
   /** 自定义圆角 */
   customRadius: '0.75',
   /** 容器宽度 */
   containerWidth: ContainerWidthEnum.FULL,
+  /** 页面一级卡片间距 */
+  cardGap: CardGapEnum.DEFAULT,
   /** 节日日期 */
   festivalDate: ''
 }
