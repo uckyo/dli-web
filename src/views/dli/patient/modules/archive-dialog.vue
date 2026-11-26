@@ -16,8 +16,8 @@
           <ElOption v-for="item in CENTER_OPTIONS" :key="item" :label="item" :value="item" />
         </ElSelect>
       </ElFormItem>
-      <ElFormItem label="负责医生" prop="doctor">
-        <ElSelect v-model="form.doctor" class="w-full" placeholder="请选择负责医生">
+      <ElFormItem label="主管医生" prop="doctor">
+        <ElSelect v-model="form.doctor" class="w-full" placeholder="请选择主管医生">
           <ElOption v-for="item in DOCTOR_OPTIONS" :key="item" :label="item" :value="item" />
         </ElSelect>
       </ElFormItem>
@@ -141,7 +141,7 @@
 
   const rules = {
     center: [{ required: true, message: '请选择所属中心', trigger: 'change' }],
-    doctor: [{ required: true, message: '请选择负责医生', trigger: 'change' }],
+    doctor: [{ required: true, message: '请选择主管医生', trigger: 'change' }],
     manageStatus: [{ required: true, message: '请选择管理状态', trigger: 'change' }],
     initialEntry: [{ required: true, message: '请选择初始入口', trigger: 'change' }],
     stage: [{ required: true, message: '请选择当前阶段', trigger: 'change' }]

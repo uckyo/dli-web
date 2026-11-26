@@ -19,7 +19,7 @@
         <ElDescriptions v-if="planMode === 'view'" :column="3" border>
           <ElDescriptionsItem label="患者编号">{{ planForm.patientId }}</ElDescriptionsItem>
           <ElDescriptionsItem label="计划名称">{{ planForm.name }}</ElDescriptionsItem>
-          <ElDescriptionsItem label="负责医生">{{ planForm.doctor }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="主管医生">{{ planForm.doctor }}</ElDescriptionsItem>
           <ElDescriptionsItem label="计划起止日期">
             {{ planForm.dateRange[0] }} ~ {{ planForm.dateRange[1] }}
           </ElDescriptionsItem>
@@ -71,8 +71,8 @@
               placeholder="保存后生成草稿版本"
             />
           </ElFormItem>
-          <ElFormItem label="负责医生" prop="doctor">
-            <ElInput v-model="planForm.doctor" placeholder="负责医生" />
+          <ElFormItem label="主管医生" prop="doctor">
+            <ElInput v-model="planForm.doctor" placeholder="主管医生" />
           </ElFormItem>
           <ElFormItem label="计划起止日期" prop="dateRange">
             <ElDatePicker
@@ -397,9 +397,9 @@
     },
     {
       key: 'doctor',
-      label: '负责医生',
+      label: '主管医生',
       type: 'input',
-      placeholder: '负责医生',
+      placeholder: '主管医生',
       span: 6
     },
     {
@@ -507,7 +507,7 @@
     { prop: 'id', label: '计划编号', width: 110 },
     { prop: 'patientId', label: '患者编号', width: 140 },
     { prop: 'name', label: '计划名称', minWidth: 180, showOverflowTooltip: true },
-    { prop: 'doctor', label: '负责医生', width: 100 },
+    { prop: 'doctor', label: '主管医生', width: 100 },
     {
       prop: 'dateRange',
       label: '计划起止日期',
@@ -603,7 +603,7 @@
   const planRules: FormRules = {
     patientId: [{ required: true, message: '请输入患者编号', trigger: 'blur' }],
     name: [{ required: true, message: '请输入计划名称', trigger: 'blur' }],
-    doctor: [{ required: true, message: '请输入负责医生', trigger: 'blur' }],
+    doctor: [{ required: true, message: '请输入主管医生', trigger: 'blur' }],
     dateRange: [{ required: true, message: '请选择计划起止日期', trigger: 'change' }]
   }
 

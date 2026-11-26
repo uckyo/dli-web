@@ -2242,7 +2242,7 @@ export async function fetchGetStaffList(
   params: StaffQueryParams
 ): Promise<Api.Common.PaginatedResponse<StaffItem>> {
   await delay()
-  let list = STAFFS.filter((item) => item.role === params.role)
+  let list = params.role ? STAFFS.filter((item) => item.role === params.role) : STAFFS
   if (params.keyword) {
     const keyword = params.keyword.trim()
     list = list.filter((item) => item.name.includes(keyword) || item.doctor.includes(keyword))
@@ -2324,7 +2324,7 @@ export interface AutomationTaskQueryParams {
   operator?: string
 }
 
-/** 演示账号与负责医生的映射，用于模拟医护患者范围；管理员不传则不限制 */
+/** 演示账号与主管医生的映射，用于模拟医护患者范围；管理员不传则不限制 */
 const OPERATOR_SCOPE_DOCTOR: Record<string, string> = {
   doctor: '陈明远',
   assistant: '陈明远',

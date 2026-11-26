@@ -227,7 +227,7 @@
     if (!p) return []
     return [
       { label: '所属中心', value: p.center },
-      { label: '负责医生', value: p.doctor },
+      { label: '主管医生', value: p.doctor },
       { label: '入组状态', value: p.enrolled ? '已入组' : '仅建档' },
       { label: '关联项目', value: `${profile.value?.enrollments.length ?? 0} 个` },
       {

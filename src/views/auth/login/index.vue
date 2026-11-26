@@ -77,7 +77,13 @@
               <ElCheckbox v-model="formData.rememberPassword">{{
                 $t('login.rememberPwd')
               }}</ElCheckbox>
-              <span class="text-xs text-g-500">演示账号密码均为 123456</span>
+              <RouterLink
+                :to="{ name: 'Register' }"
+                class="text-theme hover:underline"
+                @keyup.enter.stop
+              >
+                {{ $t('login.register') }}
+              </RouterLink>
             </div>
 
             <div style="margin-top: 30px">

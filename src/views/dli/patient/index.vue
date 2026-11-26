@@ -27,7 +27,7 @@
           <ElFormItem label="关键词">
             <ElInput
               v-model="searchParams.keyword"
-              placeholder="患者编号 / 研究编号 / 负责医生"
+              placeholder="患者编号 / 研究编号 / 主管医生"
               clearable
               style="width: 240px"
               @keyup.enter="handleSearch"
@@ -347,7 +347,7 @@
             )
         },
         { prop: 'center', label: '所属中心', width: 115 },
-        { prop: 'doctor', label: '负责医生', width: 105 },
+        { prop: 'doctor', label: '主管医生', width: 105 },
         {
           prop: 'status',
           label: '管理状态',

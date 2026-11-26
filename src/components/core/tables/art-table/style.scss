@@ -94,6 +94,11 @@
 .art-table.is-list-layout {
   --art-list-table-header-bg: #f8fafc;
 
+  :deep(.el-table__row > td:first-child:not(.el-table-column--selection) > .cell),
+  :deep(.el-table__header tr > th:first-child:not(.el-table-column--selection) > .cell) {
+    padding-inline-start: 20px;
+  }
+
   display: flex;
   flex: 1 1 0;
   flex-direction: column;

@@ -34,7 +34,7 @@
             {{ activeWarning.trigger }}
           </ElDescriptionsItem>
           <ElDescriptionsItem label="发生时间">{{ activeWarning.createdAt }}</ElDescriptionsItem>
-          <ElDescriptionsItem label="负责医生">{{
+          <ElDescriptionsItem label="主管医生">{{
             activeWarning.doctor || '—'
           }}</ElDescriptionsItem>
         </ElDescriptions>
@@ -251,7 +251,7 @@
             h(ElTag, { effect: 'light', type: LEVEL_TAG[row.level] }, () => row.level)
         },
         { prop: 'createdAt', label: '发生时间', width: 170 },
-        { prop: 'doctor', label: '负责医生', width: 110 },
+        { prop: 'doctor', label: '主管医生', width: 110 },
         {
           prop: 'status',
           label: '处理状态',

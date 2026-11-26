@@ -93,7 +93,7 @@ export interface WarningTicket {
   /** 预警等级（沿用获确认规则） [批注 05] */
   level: '高' | '中' | '低'
   status: WarningStatus
-  /** 负责医生 [批注 05] */
+  /** 主管医生 [批注 05] */
   doctor: string
   /** 关联报告编号 [批注 05] */
   relatedReportId?: string
@@ -176,7 +176,7 @@ export interface FollowupPlan {
   id: string
   patientId: string
   name: string
-  /** 负责医生 */
+  /** 主管医生 */
   doctor: string
   /** 计划起止日期 */
   startDate: string

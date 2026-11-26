@@ -531,7 +531,7 @@ export async function fetchGetFollowupTasks(
   return paginate(list, params.current, params.size)
 }
 
-/** 计划筛选：状态 / 患者 / 负责医生 / 日期范围 / 含逾期·待核对任务 [批注 10] */
+/** 计划筛选：状态 / 患者 / 主管医生 / 日期范围 / 含逾期·待核对任务 [批注 10] */
 export interface FollowupPlanQueryParams {
   status?: FollowupPlanStatus | ''
   patientId?: string

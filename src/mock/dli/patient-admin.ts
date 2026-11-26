@@ -454,7 +454,7 @@ export interface ArchiveInput {
 
 function assertArchive(input: ArchiveInput): void {
   if (!input.center.trim()) throw new Error('所属中心不能为空')
-  if (!input.doctor.trim()) throw new Error('负责医生不能为空')
+  if (!input.doctor.trim()) throw new Error('主管医生不能为空')
   if (!INITIAL_ENTRY_OPTIONS.includes(input.initialEntry)) throw new Error('初始入口无效')
   if (!STAGE_OPTIONS.includes(input.stage)) throw new Error('当前阶段无效')
   if (!MANAGE_STATUS_OPTIONS.includes(input.manageStatus)) throw new Error('管理状态无效')
@@ -1011,7 +1011,7 @@ export interface TemplateField {
 export const TEMPLATE_FIELDS: TemplateField[] = [
   { key: 'patientId', label: '患者编号', required: false },
   { key: 'center', label: '所属中心', required: true },
-  { key: 'doctor', label: '负责医生', required: true },
+  { key: 'doctor', label: '主管医生', required: true },
   { key: 'manageStatus', label: '管理状态', required: true },
   { key: 'initialEntry', label: '初始入口', required: true },
   { key: 'stage', label: '当前阶段', required: true },
@@ -1024,7 +1024,7 @@ export const EXPORT_FIELDS: TemplateField[] = [
   { key: 'initialEntry', label: '初始入口', required: true },
   { key: 'stage', label: '当前阶段', required: true },
   { key: 'center', label: '所属中心', required: false },
-  { key: 'doctor', label: '负责医生', required: false },
+  { key: 'doctor', label: '主管医生', required: false },
   { key: 'status', label: '管理状态', required: false },
   { key: 'projectCount', label: '关联项目数', required: false },
   { key: 'researchNo', label: '研究受试者编号', required: false },
@@ -1069,7 +1069,7 @@ export async function fetchPreviewImportV2(rows: ImportRow[]): Promise<ImportPre
     const id = row.patientId.trim()
     const reasons: string[] = []
     if (!row.center.trim()) reasons.push('所属中心缺值')
-    if (!row.doctor.trim()) reasons.push('负责医生缺值')
+    if (!row.doctor.trim()) reasons.push('主管医生缺值')
     if (!MANAGE_STATUS_OPTIONS.includes(row.manageStatus.trim() as WebPatient['status'])) {
       reasons.push('管理状态格式错误')
     }

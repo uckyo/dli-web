@@ -19,7 +19,7 @@
       </ElUpload>
       <ElButton plain @click="downloadTemplate">下载模板</ElButton>
       <span class="text-xs text-g-500">
-        模板列：患者编号, 所属中心, 负责医生, 管理状态, 初始入口, 当前阶段, 诊断日期, 诊断依据
+        模板列：患者编号, 所属中心, 主管医生, 管理状态, 初始入口, 当前阶段, 诊断日期, 诊断依据
       </span>
     </div>
 
@@ -40,7 +40,7 @@
         <template #default="{ row }">{{ row.patientId || '（新建时生成）' }}</template>
       </ElTableColumn>
       <ElTableColumn prop="center" label="所属中心" width="105" />
-      <ElTableColumn prop="doctor" label="负责医生" width="100" />
+      <ElTableColumn prop="doctor" label="主管医生" width="100" />
       <ElTableColumn prop="manageStatus" label="管理状态" width="100" />
       <ElTableColumn prop="initialEntry" label="初始入口" width="150" />
       <ElTableColumn prop="stage" label="当前阶段" width="90" />
@@ -206,11 +206,12 @@
     if (!lines.length) return []
     const header = lines[0]
     const indexOf = (label: string) => header.indexOf(label)
+    const doctorIndex = header.includes('主管医生') ? indexOf('主管医生') : indexOf('负责医生')
     return lines.slice(1).map((cells, position) => ({
       lineNo: position + 2,
       patientId: cells[indexOf('患者编号')] ?? '',
       center: cells[indexOf('所属中心')] ?? '',
-      doctor: cells[indexOf('负责医生')] ?? '',
+      doctor: cells[doctorIndex] ?? '',
       manageStatus: cells[indexOf('管理状态')] ?? '',
       initialEntry: cells[indexOf('初始入口')] ?? '',
       stage: cells[indexOf('当前阶段')] ?? '',

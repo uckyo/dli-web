@@ -7,11 +7,6 @@
           <ArtSvgIcon icon="ri:user-add-line" class="mr-1" />新增人员
         </ElButton>
       </template>
-      <ElTabs v-model="searchParams.role" class="mb-3" @tab-change="handleTabChange">
-        <ElTabPane label="医生助理" name="助理" />
-        <ElTabPane label="护士" name="护士" />
-      </ElTabs>
-
       <ArtSearchBar
         v-model="searchParams"
         :items="searchItems"
@@ -42,8 +37,8 @@
             <ElRadio value="护士">护士</ElRadio>
           </ElRadioGroup>
         </ElFormItem>
-        <ElFormItem label="归属医生" prop="doctor">
-          <ElSelect v-model="form.doctor" class="w-full" placeholder="选择归属医生">
+        <ElFormItem label="主管医生" prop="doctor">
+          <ElSelect v-model="form.doctor" class="w-full" placeholder="选择主管医生">
             <ElOption v-for="item in DOCTOR_OPTIONS" :key="item" :label="item" :value="item" />
           </ElSelect>
         </ElFormItem>
@@ -69,7 +64,7 @@
 
   defineOptions({ name: 'DliStaff' })
 
-  /** 归属医生候选（演示） */
+  /** 主管医生候选（演示） */
   const DOCTOR_OPTIONS = ['陈明远', '周雅琴', '刘志远', '孙可欣']
 
   const searchItems = [
@@ -77,8 +72,19 @@
       key: 'keyword',
       label: '关键词',
       type: 'input',
-      placeholder: '姓名 / 归属医生',
+      placeholder: '姓名 / 主管医生',
       span: 6
+    },
+    {
+      key: 'role',
+      label: '角色',
+      type: 'select',
+      placeholder: '全部角色',
+      clearable: true,
+      options: [
+        { label: '医生助理', value: '助理' },
+        { label: '护士', value: '护士' }
+      ]
     }
   ]
 
@@ -101,7 +107,7 @@
         current: 1,
         size: 10,
         keyword: '',
-        role: '助理' as StaffItem['role']
+        role: undefined
       },
       columnsFactory: () => [
         { prop: 'id', label: '人员编号', width: 120 },
@@ -115,7 +121,7 @@
               row.role === '助理' ? '医生助理' : '护士'
             )
         },
-        { prop: 'doctor', label: '归属医生', minWidth: 140 },
+        { prop: 'doctor', label: '主管医生', minWidth: 140 },
         { prop: 'phone', label: '手机号', minWidth: 150 },
         { prop: 'patients', label: '在管患者', minWidth: 110, align: 'center' as const },
         {
@@ -157,11 +163,6 @@
     await refreshUpdate()
   }
 
-  /** 切换助理 / 护士 */
-  function handleTabChange() {
-    getData()
-  }
-
   /** 搜索 */
   function handleSearch() {
     getData()
@@ -187,7 +188,7 @@
   const rules: FormRules = {
     name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
     role: [{ required: true, message: '请选择角色', trigger: 'change' }],
-    doctor: [{ required: true, message: '请选择归属医生', trigger: 'change' }],
+    doctor: [{ required: true, message: '请选择主管医生', trigger: 'change' }],
     phone: [
       { required: true, message: '请输入手机号', trigger: 'blur' },
       { pattern: /^1\d{10}$/, message: '请输入 11 位手机号', trigger: 'blur' }
@@ -197,7 +198,7 @@
   /** 打开新增弹窗 */
   function openAdd() {
     form.name = ''
-    form.role = searchParams.role as StaffItem['role']
+    form.role = searchParams.role === '护士' ? '护士' : '助理'
     form.doctor = ''
     form.phone = ''
     addVisible.value = true
