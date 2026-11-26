@@ -1,29 +1,24 @@
 <!-- 评估预警 · 预警处理页签：列表 / 处理抽屉（触发依据 · 关联报告 · 跟进记录 · 双跳转）[批注 05] -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-model="warningSearchParams"
-      :items="warningSearchItems"
-      @search="handleWarningSearch"
-      @reset="handleWarningReset"
+    <ArtListControls>
+      <ArtSearchBar
+        v-model="warningSearchParams"
+        :items="warningSearchItems"
+        @search="handleWarningSearch"
+        @reset="handleWarningReset"
+      />
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="warningLoading"
+      :data="warningData"
+      :columns="warningColumns"
+      :pagination="warningPagination"
+      @pagination:size-change="handleWarningSizeChange"
+      @pagination:current-change="handleWarningCurrentChange"
     />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader
-        v-model:columns="warningColumnChecks"
-        :loading="warningLoading"
-        @refresh="refreshWarningData"
-      />
-
-      <ArtTable
-        :loading="warningLoading"
-        :data="warningData"
-        :columns="warningColumns"
-        :pagination="warningPagination"
-        @pagination:size-change="handleWarningSizeChange"
-        @pagination:current-change="handleWarningCurrentChange"
-      />
-    </ElCard>
 
     <!-- 行内处理抽屉：触发依据 / 关联报告 / 跟进记录 + 处理表单 + 双跳转 [批注 05] -->
     <ElDrawer v-model="handleVisible" title="预警处理" size="640px">
@@ -126,6 +121,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElButton,
     ElTag,
@@ -214,7 +210,6 @@
 
   const {
     columns: warningColumns,
-    columnChecks: warningColumnChecks,
     data: warningData,
     loading: warningLoading,
     pagination: warningPagination,

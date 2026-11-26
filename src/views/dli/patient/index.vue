@@ -2,7 +2,21 @@
 <template>
   <div class="art-full-height">
     <!-- 搜索区 -->
-    <div class="art-card-xs px-5 pt-4 pb-0">
+    <ArtListControls>
+      <template #actions>
+        <ElButton v-if="canManage" type="primary" @click="openArchive">
+          <ArtSvgIcon icon="ri:add-line" class="mr-1" />新增患者
+        </ElButton>
+        <ElButton v-if="canManage" plain :loading="syncing" @click="syncFromHis">
+          <ArtSvgIcon icon="ri:refresh-line" class="mr-1" />同步
+        </ElButton>
+        <ElButton v-if="canManage" plain @click="importVisible = true">
+          <ArtSvgIcon icon="ri:download-2-line" class="mr-1" />导入
+        </ElButton>
+        <ElButton plain @click="exportVisible = true">
+          <ArtSvgIcon icon="ri:upload-2-line" class="mr-1" />导出
+        </ElButton>
+      </template>
       <ElForm :inline="true" class="dli-filter-form" @submit.prevent>
         <div
           ref="filterItemsRef"
@@ -88,33 +102,19 @@
           </ElButton>
         </ElFormItem>
       </ElForm>
-    </div>
+    </ArtListControls>
 
     <!-- 表格 -->
-    <ElCard class="art-table-card">
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <div class="flex-c gap-2">
-            <ElButton v-if="canManage" type="primary" @click="openArchive">新增患者</ElButton>
-            <ElButton v-if="canManage" plain :loading="syncing" @click="syncFromHis">
-              <ArtSvgIcon icon="ri:refresh-line" class="mr-1" />同步
-            </ElButton>
-            <ElButton v-if="canManage" plain @click="importVisible = true">导入</ElButton>
-            <ElButton plain @click="exportVisible = true">导出</ElButton>
-          </div>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @selection-change="handleSelectionChange"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
-      />
-    </ElCard>
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="data"
+      :columns="columns"
+      :pagination="pagination"
+      @selection-change="handleSelectionChange"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    />
 
     <!-- 医患对话 / 诊疗历程：沿用原抽屉，标题已使用患者编号 -->
     <ChatDrawer v-model="chatVisible" :patient="activePatient" :readonly="!canManage" />
@@ -132,6 +132,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElButton,
     ElForm,
@@ -233,11 +234,15 @@
   const isAiGroup = (row: PatientRow) => row.group === 'AI 组'
 
   function renderWarn(row: PatientRow, field: 'earlyScreen' | 'earlyDiagnosis') {
-    if (!isAiGroup(row)) return h('span', { class: 'text-xs text-g-400' }, '依方案不开放')
+    if (!isAiGroup(row)) return renderUnavailable()
     const warn = row[field]
     const config = WARN_CONFIG[warn.level]
     const text = warn.level === 'none' ? config.label : `${config.label} ${warn.score}`
-    return h(ElTag, { type: config.type, effect: 'plain' }, () => text)
+    return h(ElTag, { type: config.type, effect: 'light' }, () => text)
+  }
+
+  function renderUnavailable() {
+    return h('span', { class: 'patient-table-secondary' }, '—')
   }
 
   /**
@@ -250,7 +255,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,
@@ -356,7 +360,7 @@
           label: '知情同意',
           width: 110,
           formatter: (row: PatientRow) =>
-            h(ElTag, { type: row.consent.signed ? 'success' : 'warning', effect: 'plain' }, () =>
+            h(ElTag, { type: row.consent.signed ? 'success' : 'warning', effect: 'light' }, () =>
               row.consent.signed ? row.consent.version : '未签署'
             )
         },
@@ -364,18 +368,21 @@
           prop: 'earlyScreen',
           label: '早筛预警',
           width: 130,
+          align: 'center' as const,
           formatter: (row: PatientRow) => renderWarn(row, 'earlyScreen')
         },
         {
           prop: 'earlyDiagnosis',
           label: '早诊预警',
           width: 130,
+          align: 'center' as const,
           formatter: (row: PatientRow) => renderWarn(row, 'earlyDiagnosis')
         },
         {
           prop: 'outcome',
           label: '转归预测',
           minWidth: 170,
+          align: 'center' as const,
           formatter: (row: PatientRow) =>
             isAiGroup(row)
               ? h('div', { class: 'leading-5' }, [
@@ -384,9 +391,9 @@
                     { class: 'text-g-900' },
                     `${row.outcome.window} · ${(row.outcome.probability * 100).toFixed(0)}%`
                   ),
-                  h('div', { class: 'text-xs text-g-500' }, row.outcome.label)
+                  h('div', { class: 'patient-table-secondary' }, row.outcome.label)
                 ])
-              : h('span', { class: 'text-xs text-g-400' }, '依方案不开放')
+              : renderUnavailable()
         },
         {
           prop: 'chat',
@@ -400,7 +407,7 @@
                   { link: true, type: 'primary', onClick: () => openChat(row) },
                   () => '医患对话'
                 )
-              : h('span', { class: 'text-xs text-g-400' }, '依方案不开放')
+              : renderUnavailable()
         },
         {
           prop: 'history',
@@ -464,9 +471,9 @@
     const top0 = items[0].offsetTop
     const overflowing = items.filter((el) => el.offsetTop > top0 + 1)
     hiddenCount.value = overflowing.length
-    filterRowHeight.value = overflowing.length
-      ? overflowing[0].offsetTop - top0
-      : items[0].offsetHeight + 18
+    filterRowHeight.value = Math.max(
+      ...items.filter((el) => el.offsetTop <= top0 + 1).map((el) => el.offsetTop + el.offsetHeight)
+    )
   }
 
   function scheduleFilterMeasure() {
@@ -590,8 +597,12 @@
 </script>
 
 <style scoped lang="scss">
+  :deep(.patient-table-secondary) {
+    color: var(--el-text-color-regular);
+  }
+
   /* 筛选区自适应：第一行铺满后，只有换行的筛选项才进入「展开」 */
-  .dli-filter-form {
+  .dli-filter-form.el-form {
     display: flex;
     align-items: flex-start;
     width: 100%;
@@ -602,12 +613,13 @@
     display: flex;
     flex: 1 1 auto;
     flex-wrap: wrap;
+    row-gap: 12px;
     align-items: flex-start;
     min-width: 0;
     transition: max-height 0.2s ease;
 
     &.is-collapsed {
-      max-height: calc(var(--dli-filter-row-h, 56px) + 2px);
+      max-height: var(--dli-filter-row-h, 36px);
       overflow: hidden;
     }
 

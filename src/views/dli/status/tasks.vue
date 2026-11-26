@@ -1,29 +1,24 @@
 <!-- DLI 状态管理 · 执行记录：由原页签改为左侧子菜单入口 [批注 09] -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-model="taskSearchParams"
-      :items="taskSearchItems"
-      @search="getTaskData"
-      @reset="resetTaskSearchParams"
+    <ArtListControls>
+      <ArtSearchBar
+        v-model="taskSearchParams"
+        :items="taskSearchItems"
+        @search="getTaskData"
+        @reset="resetTaskSearchParams"
+      />
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="taskLoading"
+      :data="taskData"
+      :columns="taskColumns"
+      :pagination="taskPagination"
+      @pagination:size-change="handleTaskSizeChange"
+      @pagination:current-change="handleTaskCurrentChange"
     />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader
-        v-model:columns="taskColumnChecks"
-        :loading="taskLoading"
-        @refresh="refreshTaskData"
-      />
-
-      <ArtTable
-        :loading="taskLoading"
-        :data="taskData"
-        :columns="taskColumns"
-        :pagination="taskPagination"
-        @pagination:size-change="handleTaskSizeChange"
-        @pagination:current-change="handleTaskCurrentChange"
-      />
-    </ElCard>
 
     <!-- 查看记录抽屉：来源记录 / 输入资料 / 模型·规则版本 / 关联结果，不另开详情页 [批注 09] -->
     <ElDrawer v-model="detailVisible" title="执行记录" size="600px">
@@ -111,9 +106,9 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElButton,
-    ElCard,
     ElDrawer,
     ElDescriptions,
     ElDescriptionsItem,
@@ -199,7 +194,6 @@
 
   const {
     columns: taskColumns,
-    columnChecks: taskColumnChecks,
     data: taskData,
     loading: taskLoading,
     pagination: taskPagination,
@@ -231,7 +225,7 @@
           width: 90,
           align: 'center' as const,
           formatter: (row: AutomationTask) =>
-            h(ElTag, { effect: 'plain', size: 'small' }, () => row.triggerSource)
+            h(ElTag, { effect: 'light', size: 'small' }, () => row.triggerSource)
         },
         {
           prop: 'status',
@@ -246,6 +240,7 @@
           label: '失败／缺项说明',
           minWidth: 200,
           showOverflowTooltip: true,
+          align: 'center' as const,
           formatter: (row: AutomationTask) => row.note || '—'
         },
         {

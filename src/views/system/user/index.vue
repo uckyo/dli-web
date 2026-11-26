@@ -1,47 +1,50 @@
 <!-- 用户管理页面 -->
 <!-- art-full-height 自动计算出页面剩余高度 -->
-<!-- art-table-card 一个符合系统样式的 class，同时自动撑满剩余高度 -->
 <!-- 更多 useTable 使用示例请移步至 功能示例 下面的高级表格示例或者查看官方文档 -->
 <!-- useTable 文档：https://www.artd.pro/docs/zh/guide/hooks/use-table.html -->
 <template>
   <div class="user-page art-full-height">
     <!-- 搜索栏 -->
-    <UserSearch v-model="searchForm" @search="handleSearch" @reset="resetSearchParams"></UserSearch>
+    <ArtListControls>
+      <template #actions>
+        <ElSpace wrap>
+          <ElButton @click="showDialog('add')" v-ripple>
+            <ArtSvgIcon icon="ri:user-add-line" class="mr-1" />新增用户
+          </ElButton>
+        </ElSpace>
+      </template>
+      <UserSearch
+        v-model="searchForm"
+        @search="handleSearch"
+        @reset="resetSearchParams"
+      ></UserSearch>
+    </ArtListControls>
 
-    <ElCard class="art-table-card">
-      <!-- 表格头部 -->
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <ElSpace wrap>
-            <ElButton @click="showDialog('add')" v-ripple>新增用户</ElButton>
-          </ElSpace>
-        </template>
-      </ArtTableHeader>
+    <!-- 表格 -->
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="data"
+      :columns="columns"
+      :pagination="pagination"
+      @selection-change="handleSelectionChange"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    >
+    </ArtTable>
 
-      <!-- 表格 -->
-      <ArtTable
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @selection-change="handleSelectionChange"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
-      >
-      </ArtTable>
-
-      <!-- 用户弹窗 -->
-      <UserDialog
-        v-model:visible="dialogVisible"
-        :type="dialogType"
-        :user-data="currentUserData"
-        @submit="handleDialogSubmit"
-      />
-    </ElCard>
+    <!-- 用户弹窗 -->
+    <UserDialog
+      v-model:visible="dialogVisible"
+      :type="dialogType"
+      :user-data="currentUserData"
+      @submit="handleDialogSubmit"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import ArtButtonTable from '@/components/core/forms/art-button-table/index.vue'
   import { ACCOUNT_TABLE_DATA } from '@/mock/temp/formData'
   import { useTable } from '@/hooks/core/useTable'
@@ -94,7 +97,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,
@@ -102,8 +104,7 @@
     replaceSearchParams,
     resetSearchParams,
     handleSizeChange,
-    handleCurrentChange,
-    refreshData
+    handleCurrentChange
   } = useTable({
     // 核心配置
     core: {

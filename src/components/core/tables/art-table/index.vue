@@ -3,7 +3,11 @@
 <!-- 扩展功能：分页组件、渲染自定义列、loading、表格全局边框、斑马纹、表格尺寸、表头背景配置 -->
 <!-- 获取 ref：默认暴露了 elTableRef 外部通过 ref.value.elTableRef 可以调用 el-table 方法 -->
 <template>
-  <div class="art-table" :class="{ 'is-empty': isEmpty }" :style="containerHeight">
+  <div
+    class="art-table"
+    :class="{ 'is-empty': isEmpty, 'is-list-layout': listLayout }"
+    :style="listLayout ? undefined : containerHeight"
+  >
     <ElTable ref="elTableRef" v-loading="!!loading" v-bind="mergedTableProps">
       <template v-for="col in columns" :key="col.prop || col.type">
         <!-- 渲染全局序号列 -->
@@ -128,6 +132,8 @@
     pagination?: PaginationConfig
     /** 分页配置 */
     paginationOptions?: PaginationOptions
+    /** 列表页使用贴边表格及左右对齐的分页 */
+    listLayout?: boolean
     /** 空数据表格高度 */
     emptyHeight?: string
     /** 空数据时显示的文本 */
@@ -180,6 +186,9 @@
   // 合并分页配置
   const mergedPaginationOptions = computed(() => ({
     ...DEFAULT_PAGINATION_OPTIONS,
+    ...(props.listLayout
+      ? { layout: 'total, ->, sizes, prev, pager, next, jumper', size: 'large' as const }
+      : {}),
     ...props.paginationOptions
   }))
 
@@ -242,9 +251,11 @@
 
   // 表头背景颜色样式
   const headerCellStyle = computed(() => ({
-    background: isHeaderBackground.value
-      ? 'var(--el-color-primary-light-9)'
-      : 'var(--default-box-color)',
+    background: props.listLayout
+      ? 'var(--art-list-table-header-bg)'
+      : isHeaderBackground.value
+        ? 'var(--el-color-primary-light-9)'
+        : 'var(--default-box-color)',
     ...(props.headerCellStyle || {}) // 合并用户传入的样式
   }))
 
@@ -324,7 +335,7 @@
 
   // 查找并绑定表格头部元素 - 使用 VueUse 优化
   const findTableHeader = () => {
-    if (!props.showTableHeader) {
+    if (props.listLayout || !props.showTableHeader) {
       tableHeaderRef.value = undefined
       return
     }
@@ -342,7 +353,7 @@
     () => {
       // 访问响应式数据以建立依赖追踪
       void props.data?.length // 追踪数据变化
-      const shouldShow = props.showTableHeader
+      const shouldShow = !props.listLayout && props.showTableHeader
 
       // 只有在需要显示表格头部时才查找
       if (shouldShow) {

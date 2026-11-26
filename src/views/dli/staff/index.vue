@@ -1,36 +1,34 @@
 <!-- DLI 人员管理：医生维护助理与护士（仅临床角色） -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-model="searchParams"
-      :items="searchItems"
-      @search="handleSearch"
-      @reset="handleReset"
-    />
-
-    <ElCard class="art-table-card">
+    <ArtListControls>
+      <template #actions>
+        <ElButton type="primary" @click="openAdd">
+          <ArtSvgIcon icon="ri:user-add-line" class="mr-1" />新增人员
+        </ElButton>
+      </template>
       <ElTabs v-model="searchParams.role" class="mb-3" @tab-change="handleTabChange">
         <ElTabPane label="医生助理" name="助理" />
         <ElTabPane label="护士" name="护士" />
       </ElTabs>
 
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <ElButton type="primary" @click="openAdd">
-            <ArtSvgIcon icon="ri:user-add-line" class="mr-1" />新增人员
-          </ElButton>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
+      <ArtSearchBar
+        v-model="searchParams"
+        :items="searchItems"
+        @search="handleSearch"
+        @reset="handleReset"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="data"
+      :columns="columns"
+      :pagination="pagination"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    />
 
     <!-- 新增人员 -->
     <ElDialog v-model="addVisible" title="新增人员" width="520px" destroy-on-close>
@@ -62,6 +60,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import { ElMessage, ElTag, ElButton } from 'element-plus'
   import type { FormInstance, FormRules } from 'element-plus'
   import { useTable } from '@/hooks/core/useTable'
@@ -85,7 +84,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,
@@ -94,7 +92,6 @@
     resetSearchParams,
     handleSizeChange,
     handleCurrentChange,
-    refreshData,
     refreshCreate,
     refreshUpdate
   } = useTable({
@@ -114,7 +111,7 @@
           label: '角色',
           width: 110,
           formatter: (row: StaffItem) =>
-            h(ElTag, { effect: 'plain', type: row.role === '助理' ? 'primary' : 'success' }, () =>
+            h(ElTag, { effect: 'light', type: row.role === '助理' ? 'primary' : 'success' }, () =>
               row.role === '助理' ? '医生助理' : '护士'
             )
         },

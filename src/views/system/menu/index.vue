@@ -2,54 +2,53 @@
 <template>
   <div class="menu-page art-full-height">
     <!-- 搜索栏 -->
-    <ArtSearchBar
-      v-model="formFilters"
-      :items="formItems"
-      :showExpand="false"
-      @reset="handleReset"
-      @search="handleSearch"
+    <ArtListControls>
+      <template #actions>
+        <ElButton v-auth="'add'" @click="handleAddMenu" v-ripple>
+          <ArtSvgIcon icon="ri:add-line" class="mr-1" />添加菜单
+        </ElButton>
+        <ElButton @click="toggleExpand" v-ripple>
+          <ArtSvgIcon
+            :icon="isExpanded ? 'ri:arrow-up-s-line' : 'ri:arrow-down-s-line'"
+            class="mr-1"
+          />
+          {{ isExpanded ? '收起' : '展开' }}
+        </ElButton>
+      </template>
+      <ArtSearchBar
+        v-model="formFilters"
+        :items="formItems"
+        :showExpand="false"
+        @reset="handleReset"
+        @search="handleSearch"
+      />
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      ref="tableRef"
+      rowKey="path"
+      :loading="loading"
+      :columns="columns"
+      :data="filteredTableData"
+      :stripe="false"
+      :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
+      :default-expand-all="false"
     />
 
-    <ElCard class="art-table-card">
-      <!-- 表格头部 -->
-      <ArtTableHeader
-        :showZebra="false"
-        :loading="loading"
-        v-model:columns="columnChecks"
-        @refresh="handleRefresh"
-      >
-        <template #left>
-          <ElButton v-auth="'add'" @click="handleAddMenu" v-ripple> 添加菜单 </ElButton>
-          <ElButton @click="toggleExpand" v-ripple>
-            {{ isExpanded ? '收起' : '展开' }}
-          </ElButton>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        ref="tableRef"
-        rowKey="path"
-        :loading="loading"
-        :columns="columns"
-        :data="filteredTableData"
-        :stripe="false"
-        :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
-        :default-expand-all="false"
-      />
-
-      <!-- 菜单弹窗 -->
-      <MenuDialog
-        v-model:visible="dialogVisible"
-        :type="dialogType"
-        :editData="editData"
-        :lockType="lockMenuType"
-        @submit="handleSubmit"
-      />
-    </ElCard>
+    <!-- 菜单弹窗 -->
+    <MenuDialog
+      v-model:visible="dialogVisible"
+      :type="dialogType"
+      :editData="editData"
+      :lockType="lockMenuType"
+      @submit="handleSubmit"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import { formatMenuTitle } from '@/utils/router'
   import ArtButtonTable from '@/components/core/forms/art-button-table/index.vue'
   import { useTableColumns } from '@/hooks/core/useTableColumns'
@@ -146,7 +145,7 @@
   }
 
   // 表格列配置
-  const { columnChecks, columns } = useTableColumns(() => [
+  const { columns } = useTableColumns(() => [
     {
       prop: 'meta.title',
       label: '菜单名称',
@@ -246,13 +245,6 @@
    */
   const handleSearch = (): void => {
     Object.assign(appliedFilters, { ...formFilters })
-    getMenuList()
-  }
-
-  /**
-   * 刷新菜单列表
-   */
-  const handleRefresh = (): void => {
     getMenuList()
   }
 

@@ -1,33 +1,29 @@
 <!-- DLI 编码规则配置（批注 18）：规则表 5 列 + 编辑弹窗（7 段 + 编号预览）+ 校验并发布；平台/中心/课题组三路由复用 -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-model="ruleSearchParams"
-      :items="ruleSearchItems"
-      @search="handleRuleSearch"
-      @reset="handleRuleReset"
-    />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader
-        v-model:columns="ruleColumnChecks"
-        :loading="ruleLoading"
-        @refresh="refreshRuleData"
-      >
-        <template #left>
-          <ElButton v-if="canMaintain" type="primary" @click="openRuleForm()">新增规则</ElButton>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        :loading="ruleLoading"
-        :data="ruleData"
-        :columns="ruleColumns"
-        :pagination="rulePagination"
-        @pagination:size-change="handleRuleSizeChange"
-        @pagination:current-change="handleRuleCurrentChange"
+    <ArtListControls>
+      <template #actions>
+        <ElButton v-if="canMaintain" type="primary" @click="openRuleForm()">
+          <ArtSvgIcon icon="ri:add-line" class="mr-1" />新增规则
+        </ElButton>
+      </template>
+      <ArtSearchBar
+        v-model="ruleSearchParams"
+        :items="ruleSearchItems"
+        @search="handleRuleSearch"
+        @reset="handleRuleReset"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="ruleLoading"
+      :data="ruleData"
+      :columns="ruleColumns"
+      :pagination="rulePagination"
+      @pagination:size-change="handleRuleSizeChange"
+      @pagination:current-change="handleRuleCurrentChange"
+    />
 
     <!-- 编辑弹窗：编号前缀/中心代码段/项目代码段/日期格式/流水号位数/流水重置周期/适用范围 + 编号预览 [批注 18] -->
     <ElDialog
@@ -107,6 +103,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElButton,
     ElTag,
@@ -183,7 +180,6 @@
 
   const {
     columns: ruleColumns,
-    columnChecks: ruleColumnChecks,
     data: ruleData,
     loading: ruleLoading,
     pagination: rulePagination,

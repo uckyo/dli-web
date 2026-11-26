@@ -1,21 +1,19 @@
 <!-- DLI 评估预警：单入口双页签「评估报告 / 预警处理」（蓝图 P05）[批注 05] -->
 <template>
   <div class="art-full-height overflow-y-auto pb-5">
-    <ElCard class="art-table-card dli-tab-card" shadow="never">
-      <ElTabs v-model="activeTab" class="dli-tabs">
-        <ElTabPane label="评估报告" name="reports">
-          <ReportList ref="reportRef" :patient-id="presetPatientId" />
-        </ElTabPane>
-        <ElTabPane label="预警处理" name="warnings">
-          <WarningList ref="warningRef" :patient-id="presetPatientId" />
-        </ElTabPane>
-      </ElTabs>
-    </ElCard>
+    <ElTabs v-model="activeTab" class="dli-tabs art-list-tabs">
+      <ElTabPane label="评估报告" name="reports">
+        <ReportList ref="reportRef" :patient-id="presetPatientId" />
+      </ElTabPane>
+      <ElTabPane label="预警处理" name="warnings">
+        <WarningList ref="warningRef" :patient-id="presetPatientId" />
+      </ElTabPane>
+    </ElTabs>
   </div>
 </template>
 
 <script setup lang="ts">
-  import { ElCard, ElTabs, ElTabPane } from 'element-plus'
+  import { ElTabs, ElTabPane } from 'element-plus'
   import { useRoute } from 'vue-router'
   import ReportList from './report-list.vue'
   import WarningList from './warning-list.vue'

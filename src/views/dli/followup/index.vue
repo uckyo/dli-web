@@ -148,43 +148,48 @@
 
     <!-- ==================== 列表模式：计划列表 / 随访模板 ==================== -->
     <template v-else>
-      <ElCard class="art-table-card dli-tab-card" shadow="never">
-        <ElTabs v-model="activeTab" class="dli-tabs">
-          <!-- 计划列表（默认显示计划表） [批注 10] -->
-          <ElTabPane label="计划列表" name="plans">
-            <div class="pt-3">
+      <ElTabs v-model="activeTab" class="dli-tabs art-list-tabs">
+        <!-- 计划列表（默认显示计划表） [批注 10] -->
+        <ElTabPane label="计划列表" name="plans">
+          <div class="art-list-stack pt-3">
+            <ArtListControls>
+              <template #actions>
+                <ElButton type="primary" @click="openPlanPage('create')">
+                  <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建计划
+                </ElButton>
+              </template>
               <ArtSearchBar
                 v-model="planSearchParams"
                 :items="planSearchItems"
                 @search="loadPlans"
                 @reset="resetPlanSearchParams"
               />
-              <ElCard class="art-table-card" shadow="never">
-                <ArtTableHeader :loading="planLoading" @refresh="loadPlans">
-                  <template #left>
-                    <ElButton type="primary" @click="openPlanPage('create')">新建计划</ElButton>
-                  </template>
-                </ArtTableHeader>
-                <ArtTable :loading="planLoading" :data="planList" :columns="planColumns" />
-              </ElCard>
-            </div>
-          </ElTabPane>
+            </ArtListControls>
 
-          <!-- 随访模板 [批注 10] -->
-          <ElTabPane label="随访模板" name="templates" lazy>
-            <div class="pt-3">
-              <ElCard class="art-table-card" shadow="never">
-                <ArtTableHeader :loading="templateLoading" @refresh="loadTemplates">
-                  <template #left>
-                    <ElButton type="primary" @click="openTemplateDialog()">新增模板</ElButton>
-                  </template>
-                </ArtTableHeader>
-                <ArtTable :loading="templateLoading" :data="templates" :columns="templateColumns" />
-              </ElCard>
-            </div>
-          </ElTabPane>
-        </ElTabs>
-      </ElCard>
+            <ArtTable list-layout :loading="planLoading" :data="planList" :columns="planColumns" />
+          </div>
+        </ElTabPane>
+
+        <!-- 随访模板 [批注 10] -->
+        <ElTabPane label="随访模板" name="templates" lazy>
+          <div class="art-list-stack pt-3">
+            <ArtListControls>
+              <template #actions>
+                <ElButton type="primary" @click="openTemplateDialog()">
+                  <ArtSvgIcon icon="ri:add-line" class="mr-1" />新增模板
+                </ElButton>
+              </template>
+            </ArtListControls>
+
+            <ArtTable
+              list-layout
+              :loading="templateLoading"
+              :data="templates"
+              :columns="templateColumns"
+            />
+          </div>
+        </ElTabPane>
+      </ElTabs>
     </template>
 
     <!-- 核对弹窗：患者反馈内容/附件、提交时间（只读）、核对结果、核对意见 [批注 10] -->
@@ -360,6 +365,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElButton,
     ElCard,

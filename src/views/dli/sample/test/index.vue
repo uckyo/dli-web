@@ -1,38 +1,36 @@
 <!-- DLI 生物样本 · 检测管理：只读展示样本库检测数据 [批注 07] -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-if="!props.patientId"
-      v-model="searchParams"
-      :items="searchItems"
-      @search="handleSearch"
-      @reset="handleReset"
-    />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <ElTag
-            v-if="props.patientId && props.sampleId"
-            closable
-            type="primary"
-            effect="plain"
-            @close="clearSampleFilter"
-          >
-            关联样本：{{ props.sampleId }}
-          </ElTag>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
+    <ArtListControls>
+      <template #actions>
+        <ElTag
+          v-if="props.patientId && props.sampleId"
+          closable
+          type="primary"
+          effect="light"
+          @close="clearSampleFilter"
+        >
+          关联样本：{{ props.sampleId }}
+        </ElTag>
+      </template>
+      <ArtSearchBar
+        v-if="!props.patientId"
+        v-model="searchParams"
+        :items="searchItems"
+        @search="handleSearch"
+        @reset="handleReset"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="data"
+      :columns="columns"
+      :pagination="pagination"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    />
 
     <SampleTestDetailDrawer
       v-model="testDrawerVisible"
@@ -46,6 +44,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import { ElTag, ElButton, ElTable, ElTableColumn } from 'element-plus'
   import { useRoute } from 'vue-router'
   import { useTable } from '@/hooks/core/useTable'
@@ -127,7 +126,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,
@@ -180,7 +178,7 @@
           label: '检测类型',
           width: 76,
           formatter: (row: SampleTestRecord) =>
-            h(ElTag, { effect: 'plain', type: 'primary' }, () => row.type)
+            h(ElTag, { effect: 'light', type: 'primary' }, () => row.type)
         },
         { prop: 'item', label: '检测项目', minWidth: 102 },
         { prop: 'batch', label: '检测批次', width: 92 },
@@ -199,7 +197,7 @@
                 ? [
                     h(
                       ElTag,
-                      { size: 'small', effect: 'plain', type: 'info' },
+                      { size: 'small', effect: 'light', type: 'info' },
                       () => `共 ${row.linkedSamples.length} 份`
                     )
                   ]
@@ -220,7 +218,7 @@
                     h(
                       ElTag,
                       {
-                        effect: 'plain',
+                        effect: 'light',
                         size: 'small',
                         type: SYNC_STATUS_TAG[row.syncStatus],
                         title: row.syncNote
@@ -236,14 +234,14 @@
           label: '质控结论',
           width: 76,
           formatter: (row: SampleTestRecord) =>
-            h(ElTag, { effect: 'plain', type: QC_TAG[row.qc] }, () => row.qc)
+            h(ElTag, { effect: 'light', type: QC_TAG[row.qc] }, () => row.qc)
         },
         {
           prop: 'shareLevel',
           label: '共享级别',
           width: 74,
           formatter: (row: SampleTestRecord) =>
-            h(ElTag, { effect: 'plain', type: SCOPE_TAG[row.shareLevel] }, () => row.shareLevel)
+            h(ElTag, { effect: 'light', type: SCOPE_TAG[row.shareLevel] }, () => row.shareLevel)
         },
         {
           prop: 'operation',

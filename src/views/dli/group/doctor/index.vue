@@ -1,31 +1,29 @@
 <!-- DLI 课题组管理 · 医生管理：同一课题组内医生的在管患者与启停 -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-model="searchParams"
-      :items="searchItems"
-      @search="handleSearch"
-      @reset="handleReset"
-    />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <ElButton type="primary" @click="openAdd">
-            <ArtSvgIcon icon="ri:user-add-line" class="mr-1" />新增医生
-          </ElButton>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
+    <ArtListControls>
+      <template #actions>
+        <ElButton type="primary" @click="openAdd">
+          <ArtSvgIcon icon="ri:user-add-line" class="mr-1" />新增医生
+        </ElButton>
+      </template>
+      <ArtSearchBar
+        v-model="searchParams"
+        :items="searchItems"
+        @search="handleSearch"
+        @reset="handleReset"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="data"
+      :columns="columns"
+      :pagination="pagination"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    />
 
     <!-- 新增医生 -->
     <ElDialog v-model="addVisible" title="新增医生" width="520px" destroy-on-close>
@@ -51,6 +49,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import { ElMessage, ElTag, ElButton } from 'element-plus'
   import type { FormInstance, FormRules } from 'element-plus'
   import { useTable } from '@/hooks/core/useTable'
@@ -73,7 +72,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,
@@ -82,7 +80,6 @@
     resetSearchParams,
     handleSizeChange,
     handleCurrentChange,
-    refreshData,
     refreshCreate,
     refreshUpdate
   } = useTable({

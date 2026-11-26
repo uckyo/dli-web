@@ -1,31 +1,29 @@
 <!-- DLI 知识库管理：文档资产、检索测试与召回参数 -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-model="searchParams"
-      :items="searchItems"
-      @search="handleSearch"
-      @reset="handleReset"
-    />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <ElButton v-if="isAdmin" type="primary" @click="openCreate">
-            <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建知识库
-          </ElButton>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
+    <ArtListControls>
+      <template #actions>
+        <ElButton v-if="isAdmin" type="primary" @click="openCreate">
+          <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建知识库
+        </ElButton>
+      </template>
+      <ArtSearchBar
+        v-model="searchParams"
+        :items="searchItems"
+        @search="handleSearch"
+        @reset="handleReset"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="data"
+      :columns="columns"
+      :pagination="pagination"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    />
 
     <KnowledgeDetailDrawer
       v-model="detailVisible"
@@ -41,6 +39,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import { ElButton, ElMessage, ElMessageBox, ElSwitch, ElTag } from 'element-plus'
   import { useTable } from '@/hooks/core/useTable'
   import ArtButtonMore from '@/components/core/forms/art-button-more/index.vue'
@@ -106,7 +105,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,
@@ -115,7 +113,6 @@
     resetSearchParams,
     handleSizeChange,
     handleCurrentChange,
-    refreshData,
     refreshSoft,
     refreshCreate,
     refreshUpdate,
@@ -142,7 +139,7 @@
           formatter: (row: KnowledgeItem) =>
             h(
               ElTag,
-              { type: SCOPE_TAG[row.scope], effect: 'plain', size: 'small' },
+              { type: SCOPE_TAG[row.scope], effect: 'light', size: 'small' },
               () => row.scope
             )
         },
@@ -189,7 +186,7 @@
                 })
               : h(
                   ElTag,
-                  { type: row.enabled ? 'success' : 'info', effect: 'plain', size: 'small' },
+                  { type: row.enabled ? 'success' : 'info', effect: 'light', size: 'small' },
                   () => (row.enabled ? '已启用' : '已停用')
                 )
         },

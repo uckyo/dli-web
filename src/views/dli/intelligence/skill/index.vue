@@ -1,32 +1,30 @@
 <!-- DLI 技能管理：资产台账、调用质量、配置与版本 -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-model="searchParams"
-      :items="searchItems"
-      label-width="90px"
-      @search="handleSearch"
-      @reset="handleReset"
-    />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <ElButton v-if="isAdmin" type="primary" @click="openCreate">
-            <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建技能
-          </ElButton>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
+    <ArtListControls>
+      <template #actions>
+        <ElButton v-if="isAdmin" type="primary" @click="openCreate">
+          <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建技能
+        </ElButton>
+      </template>
+      <ArtSearchBar
+        v-model="searchParams"
+        :items="searchItems"
+        label-width="90px"
+        @search="handleSearch"
+        @reset="handleReset"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="data"
+      :columns="columns"
+      :pagination="pagination"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    />
 
     <SkillDetailDrawer
       v-model="detailVisible"
@@ -42,6 +40,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import { ElButton, ElMessage, ElMessageBox, ElSwitch, ElTag } from 'element-plus'
   import { useTable } from '@/hooks/core/useTable'
   import ArtButtonMore from '@/components/core/forms/art-button-more/index.vue'
@@ -116,7 +115,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,
@@ -125,7 +123,6 @@
     resetSearchParams,
     handleSizeChange,
     handleCurrentChange,
-    refreshData,
     refreshSoft,
     refreshCreate,
     refreshUpdate,
@@ -152,7 +149,7 @@
           formatter: (row: SkillItem) =>
             h(
               ElTag,
-              { type: SKILL_TYPE_TAG[row.type], effect: 'plain', size: 'small' },
+              { type: SKILL_TYPE_TAG[row.type], effect: 'light', size: 'small' },
               () => row.type
             )
         },
@@ -193,7 +190,7 @@
                 })
               : h(
                   ElTag,
-                  { type: row.enabled ? 'success' : 'info', effect: 'plain', size: 'small' },
+                  { type: row.enabled ? 'success' : 'info', effect: 'light', size: 'small' },
                   () => (row.enabled ? '已启用' : '已停用')
                 )
         },

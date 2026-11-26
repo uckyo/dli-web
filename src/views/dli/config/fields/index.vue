@@ -1,35 +1,35 @@
 <!-- DLI 患者字段配置（批注 17）：字段表 + 预览效果宽弹窗 + 草稿→提交平台→发布流转；平台/中心/课题组三路由复用 -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-model="fieldSearchParams"
-      :items="fieldSearchItems"
-      @search="handleFieldSearch"
-      @reset="handleFieldReset"
-    />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader
-        v-model:columns="fieldColumnChecks"
-        :loading="fieldLoading"
-        @refresh="refreshFieldData"
-      >
-        <template #left>
-          <ElButton type="primary" @click="openFieldForm()">新增字段</ElButton>
-          <ElButton @click="previewVisible = true">预览效果</ElButton>
-          <ElButton @click="openVersions">版本记录</ElButton>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        :loading="fieldLoading"
-        :data="fieldData"
-        :columns="fieldColumns"
-        :pagination="fieldPagination"
-        @pagination:size-change="handleFieldSizeChange"
-        @pagination:current-change="handleFieldCurrentChange"
+    <ArtListControls>
+      <template #actions>
+        <ElButton type="primary" @click="openFieldForm()">
+          <ArtSvgIcon icon="ri:add-line" class="mr-1" />新增字段
+        </ElButton>
+        <ElButton @click="previewVisible = true">
+          <ArtSvgIcon icon="ri:eye-line" class="mr-1" />预览效果
+        </ElButton>
+        <ElButton @click="openVersions">
+          <ArtSvgIcon icon="ri:history-line" class="mr-1" />版本记录
+        </ElButton>
+      </template>
+      <ArtSearchBar
+        v-model="fieldSearchParams"
+        :items="fieldSearchItems"
+        @search="handleFieldSearch"
+        @reset="handleFieldReset"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="fieldLoading"
+      :data="fieldData"
+      :columns="fieldColumns"
+      :pagination="fieldPagination"
+      @pagination:size-change="handleFieldSizeChange"
+      @pagination:current-change="handleFieldCurrentChange"
+    />
 
     <!-- 新增 / 编辑字段弹窗：11 项配置 [批注 17] -->
     <ElDialog
@@ -174,6 +174,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElButton,
     ElTag,
@@ -274,7 +275,6 @@
 
   const {
     columns: fieldColumns,
-    columnChecks: fieldColumnChecks,
     data: fieldData,
     loading: fieldLoading,
     pagination: fieldPagination,
@@ -315,7 +315,7 @@
           formatter: (row: PatientField) =>
             h(
               ElTag,
-              { effect: 'plain', type: row.required ? 'warning' : 'info', size: 'small' },
+              { effect: 'light', type: row.required ? 'warning' : 'info', size: 'small' },
               () => (row.required ? '是' : '否')
             )
         },

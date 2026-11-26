@@ -1,34 +1,30 @@
 <!-- 评估预警 · 评估报告页签：列表 / 发起评估；记录意见与重新评估在报告详情页 [批注 05] -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-model="reportSearchParams"
-      :items="reportSearchItems"
-      @search="handleReportSearch"
-      @reset="handleReportReset"
-    />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader
-        v-model:columns="reportColumnChecks"
-        :loading="reportLoading"
-        @refresh="refreshReportData"
-      >
-        <template #left>
-          <!-- 发起评估：选患者编号 + 模型用途，只读显示模型版本和输入完整性 [批注 05] -->
-          <ElButton v-if="isDoctor" type="primary" @click="openLaunch()">发起评估</ElButton>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        :loading="reportLoading"
-        :data="reportData"
-        :columns="reportColumns"
-        :pagination="reportPagination"
-        @pagination:size-change="handleReportSizeChange"
-        @pagination:current-change="handleReportCurrentChange"
+    <ArtListControls>
+      <template #actions>
+        <!-- 发起评估：选患者编号 + 模型用途，只读显示模型版本和输入完整性 [批注 05] -->
+        <ElButton v-if="isDoctor" type="primary" @click="openLaunch()">
+          <ArtSvgIcon icon="ri:add-line" class="mr-1" />发起评估
+        </ElButton>
+      </template>
+      <ArtSearchBar
+        v-model="reportSearchParams"
+        :items="reportSearchItems"
+        @search="handleReportSearch"
+        @reset="handleReportReset"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="reportLoading"
+      :data="reportData"
+      :columns="reportColumns"
+      :pagination="reportPagination"
+      @pagination:size-change="handleReportSizeChange"
+      @pagination:current-change="handleReportCurrentChange"
+    />
 
     <!-- 发起评估弹窗：等待时显示执行状态 -->
     <ElDialog v-model="launchVisible" title="发起评估" width="560px" destroy-on-close>
@@ -68,6 +64,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElButton,
     ElTag,
@@ -166,7 +163,6 @@
 
   const {
     columns: reportColumns,
-    columnChecks: reportColumnChecks,
     data: reportData,
     loading: reportLoading,
     pagination: reportPagination,
@@ -174,8 +170,7 @@
     getData: getReportData,
     resetSearchParams: resetReportSearchParams,
     handleSizeChange: handleReportSizeChange,
-    handleCurrentChange: handleReportCurrentChange,
-    refreshData: refreshReportData
+    handleCurrentChange: handleReportCurrentChange
   } = useTable({
     core: {
       apiFn: fetchGetAssessmentReports,
@@ -212,7 +207,7 @@
           label: '模型用途',
           width: 110,
           formatter: (row: AssessmentReport) =>
-            h(ElTag, { effect: 'plain', type: 'primary' }, () => row.modelUsage)
+            h(ElTag, { effect: 'light', type: 'primary' }, () => row.modelUsage)
         },
         { prop: 'assessedAt', label: '评估时间', width: 170 },
         { prop: 'result', label: '结果摘要', minWidth: 200, showOverflowTooltip: true },

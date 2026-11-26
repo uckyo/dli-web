@@ -2,33 +2,33 @@
 <template>
   <div class="art-full-height">
     <!-- 患者详情页嵌入模式不显示筛选栏 -->
-    <ArtSearchBar
-      v-if="!props.patientId"
-      v-model="searchParams"
-      :items="searchItems"
-      @search="handleSearch"
-      @reset="handleReset"
-    />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <ElButton v-if="canManage" type="primary" :loading="syncing" @click="syncFromHis">
-            <ArtSvgIcon icon="ri:refresh-line" class="mr-1" />同步
-          </ElButton>
-          <ElButton v-else plain @click="requestDataPermission">申请数据权限</ElButton>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        :loading="loading"
-        :data="tableData"
-        :columns="columns"
-        :pagination="pagination"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
+    <ArtListControls>
+      <template #actions>
+        <ElButton v-if="canManage" type="primary" :loading="syncing" @click="syncFromHis">
+          <ArtSvgIcon icon="ri:refresh-line" class="mr-1" />同步
+        </ElButton>
+        <ElButton v-else plain @click="requestDataPermission">
+          <ArtSvgIcon icon="ri:shield-keyhole-line" class="mr-1" />申请数据权限
+        </ElButton>
+      </template>
+      <ArtSearchBar
+        v-if="!props.patientId"
+        v-model="searchParams"
+        :items="searchItems"
+        @search="handleSearch"
+        @reset="handleReset"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="tableData"
+      :columns="columns"
+      :pagination="pagination"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    />
 
     <!-- 影像原图仍走影像查看入口，不按报告文字识别 [批注 06] -->
     <ElDialog v-model="imageVisible" title="影像查看" width="520px">
@@ -44,9 +44,10 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import { computed, h, onActivated, ref } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
-  import { ElButton, ElCard, ElDialog, ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { ElButton, ElDialog, ElMessage, ElMessageBox, ElTag } from 'element-plus'
   import { useTable } from '@/hooks/core/useTable'
   import { useUserStore } from '@/store/modules/user'
   import { fetchGetExamList, fetchStartExamRecognition, isReportExam } from '@/mock/dli/api'
@@ -141,7 +142,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,
@@ -149,8 +149,7 @@
     getData,
     resetSearchParams,
     handleSizeChange,
-    handleCurrentChange,
-    refreshData
+    handleCurrentChange
   } = useTable({
     core: {
       apiFn: fetchGetExamList,
@@ -184,7 +183,7 @@
           label: '资料分类',
           width: 80,
           formatter: (row: ExamRecord) =>
-            h(ElTag, { effect: 'plain', type: 'primary' }, () => row.category)
+            h(ElTag, { effect: 'light', type: 'primary' }, () => row.category)
         },
         { prop: 'item', label: '检查项目／资料名称', minWidth: 145, showOverflowTooltip: true },
         { prop: 'date', label: '检查日期', width: 110 },
@@ -196,7 +195,7 @@
             h(
               ElTag,
               {
-                effect: 'plain',
+                effect: 'light',
                 size: 'small',
                 type:
                   row.source === '院内同步'

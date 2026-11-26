@@ -1,82 +1,75 @@
 <!-- DLI 状态管理：页内「自动化配置 / 执行记录」双页签 [批注 09] -->
 <template>
   <div class="art-full-height overflow-y-auto pb-5">
-    <ElCard class="art-table-card dli-tab-card" shadow="never">
-      <ElTabs v-model="activeTab" class="dli-tabs">
-        <!-- 页签一：自动化配置（原三组开关与保存按钮） [批注 09] -->
-        <ElTabPane label="自动化配置" name="config">
-          <div v-loading="loading" class="pt-4">
-            <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
-              <div v-for="group in GROUPS" :key="group.name" class="art-card px-5 py-4">
-                <div class="mb-3 flex-c gap-2">
-                  <span class="size-9 flex-cc rounded-lg bg-primary/10 text-primary">
-                    <ArtSvgIcon :icon="group.icon" />
-                  </span>
-                  <div>
-                    <p class="font-medium text-g-900">{{ group.title }}</p>
-                    <p class="text-xs text-g-500">{{ group.desc }}</p>
-                  </div>
+    <ElTabs v-model="activeTab" class="dli-tabs art-list-tabs">
+      <!-- 页签一：自动化配置（原三组开关与保存按钮） [批注 09] -->
+      <ElTabPane label="自动化配置" name="config">
+        <div v-loading="loading" class="pt-4">
+          <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+            <div v-for="group in GROUPS" :key="group.name" class="art-card px-5 py-4">
+              <div class="mb-3 flex-c gap-2">
+                <span class="size-9 flex-cc rounded-lg bg-primary/10 text-primary">
+                  <ArtSvgIcon :icon="group.icon" />
+                </span>
+                <div>
+                  <p class="font-medium text-g-900">{{ group.title }}</p>
+                  <p class="text-xs text-g-500">{{ group.desc }}</p>
                 </div>
+              </div>
 
-                <div class="space-y-3">
-                  <div
-                    v-for="item in group.items"
-                    :key="item.key"
-                    class="rounded-lg border border-full-d px-3 py-3"
-                  >
-                    <div class="flex-cb gap-3">
-                      <span class="text-sm font-medium text-g-800">{{ item.label }}</span>
-                      <!-- 配置开关只给明确获授权医生等现有角色 [批注 09] -->
-                      <ElSwitch
-                        v-model="item.enabled"
-                        :disabled="!canConfigure"
-                        @change="handleToggle(item)"
-                      />
-                    </div>
-                    <p class="mt-1 text-xs leading-5 text-g-500">{{ item.description }}</p>
+              <div class="space-y-3">
+                <div
+                  v-for="item in group.items"
+                  :key="item.key"
+                  class="rounded-lg border border-full-d px-3 py-3"
+                >
+                  <div class="flex-cb gap-3">
+                    <span class="text-sm font-medium text-g-800">{{ item.label }}</span>
+                    <!-- 配置开关只给明确获授权医生等现有角色 [批注 09] -->
+                    <ElSwitch
+                      v-model="item.enabled"
+                      :disabled="!canConfigure"
+                      @change="handleToggle(item)"
+                    />
                   </div>
+                  <p class="mt-1 text-xs leading-5 text-g-500">{{ item.description }}</p>
                 </div>
               </div>
             </div>
-            <div class="mt-4 flex-c gap-2">
-              <ElButton v-if="canConfigure" type="primary" @click="saveConfig">保存配置</ElButton>
-              <p v-else class="text-xs text-g-500">
-                助理／护士不默认保存医学规则，配置开关仅对获授权医生开放
-              </p>
-            </div>
           </div>
-        </ElTabPane>
+          <div class="mt-4 flex-c gap-2">
+            <ElButton v-if="canConfigure" type="primary" @click="saveConfig">保存配置</ElButton>
+            <p v-else class="text-xs text-g-500">
+              助理／护士不默认保存医学规则，配置开关仅对获授权医生开放
+            </p>
+          </div>
+        </div>
+      </ElTabPane>
 
-        <!-- 页签二：执行记录（点开才显示任务表） [批注 09] -->
-        <ElTabPane label="执行记录" name="tasks" lazy>
-          <div class="pt-3">
+      <!-- 页签二：执行记录（点开才显示任务表） [批注 09] -->
+      <ElTabPane label="执行记录" name="tasks" lazy>
+        <div class="art-list-stack pt-3">
+          <ArtListControls>
             <ArtSearchBar
               v-model="taskSearchParams"
               :items="taskSearchItems"
               @search="getTaskData"
               @reset="resetTaskSearchParams"
             />
+          </ArtListControls>
 
-            <ElCard class="art-table-card" shadow="never">
-              <ArtTableHeader
-                v-model:columns="taskColumnChecks"
-                :loading="taskLoading"
-                @refresh="refreshTaskData"
-              />
-
-              <ArtTable
-                :loading="taskLoading"
-                :data="taskData"
-                :columns="taskColumns"
-                :pagination="taskPagination"
-                @pagination:size-change="handleTaskSizeChange"
-                @pagination:current-change="handleTaskCurrentChange"
-              />
-            </ElCard>
-          </div>
-        </ElTabPane>
-      </ElTabs>
-    </ElCard>
+          <ArtTable
+            list-layout
+            :loading="taskLoading"
+            :data="taskData"
+            :columns="taskColumns"
+            :pagination="taskPagination"
+            @pagination:size-change="handleTaskSizeChange"
+            @pagination:current-change="handleTaskCurrentChange"
+          />
+        </div>
+      </ElTabPane>
+    </ElTabs>
 
     <!-- 查看记录抽屉：来源记录 / 输入资料 / 模型·规则版本 / 关联结果，不另开详情页 [批注 09] -->
     <ElDrawer v-model="detailVisible" title="执行记录" size="600px">
@@ -164,9 +157,9 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElButton,
-    ElCard,
     ElDrawer,
     ElDescriptions,
     ElDescriptionsItem,
@@ -337,7 +330,6 @@
 
   const {
     columns: taskColumns,
-    columnChecks: taskColumnChecks,
     data: taskData,
     loading: taskLoading,
     pagination: taskPagination,
@@ -369,7 +361,7 @@
           width: 90,
           align: 'center' as const,
           formatter: (row: AutomationTask) =>
-            h(ElTag, { effect: 'plain', size: 'small' }, () => row.triggerSource)
+            h(ElTag, { effect: 'light', size: 'small' }, () => row.triggerSource)
         },
         {
           prop: 'status',
@@ -384,6 +376,7 @@
           label: '失败／缺项说明',
           minWidth: 200,
           showOverflowTooltip: true,
+          align: 'center' as const,
           formatter: (row: AutomationTask) => row.note || '—'
         },
         {

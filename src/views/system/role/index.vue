@@ -1,38 +1,33 @@
 <!-- 角色管理页面 -->
 <template>
   <div class="art-full-height">
-    <RoleSearch
-      v-show="showSearchBar"
-      v-model="searchForm"
-      @search="handleSearch"
-      @reset="resetSearchParams"
-    ></RoleSearch>
+    <ArtListControls>
+      <template #actions>
+        <ElSpace wrap>
+          <ElButton @click="showDialog('add')" v-ripple>
+            <ArtSvgIcon icon="ri:user-add-line" class="mr-1" />新增角色
+          </ElButton>
+        </ElSpace>
+      </template>
+      <RoleSearch
+        v-if="showSearchBar"
+        v-model="searchForm"
+        @search="handleSearch"
+        @reset="resetSearchParams"
+      ></RoleSearch>
+    </ArtListControls>
 
-    <ElCard class="art-table-card" :style="{ 'margin-top': showSearchBar ? '12px' : '0' }">
-      <ArtTableHeader
-        v-model:columns="columnChecks"
-        v-model:showSearchBar="showSearchBar"
-        :loading="loading"
-        @refresh="refreshData"
-      >
-        <template #left>
-          <ElSpace wrap>
-            <ElButton @click="showDialog('add')" v-ripple>新增角色</ElButton>
-          </ElSpace>
-        </template>
-      </ArtTableHeader>
-
-      <!-- 表格 -->
-      <ArtTable
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
-      >
-      </ArtTable>
-    </ElCard>
+    <!-- 表格 -->
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="data"
+      :columns="columns"
+      :pagination="pagination"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    >
+    </ArtTable>
 
     <!-- 角色编辑弹窗 -->
     <RoleEditDialog
@@ -52,6 +47,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import { ButtonMoreItem } from '@/components/core/forms/art-button-more/index.vue'
   import { useTable } from '@/hooks/core/useTable'
   import { fetchGetRoleList } from '@/api/system-manage'
@@ -85,7 +81,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,

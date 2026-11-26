@@ -460,9 +460,15 @@
     const top0 = items[0].offsetTop
     const overflowing = items.filter((el) => el.offsetTop > top0 + 1)
     hiddenCount.value = overflowing.length
-    rowHeight.value = overflowing.length
-      ? overflowing[0].offsetTop - top0
-      : items[0].offsetHeight + 16
+    const firstRow = items.filter((el) => el.offsetTop <= top0 + 1)
+    rowHeight.value = Math.ceil(
+      Math.max(
+        ...firstRow.map(
+          (el) =>
+            el.offsetTop + el.offsetHeight + (parseFloat(getComputedStyle(el).marginBottom) || 0)
+        )
+      )
+    )
   }
 
   function scheduleMeasure() {
@@ -568,7 +574,7 @@
 
 <style lang="scss" scoped>
   .art-search-bar {
-    padding: 15px 20px 0;
+    padding: var(--art-search-padding, 15px 20px 0);
 
     // label 宽度已按文案计算，这里兜底防止字体/缩放差异导致折行
     :deep(.el-form-item__label) {
@@ -587,6 +593,7 @@
       display: flex;
       flex: 1 1 auto;
       flex-wrap: wrap;
+      row-gap: var(--art-search-row-gap, 0);
       align-items: flex-start;
       min-width: 0;
       transition: max-height 0.2s ease;
@@ -599,7 +606,7 @@
       :deep(.el-form-item) {
         flex: 0 0 auto;
         margin-right: 16px;
-        margin-bottom: 14px;
+        margin-bottom: var(--art-search-item-bottom, 14px);
       }
 
       // 控件按类型给宽度：选择器短、输入框长、日期范围更长，
@@ -654,7 +661,7 @@
       flex-wrap: wrap;
       align-items: center;
       justify-content: flex-end;
-      margin-bottom: 14px;
+      margin-bottom: var(--art-search-item-bottom, 14px);
     }
 
     .form-buttons {
@@ -693,7 +700,7 @@
   // 响应式优化：窄屏下按钮独占一行，避免和筛选项抢宽度
   @media (width <= 768px) {
     .art-search-bar {
-      padding: 16px 16px 0;
+      padding: var(--art-search-padding, 16px 16px 0);
 
       .art-search-body {
         flex-direction: column;

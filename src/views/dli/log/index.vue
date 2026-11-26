@@ -1,30 +1,30 @@
 <!-- DLI 系统日志：按授权范围查询重要数据、权限、导入导出及配置变更留痕（蓝图 P18）[批注 23] -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-model="searchParams"
-      :items="searchItems"
-      @search="handleSearch"
-      @reset="handleReset"
-    />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <span class="mr-1 text-xs text-g-500">当前范围：{{ scopeLabel }}</span>
-          <ElButton v-if="canExport" type="primary" @click="exportLogs">导出当前日志</ElButton>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
+    <ArtListControls>
+      <template #actions>
+        <span class="mr-1 text-xs text-g-500">当前范围：{{ scopeLabel }}</span>
+        <ElButton v-if="canExport" type="primary" @click="exportLogs">
+          <ArtSvgIcon icon="ri:upload-2-line" class="mr-1" />导出当前日志
+        </ElButton>
+      </template>
+      <ArtSearchBar
+        v-model="searchParams"
+        :items="searchItems"
+        @search="handleSearch"
+        @reset="handleReset"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="data"
+      :columns="columns"
+      :pagination="pagination"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    />
 
     <!-- 行内查看抽屉：变更前内容 / 变更后内容 / 失败原因，关闭回表不另建详情页 [批注 23] -->
     <ElDrawer v-model="detailVisible" title="日志详情" size="560px">
@@ -71,6 +71,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElButton,
     ElMessage,
@@ -214,7 +215,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,
@@ -222,8 +222,7 @@
     getData,
     resetSearchParams,
     handleSizeChange,
-    handleCurrentChange,
-    refreshData
+    handleCurrentChange
   } = useTable({
     core: {
       apiFn: querySystemLogs,
@@ -249,6 +248,7 @@
           prop: 'objectType',
           label: '业务对象类型',
           width: 130,
+          align: 'center' as const,
           formatter: (row: SystemLog) => row.objectType || '—'
         },
         {

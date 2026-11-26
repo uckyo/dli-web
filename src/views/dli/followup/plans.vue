@@ -148,27 +148,29 @@
 
     <!-- ==================== 计划列表 ==================== -->
     <template v-else>
-      <ArtSearchBar
-        v-model="planSearchParams"
-        :items="planSearchItems"
-        @search="handlePlanSearch"
-        @reset="resetPlanSearchParams"
-      />
-      <ElCard class="art-table-card">
-        <ArtTableHeader :loading="planLoading" @refresh="loadPlans">
-          <template #left>
-            <ElButton type="primary" @click="openPlanPage('create')">新建计划</ElButton>
-          </template>
-        </ArtTableHeader>
-        <ArtTable
-          :loading="planLoading"
-          :data="pagedPlanList"
-          :columns="planColumns"
-          :pagination="planPagination"
-          @pagination:size-change="handlePlanSizeChange"
-          @pagination:current-change="handlePlanCurrentChange"
+      <ArtListControls>
+        <template #actions>
+          <ElButton type="primary" @click="openPlanPage('create')">
+            <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建计划
+          </ElButton>
+        </template>
+        <ArtSearchBar
+          v-model="planSearchParams"
+          :items="planSearchItems"
+          @search="handlePlanSearch"
+          @reset="resetPlanSearchParams"
         />
-      </ElCard>
+      </ArtListControls>
+
+      <ArtTable
+        list-layout
+        :loading="planLoading"
+        :data="pagedPlanList"
+        :columns="planColumns"
+        :pagination="planPagination"
+        @pagination:size-change="handlePlanSizeChange"
+        @pagination:current-change="handlePlanCurrentChange"
+      />
     </template>
 
     <!-- 核对弹窗：患者反馈内容/附件、提交时间（只读）、核对结果、核对意见 [批注 10] -->
@@ -286,6 +288,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElButton,
     ElCard,

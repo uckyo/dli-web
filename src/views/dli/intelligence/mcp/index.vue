@@ -1,31 +1,31 @@
 <!-- DLI MCP 管理：平台统一维护，只读查看与授权下载，不提供测试/新增/编辑/删除 [批注 21] -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-model="searchParams"
-      :items="searchItems"
-      @search="handleSearch"
-      @reset="handleReset"
-    />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData" />
-
-      <ArtTable
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
+    <ArtListControls>
+      <ArtSearchBar
+        v-model="searchParams"
+        :items="searchItems"
+        @search="handleSearch"
+        @reset="handleReset"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="data"
+      :columns="columns"
+      :pagination="pagination"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    />
 
     <McpDetailDrawer v-model="detailVisible" :mcp-id="activeMcpId" />
   </div>
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import { ElButton, ElMessage, ElTag } from 'element-plus'
   import { useTable } from '@/hooks/core/useTable'
   import { fetchGetMcpDetail, fetchGetMcpList, fetchGetMcpOverview } from '@/mock/dli/api'
@@ -87,7 +87,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,
@@ -96,7 +95,6 @@
     resetSearchParams,
     handleSizeChange,
     handleCurrentChange,
-    refreshData,
     refreshSoft
   } = useTable({
     core: {
@@ -118,7 +116,7 @@
           label: '协议类型',
           width: 100,
           formatter: (row: McpItem) =>
-            h(ElTag, { type: PROTOCOL_TAG[row.protocol], effect: 'plain', size: 'small' }, () =>
+            h(ElTag, { type: PROTOCOL_TAG[row.protocol], effect: 'light', size: 'small' }, () =>
               row.protocol.toUpperCase()
             )
         },

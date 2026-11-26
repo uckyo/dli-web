@@ -2,7 +2,13 @@
 <template>
   <div class="art-full-height">
     <!-- 搜索区 -->
-    <div class="art-card-xs px-5 pt-4 pb-0">
+    <ArtListControls>
+      <template #actions>
+        <ElButton v-if="isClinical" type="primary" @click="openCreate">
+          <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建研究
+        </ElButton>
+        <ElTag v-else effect="light" type="info" size="small">管理端共享查看 · 只读</ElTag>
+      </template>
       <ElForm :inline="true" @submit.prevent>
         <ElFormItem label="关键词">
           <ElInput
@@ -39,27 +45,17 @@
           <ElButton @click="handleReset">重置</ElButton>
         </ElFormItem>
       </ElForm>
-    </div>
+    </ArtListControls>
 
-    <ElCard class="art-table-card">
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <ElButton v-if="isClinical" type="primary" @click="openCreate">
-            <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建研究
-          </ElButton>
-          <ElTag v-else effect="plain" type="info" size="small">管理端共享查看 · 只读</ElTag>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
-      />
-    </ElCard>
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="data"
+      :columns="columns"
+      :pagination="pagination"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    />
 
     <!-- Agent 对话：列表沿用弹窗，不传条件时用项目默认配置 -->
     <ResearchChat v-model="chatVisible" :research="activeResearch" :readonly="!isClinical" />
@@ -125,9 +121,9 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElButton,
-    ElCard,
     ElDialog,
     ElForm,
     ElFormItem,
@@ -178,7 +174,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,
@@ -223,7 +218,7 @@
               'div',
               { class: 'flex flex-wrap gap-1' },
               row.groupBy.map((item) =>
-                h(ElTag, { key: item, size: 'small', effect: 'plain' }, () => item)
+                h(ElTag, { key: item, size: 'small', effect: 'light' }, () => item)
               )
             )
         },

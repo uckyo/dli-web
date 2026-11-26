@@ -1,26 +1,25 @@
 <!-- DLI 生物样本 · 样本管理：只读展示样本库数据 [批注 07] -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-if="!props.patientId"
-      v-model="searchParams"
-      :items="searchItems"
-      @search="handleSearch"
-      @reset="handleReset"
-    />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData" />
-
-      <ArtTable
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
+    <ArtListControls>
+      <ArtSearchBar
+        v-if="!props.patientId"
+        v-model="searchParams"
+        :items="searchItems"
+        @search="handleSearch"
+        @reset="handleReset"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="data"
+      :columns="columns"
+      :pagination="pagination"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    />
 
     <SampleDetailDrawer
       v-model="drawerVisible"
@@ -32,6 +31,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import { ElTag, ElButton } from 'element-plus'
   import { useRouter } from 'vue-router'
   import { useTable } from '@/hooks/core/useTable'
@@ -123,7 +123,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,
@@ -158,7 +157,7 @@
           label: '样本类型',
           width: 80,
           formatter: (row: SampleRecord) =>
-            h(ElTag, { effect: 'plain', type: 'primary' }, () => row.type)
+            h(ElTag, { effect: 'light', type: 'primary' }, () => row.type)
         },
         { prop: 'collectedAt', label: '采集时间', width: 138 },
         {
@@ -180,7 +179,7 @@
                     h(
                       ElTag,
                       {
-                        effect: 'plain',
+                        effect: 'light',
                         size: 'small',
                         type: SYNC_STATUS_TAG[row.syncStatus],
                         title: row.syncNote
@@ -197,7 +196,7 @@
           label: '共享级别',
           width: 80,
           formatter: (row: SampleRecord) =>
-            h(ElTag, { effect: 'plain', type: SCOPE_TAG[row.shareLevel] }, () => row.shareLevel)
+            h(ElTag, { effect: 'light', type: SCOPE_TAG[row.shareLevel] }, () => row.shareLevel)
         },
         {
           prop: 'operation',

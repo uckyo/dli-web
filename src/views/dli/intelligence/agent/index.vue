@@ -1,31 +1,29 @@
 <!-- DLI 智能体管理：台账、配置、版本发布与回滚、会话记录 -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-model="searchParams"
-      :items="searchItems"
-      @search="handleSearch"
-      @reset="handleReset"
-    />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <ElButton v-if="isAdmin" type="primary" @click="openCreate">
-            <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建智能体
-          </ElButton>
-        </template>
-      </ArtTableHeader>
-
-      <ArtTable
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
+    <ArtListControls>
+      <template #actions>
+        <ElButton v-if="isAdmin" type="primary" @click="openCreate">
+          <ArtSvgIcon icon="ri:add-line" class="mr-1" />新建智能体
+        </ElButton>
+      </template>
+      <ArtSearchBar
+        v-model="searchParams"
+        :items="searchItems"
+        @search="handleSearch"
+        @reset="handleReset"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="loading"
+      :data="data"
+      :columns="columns"
+      :pagination="pagination"
+      @pagination:size-change="handleSizeChange"
+      @pagination:current-change="handleCurrentChange"
+    />
 
     <AgentDetailDrawer
       v-model="detailVisible"
@@ -41,6 +39,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import { ElButton, ElMessage, ElMessageBox, ElSwitch, ElTag } from 'element-plus'
   import { useTable } from '@/hooks/core/useTable'
   import ArtButtonMore from '@/components/core/forms/art-button-more/index.vue'
@@ -111,7 +110,6 @@
 
   const {
     columns,
-    columnChecks,
     data,
     loading,
     pagination,
@@ -120,7 +118,6 @@
     resetSearchParams,
     handleSizeChange,
     handleCurrentChange,
-    refreshData,
     refreshSoft,
     refreshCreate,
     refreshUpdate,
@@ -139,7 +136,7 @@
               h('div', { class: 'flex-c gap-2' }, [
                 h('span', { class: 'text-g-900' }, row.name),
                 row.builtin
-                  ? h(ElTag, { type: 'primary', effect: 'plain', size: 'small' }, () => '内置')
+                  ? h(ElTag, { type: 'primary', effect: 'light', size: 'small' }, () => '内置')
                   : null
               ]),
               h('div', { class: 'text-xs text-g-500' }, row.description)
@@ -161,10 +158,10 @@
             const rest = row.skills.length - shown.length
             return h('div', { class: 'flex flex-wrap gap-1' }, [
               ...shown.map((skill) =>
-                h(ElTag, { key: skill, size: 'small', effect: 'plain' }, () => skill)
+                h(ElTag, { key: skill, size: 'small', effect: 'light' }, () => skill)
               ),
               rest > 0
-                ? h(ElTag, { size: 'small', type: 'info', effect: 'plain' }, () => `+${rest}`)
+                ? h(ElTag, { size: 'small', type: 'info', effect: 'light' }, () => `+${rest}`)
                 : null
             ])
           }
@@ -205,7 +202,7 @@
                 })
               : h(
                   ElTag,
-                  { type: row.enabled ? 'success' : 'info', effect: 'plain', size: 'small' },
+                  { type: row.enabled ? 'success' : 'info', effect: 'light', size: 'small' },
                   () => (row.enabled ? '已启用' : '已停用')
                 )
         },

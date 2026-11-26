@@ -1,28 +1,29 @@
 <!-- DLI 随访管理 · 随访模板：由原页签改为左侧子菜单入口 [批注 10] -->
 <template>
   <div class="art-full-height">
-    <ArtSearchBar
-      v-model="templateSearchParams"
-      :items="templateSearchItems"
-      @search="handleTemplateSearch"
-      @reset="resetTemplateSearchParams"
-    />
-
-    <ElCard class="art-table-card">
-      <ArtTableHeader :loading="templateLoading" @refresh="loadTemplates">
-        <template #left>
-          <ElButton type="primary" @click="openTemplateDialog()">新增模板</ElButton>
-        </template>
-      </ArtTableHeader>
-      <ArtTable
-        :loading="templateLoading"
-        :data="pagedTemplates"
-        :columns="templateColumns"
-        :pagination="templatePagination"
-        @pagination:size-change="handleTemplateSizeChange"
-        @pagination:current-change="handleTemplateCurrentChange"
+    <ArtListControls>
+      <template #actions>
+        <ElButton type="primary" @click="openTemplateDialog()">
+          <ArtSvgIcon icon="ri:add-line" class="mr-1" />新增模板
+        </ElButton>
+      </template>
+      <ArtSearchBar
+        v-model="templateSearchParams"
+        :items="templateSearchItems"
+        @search="handleTemplateSearch"
+        @reset="resetTemplateSearchParams"
       />
-    </ElCard>
+    </ArtListControls>
+
+    <ArtTable
+      list-layout
+      :loading="templateLoading"
+      :data="pagedTemplates"
+      :columns="templateColumns"
+      :pagination="templatePagination"
+      @pagination:size-change="handleTemplateSizeChange"
+      @pagination:current-change="handleTemplateCurrentChange"
+    />
 
     <!-- 模板新增 / 编辑弹窗 [批注 10] -->
     <ElDialog
@@ -85,9 +86,9 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElButton,
-    ElCard,
     ElTag,
     ElMessage,
     ElDialog,
