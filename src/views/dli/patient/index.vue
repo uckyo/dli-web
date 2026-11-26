@@ -96,6 +96,9 @@
         <template #left>
           <div class="flex-c gap-2">
             <ElButton v-if="canManage" type="primary" @click="openArchive">新增患者</ElButton>
+            <ElButton v-if="canManage" plain :loading="syncing" @click="syncFromHis">
+              <ArtSvgIcon icon="ri:refresh-line" class="mr-1" />同步
+            </ElButton>
             <ElButton v-if="canManage" plain @click="importVisible = true">导入</ElButton>
             <ElButton plain @click="exportVisible = true">导出</ElButton>
           </div>
@@ -135,6 +138,8 @@
     ElFormItem,
     ElIcon,
     ElInput,
+    ElMessage,
+    ElMessageBox,
     ElOption,
     ElPopover,
     ElSelect,
@@ -183,6 +188,28 @@
   const exportVisible = ref(false)
   const searchExpanded = ref(false)
   const activePatient = ref<WebPatient>()
+
+  /** 从医院 HIS 系统同步患者数据（演示：确认后走本地刷新，不产生真实外部写入） */
+  const syncing = ref(false)
+  async function syncFromHis() {
+    const confirmed = await ElMessageBox.confirm(
+      '将从医院 HIS 系统同步患者数据，过程可能需要几分钟。',
+      '同步患者数据',
+      { type: 'warning', confirmButtonText: '开始同步', cancelButtonText: '取消' }
+    )
+      .then(() => true)
+      .catch(() => false)
+    if (!confirmed || syncing.value) return
+    syncing.value = true
+    try {
+      await getData()
+      ElMessage.success('已从医院 HIS 系统同步患者数据')
+    } catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : '同步失败')
+    } finally {
+      syncing.value = false
+    }
+  }
 
   /** 关闭建档弹窗后清掉编辑目标，避免下次「新增患者」误进编辑模式 */
   watch(archiveVisible, (visible) => {

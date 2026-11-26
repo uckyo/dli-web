@@ -165,10 +165,11 @@
         }
       }
 
-      // 添加图例配置
-      if (props.showLegend && isMultipleData.value) {
-        options.legend = getLegendStyle(props.legendPosition)
-      }
+      // 添加图例配置：单系列时显式关闭，避免切换指标后旧图例残留遮挡图表
+      options.legend =
+        props.showLegend && isMultipleData.value
+          ? getLegendStyle(props.legendPosition)
+          : { show: false }
 
       // 生成系列数据
       if (isMultipleData.value) {

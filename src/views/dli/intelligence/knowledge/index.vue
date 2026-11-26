@@ -1,35 +1,6 @@
 <!-- DLI 知识库管理：文档资产、检索测试与召回参数 -->
 <template>
   <div class="art-full-height">
-    <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <ArtStatsCard
-        title="知识库数"
-        :count="overview.total"
-        icon="ri:book-2-line"
-        icon-style="bg-primary"
-      />
-      <ArtStatsCard
-        title="文档总数"
-        :count="overview.docs"
-        icon="ri:file-text-line"
-        icon-style="bg-success"
-      />
-      <ArtStatsCard
-        title="总容量"
-        :count="overview.sizeGb"
-        :decimals="2"
-        suffix="GB"
-        icon="ri:hard-drive-2-line"
-        icon-style="bg-warning"
-      />
-      <ArtStatsCard
-        title="近 7 天检索"
-        :count="overview.retrievals7d"
-        icon="ri:search-eye-line"
-        icon-style="bg-danger"
-      />
-    </div>
-
     <ArtSearchBar
       v-model="searchParams"
       :items="searchItems"

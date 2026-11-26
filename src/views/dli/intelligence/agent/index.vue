@@ -1,35 +1,6 @@
 <!-- DLI 智能体管理：台账、配置、版本发布与回滚、会话记录 -->
 <template>
   <div class="art-full-height">
-    <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <ArtStatsCard
-        title="智能体总数"
-        :count="overview.total"
-        icon="ri:robot-2-line"
-        icon-style="bg-primary"
-      />
-      <ArtStatsCard
-        title="已启用"
-        :count="overview.enabled"
-        icon="ri:play-circle-line"
-        icon-style="bg-success"
-      />
-      <ArtStatsCard
-        title="今日会话"
-        :count="overview.todaySessions"
-        icon="ri:chat-3-line"
-        icon-style="bg-warning"
-      />
-      <ArtStatsCard
-        title="平均满意度"
-        :count="overview.avgSatisfaction"
-        :decimals="1"
-        suffix="%"
-        icon="ri:emotion-happy-line"
-        icon-style="bg-danger"
-      />
-    </div>
-
     <ArtSearchBar
       v-model="searchParams"
       :items="searchItems"

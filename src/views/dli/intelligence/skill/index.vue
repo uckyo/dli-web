@@ -1,35 +1,6 @@
 <!-- DLI 技能管理：资产台账、调用质量、配置与版本 -->
 <template>
   <div class="art-full-height">
-    <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <ArtStatsCard
-        title="技能总数"
-        :count="overview.total"
-        icon="ri:flashlight-line"
-        icon-style="bg-primary"
-      />
-      <ArtStatsCard
-        title="已启用"
-        :count="overview.enabled"
-        icon="ri:play-circle-line"
-        icon-style="bg-success"
-      />
-      <ArtStatsCard
-        title="近 30 天调用"
-        :count="overview.calls30d"
-        icon="ri:loop-left-line"
-        icon-style="bg-warning"
-      />
-      <ArtStatsCard
-        title="平均成功率"
-        :count="overview.avgSuccessRate"
-        :decimals="1"
-        suffix="%"
-        icon="ri:shield-check-line"
-        icon-style="bg-danger"
-      />
-    </div>
-
     <ArtSearchBar
       v-model="searchParams"
       :items="searchItems"

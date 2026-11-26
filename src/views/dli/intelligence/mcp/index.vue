@@ -1,33 +1,6 @@
 <!-- DLI MCP 管理：平台统一维护，只读查看与授权下载，不提供测试/新增/编辑/删除 [批注 21] -->
 <template>
   <div class="art-full-height">
-    <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <ArtStatsCard
-        title="MCP 服务"
-        :count="overview.services"
-        icon="ri:plug-line"
-        icon-style="bg-primary"
-      />
-      <ArtStatsCard
-        title="注册工具"
-        :count="overview.tools"
-        icon="ri:tools-line"
-        icon-style="bg-success"
-      />
-      <ArtStatsCard
-        title="在线服务"
-        :count="overview.online"
-        icon="ri:signal-tower-line"
-        icon-style="bg-warning"
-      />
-      <ArtStatsCard
-        title="近 30 天调用"
-        :count="overview.calls30d"
-        icon="ri:exchange-line"
-        icon-style="bg-danger"
-      />
-    </div>
-
     <ArtSearchBar
       v-model="searchParams"
       :items="searchItems"

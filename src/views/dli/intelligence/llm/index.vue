@@ -1,37 +1,6 @@
 <!-- DLI LLM 管理：服务卡片、用量趋势与余额；额度操作仅授权管理员 [批注 22] -->
 <template>
   <div class="art-full-height overflow-y-auto pb-5">
-    <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <ArtStatsCard
-        title="接入模型"
-        :count="overview.models"
-        icon="ri:cloud-line"
-        icon-style="bg-primary"
-      />
-      <ArtStatsCard
-        title="今日调用"
-        :count="overview.todayCalls"
-        icon="ri:loop-left-line"
-        icon-style="bg-success"
-      />
-      <ArtStatsCard
-        title="今日 Token"
-        :count="overview.todayTokens / 10000"
-        :decimals="1"
-        suffix=" 万"
-        icon="ri:database-2-line"
-        icon-style="bg-warning"
-      />
-      <ArtStatsCard
-        title="本月费用"
-        :count="overview.monthCost"
-        :decimals="2"
-        prefix="¥"
-        icon="ri:money-cny-circle-line"
-        icon-style="bg-danger"
-      />
-    </div>
-
     <TrendPanel
       title="近 30 天用量趋势"
       :x-axis="usageTrend.map((item) => item.date)"

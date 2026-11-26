@@ -5,7 +5,8 @@
       <slot name="left"></slot>
     </div>
 
-    <div class="flex-c md:justify-end max-md:mt-3 max-sm:!hidden">
+    <!-- 右上角工具栏按需求隐藏，保留实现便于后续恢复 -->
+    <div v-if="false" class="flex-c md:justify-end max-md:mt-3 max-sm:!hidden">
       <div
         v-if="showSearchBar != null"
         class="button"
