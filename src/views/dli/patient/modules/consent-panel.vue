@@ -1,16 +1,15 @@
 <!-- 患者详情 → 知情同意 [批注 03/16]：发放、签署、核对、拒绝、撤回，按项目记录 -->
 <template>
-  <div class="dli-pane dli-own">
+  <div class="art-list-stack">
     <ElAlert
       v-if="focusProjectId"
-      class="mb-3"
       type="info"
       :closable="false"
       show-icon
       :title="`已从研究入组带入项目：${focusProjectName}`"
     />
 
-    <ArtTable :data="rows" :columns="columns" empty-text="暂无知情同意记录" />
+    <ArtTable list-layout :data="rows" :columns="columns" empty-text="暂无知情同意记录" />
 
     <!-- 发放 / 签署 / 拒绝 / 撤回 -->
     <ElDialog v-model="actionVisible" :title="dialogTitle" width="520px" destroy-on-close>
@@ -323,7 +322,7 @@
   }
 
   function tag(value: ConsentStatus) {
-    return h(ElTag, { type: STATUS_TAG[value], effect: 'plain' }, () => value)
+    return h(ElTag, { type: STATUS_TAG[value], effect: 'light' }, () => value)
   }
 
   function actionButton(row: PatientEnrollment, action: ConsentAction, label: string) {

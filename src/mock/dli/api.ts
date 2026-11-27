@@ -148,6 +148,7 @@ export interface ExamQueryParams {
   checkStatus?: ExamCheckStatus | ''
   /** 患者编号独立筛选；不再用患者姓名参与页面检索 */
   patientId?: string
+  patientDetail?: boolean
 }
 
 /** 人员列表查询参数 */
@@ -677,7 +678,9 @@ export async function fetchGetExamList(
 ): Promise<Api.Common.PaginatedResponse<ExamRecord>> {
   await delay()
   let list = EXAMS.filter((item) => !params.category || item.category === params.category)
-  if (params.patientId) {
+  if (params.patientDetail) {
+    list = list.filter((item) => item.patientId === params.patientId)
+  } else if (params.patientId) {
     const patientId = params.patientId.trim().toLowerCase()
     list = list.filter((item) => item.patientId.toLowerCase().includes(patientId))
   }
@@ -694,7 +697,9 @@ export async function fetchGetExamList(
         item.patientId.toLowerCase().includes(keyword)
     )
   }
-  return paginate(list, params.current, params.size)
+  return params.patientDetail
+    ? paginate(list, 1, Math.max(1, list.length))
+    : paginate(list, params.current, params.size)
 }
 
 /* ---------------- 检查资料共享领域：检查管理与患者详情引用同一份 EXAMS [批注 03-1] ---------------- */

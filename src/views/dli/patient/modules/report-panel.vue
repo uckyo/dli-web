@@ -1,7 +1,7 @@
 <!-- 患者详情 → 上报：患者端主动上报，医护在此核对 [批注 14]；报告资料仍复用检查记录 -->
 <template>
-  <div class="dli-pane dli-own">
-    <ArtTable :data="reportList" :columns="columns" empty-text="暂无上报记录" />
+  <div class="art-list-stack">
+    <ArtTable list-layout :data="reportList" :columns="columns" empty-text="暂无上报记录" />
   </div>
 </template>
 

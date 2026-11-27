@@ -1,12 +1,18 @@
 <!-- 患者详情 → 管理计划：仅保留管理安排 [批注 05]；上报归属见检查资料，安全事件归属见研究入组→研究记录 [批注 14/15] -->
 <template>
-  <div class="dli-pane dli-own">
+  <div class="art-list-stack">
     <!-- 管理安排：安排名称 / 类型 / 执行时间 / 发布状态 / 操作 [批注 05] -->
-    <div class="dli-section-title">管理安排</div>
-    <div class="dli-pane-bar mb-2">
-      <ElButton type="primary" plain @click="openPlanDialog()">新增安排</ElButton>
-    </div>
-    <ArtTable :data="planTableData" :columns="managementColumns" empty-text="暂无管理安排" />
+    <ArtListControls>
+      <template #actions>
+        <ElButton type="primary" plain @click="openPlanDialog()">新增安排</ElButton>
+      </template>
+    </ArtListControls>
+    <ArtTable
+      list-layout
+      :data="planTableData"
+      :columns="managementColumns"
+      empty-text="暂无管理安排"
+    />
 
     <!-- 管理安排新增 / 编辑弹窗：安排名称、类型、具体内容、执行时间、执行要求 [批注 05] -->
     <ElDialog
@@ -62,6 +68,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElButton,
     ElDialog,
@@ -105,7 +112,7 @@
       prop: 'type',
       label: '安排类型',
       width: 100,
-      formatter: (row) => h(ElTag, { effect: 'plain', size: 'small' }, () => row.type)
+      formatter: (row) => h(ElTag, { effect: 'light', size: 'small' }, () => row.type)
     },
     { prop: 'executeAt', label: '执行时间', width: 150 },
     {
@@ -270,12 +277,3 @@
   )
   defineExpose({ load })
 </script>
-
-<style lang="scss">
-  .dli-section-title {
-    margin: 4px 0 10px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--art-gray-800);
-  }
-</style>

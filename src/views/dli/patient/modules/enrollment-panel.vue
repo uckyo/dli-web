@@ -1,11 +1,14 @@
 <!-- 患者详情 → 研究入组 [批注 03]：按项目核对条件、办理同意、确认入组、登记分组、退出研究 -->
 <template>
-  <div class="dli-pane dli-own">
-    <div class="dli-pane-bar">
-      <ElButton v-if="canManage" type="primary" @click="openApply">申请入组</ElButton>
-    </div>
+  <div class="art-list-stack">
+    <ArtListControls>
+      <template #actions>
+        <ElButton v-if="canManage" type="primary" @click="openApply">申请入组</ElButton>
+      </template>
+    </ArtListControls>
 
     <ArtTable
+      list-layout
       :data="rows"
       :columns="columns"
       empty-text="暂无研究项目记录，可点击「申请入组」发起"
@@ -138,6 +141,7 @@
 </template>
 
 <script setup lang="ts">
+  import ArtListControls from '@/components/core/tables/art-list-controls/index.vue'
   import {
     ElAlert,
     ElButton,
@@ -229,7 +233,7 @@
   }
 
   function tag(value: string) {
-    return h(ElTag, { type: TAG_TYPE[value] ?? 'info', effect: 'plain' }, () => value)
+    return h(ElTag, { type: TAG_TYPE[value] ?? 'info', effect: 'light' }, () => value)
   }
 
   function gaps(row: PatientEnrollment): string[] {

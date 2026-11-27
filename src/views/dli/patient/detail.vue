@@ -79,39 +79,37 @@
       </div>
     </section>
 
-    <ElCard class="dli-card art-table-card dli-tab-card" shadow="never">
-      <ElTabs v-model="activeTab" class="dli-tabs">
-        <ElTabPane label="检查资料" name="exam">
-          <div class="dli-pane dli-embed">
-            <ExamView :key="patientId" :patient-id="patientId" />
-          </div>
-        </ElTabPane>
+    <ElTabs v-model="activeTab" class="dli-tabs">
+      <ElTabPane label="检查资料" name="exam">
+        <div class="dli-pane dli-embed">
+          <ExamView :key="patientId" :patient-id="patientId" />
+        </div>
+      </ElTabPane>
 
-        <ElTabPane label="管理计划" name="plan">
-          <ManagementPanel :key="`plan-${patientId}`" :patient-id="patientId" />
-        </ElTabPane>
+      <ElTabPane label="管理计划" name="plan">
+        <ManagementPanel :key="`plan-${patientId}`" :patient-id="patientId" />
+      </ElTabPane>
 
-        <ElTabPane label="研究入组" name="enrollment">
-          <EnrollmentPanel
-            :key="`enroll-${patientId}`"
-            :patient-id="patientId"
-            @go-consent="goConsent"
-          />
-        </ElTabPane>
+      <ElTabPane label="研究入组" name="enrollment">
+        <EnrollmentPanel
+          :key="`enroll-${patientId}`"
+          :patient-id="patientId"
+          @go-consent="goConsent"
+        />
+      </ElTabPane>
 
-        <ElTabPane label="知情同意" name="consent">
-          <ConsentPanel
-            :key="`consent-${patientId}`"
-            :patient-id="patientId"
-            :focus-project-id="consentProjectId"
-          />
-        </ElTabPane>
+      <ElTabPane label="知情同意" name="consent">
+        <ConsentPanel
+          :key="`consent-${patientId}`"
+          :patient-id="patientId"
+          :focus-project-id="consentProjectId"
+        />
+      </ElTabPane>
 
-        <ElTabPane label="上报" name="report">
-          <ReportPanel :key="`report-${patientId}`" :patient-id="patientId" />
-        </ElTabPane>
-      </ElTabs>
-    </ElCard>
+      <ElTabPane label="上报" name="report">
+        <ReportPanel :key="`report-${patientId}`" :patient-id="patientId" />
+      </ElTabPane>
+    </ElTabs>
 
     <!-- 医患对话 / 诊疗历程：与患者列表页共用同一套抽屉 -->
     <ChatDrawer v-model="chatVisible" :patient="patient" :readonly="!canManage" />
@@ -143,7 +141,6 @@
 <script setup lang="ts">
   import {
     ElButton,
-    ElCard,
     ElDrawer,
     ElDropdown,
     ElDropdownItem,
@@ -512,17 +509,20 @@
     border-radius: 2px;
   }
 
-  .dli-card.el-card {
-    border-radius: 10px;
+  .dli-detail > .dli-tabs {
+    flex: none;
   }
 
-  .dli-card .el-card__body {
-    padding: 16px 18px;
+  .dli-detail .dli-tabs .art-table.is-list-layout {
+    flex: none;
   }
 
-  /* Tab 卡：标签头贴卡片顶部 */
-  .dli-tab-card .el-card__body {
-    padding: 6px 18px 16px;
+  .dli-detail .dli-tabs .art-table.is-list-layout:not(.is-empty) {
+    height: auto;
+
+    > .el-table {
+      flex: none;
+    }
   }
 
   /* 嵌入的管理页自带卡片在 Tab 卡内去边框，融合为一块内容 */

@@ -25,7 +25,7 @@
       :loading="loading"
       :data="tableData"
       :columns="columns"
-      :pagination="pagination"
+      :pagination="props.patientId ? undefined : pagination"
       @pagination:size-change="handleSizeChange"
       @pagination:current-change="handleCurrentChange"
     />
@@ -158,6 +158,7 @@
         size: 10,
         keyword: '',
         patientId: props.patientId ?? '',
+        patientDetail: Boolean(props.patientId),
         source: '',
         checkStatus: '',
         category: ''
