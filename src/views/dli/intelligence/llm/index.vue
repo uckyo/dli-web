@@ -24,7 +24,7 @@
       @reset="handleReset"
     />
 
-    <div v-loading="loading" class="mt-3 min-h-[200px]">
+    <div v-loading="loading" class="min-h-[200px]">
       <div v-if="models.length" class="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
         <div
           v-for="item in models"
@@ -40,9 +40,6 @@
                   {{ item.status }}
                 </ElTag>
               </div>
-              <p class="mt-1 truncate text-xs text-g-500">
-                {{ item.vendor }} · {{ item.model }} · {{ item.contextWindow }}K 上下文
-              </p>
             </div>
             <ElSwitch
               v-if="isAdmin"
@@ -87,7 +84,7 @@
             <p class="mt-0.5">数据更新时间：{{ item.updatedAt }}</p>
           </div>
 
-          <div class="mt-auto flex-cb border-t border-full-d pt-3">
+          <div class="mt-auto flex-cb pt-3">
             <span class="text-xs text-g-500"
               >本月费用（人民币）{{ formatCurrency(item.monthCost) }}</span
             >

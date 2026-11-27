@@ -114,7 +114,7 @@
         {
           prop: 'protocol',
           label: '协议类型',
-          width: 100,
+          width: 200,
           formatter: (row: McpItem) =>
             h(ElTag, { type: PROTOCOL_TAG[row.protocol], effect: 'light', size: 'small' }, () =>
               row.protocol.toUpperCase()
@@ -124,7 +124,7 @@
         {
           prop: 'status',
           label: '服务状态',
-          width: 105,
+          width: 200,
           formatter: (row: McpItem) =>
             h('div', { class: 'flex-c gap-2' }, [
               h('span', { class: ['size-2 rounded-full', MCP_STATUS_DOT[row.status]] }),
@@ -134,8 +134,7 @@
         {
           prop: 'calls30d',
           label: '调用次数',
-          width: 105,
-          align: 'right' as const,
+          width: 200,
           formatter: (row: McpItem) =>
             h('span', { class: row.calls30d ? 'text-g-700' : 'text-g-400' }, [
               row.calls30d ? formatInt(row.calls30d) : '暂无'
@@ -144,7 +143,7 @@
         {
           prop: 'lastCalledAt',
           label: '最近调用时间',
-          width: 155,
+          width: 200,
           formatter: (row: McpItem) =>
             h(
               'span',

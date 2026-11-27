@@ -18,12 +18,7 @@
         </ElButton>
       </template>
       <ElForm :inline="true" class="dli-filter-form" @submit.prevent>
-        <div
-          ref="filterItemsRef"
-          class="dli-filter-items"
-          :class="{ 'is-collapsed': !searchExpanded && hiddenCount > 0 }"
-          :style="{ '--dli-filter-row-h': `${filterRowHeight}px` }"
-        >
+        <div class="dli-filter-items">
           <ElFormItem label="关键词">
             <ElInput
               v-model="searchParams.keyword"
@@ -91,15 +86,6 @@
         <ElFormItem class="dli-filter-actions">
           <ElButton type="primary" @click="handleSearch">查询</ElButton>
           <ElButton @click="handleReset">重置</ElButton>
-          <ElButton
-            v-if="hiddenCount > 0"
-            link
-            type="primary"
-            @click="searchExpanded = !searchExpanded"
-          >
-            {{ searchExpanded ? '收起' : `展开（${hiddenCount}）` }}
-            <ArtSvgIcon :icon="searchExpanded ? 'ri:arrow-up-s-line' : 'ri:arrow-down-s-line'" />
-          </ElButton>
         </ElFormItem>
       </ElForm>
     </ArtListControls>
@@ -147,7 +133,7 @@
     ElTag
   } from 'element-plus'
   import { InfoFilled } from '@element-plus/icons-vue'
-  import { computed, h, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+  import { computed, h, onMounted, ref, watch } from 'vue'
   import { useRouter } from 'vue-router'
   import { useTable } from '@/hooks/core/useTable'
   import {
@@ -187,7 +173,6 @@
   const editPatientId = ref('')
   const importVisible = ref(false)
   const exportVisible = ref(false)
-  const searchExpanded = ref(false)
   const activePatient = ref<WebPatient>()
 
   /** 从医院 HIS 系统同步患者数据（演示：确认后走本地刷新，不产生真实外部写入） */
@@ -278,12 +263,13 @@
       } as PatientSearchParams,
       columnsFactory: () => [
         { type: 'selection', width: 45 }, // 勾选列：配合导出「已勾选记录」 [批注 04]
-        { prop: 'id', label: '患者编号', width: 160, fixed: 'left' as const },
-        { prop: 'initialEntry', label: '初始入口', width: 170 },
+        { prop: 'id', label: '患者编号', minWidth: 128, fixed: 'left' as const },
+        { prop: 'initialEntry', label: '初始入口', minWidth: 160 },
         {
           prop: 'stage',
+          className: 'patient-compact-cell',
           label: '当前阶段',
-          width: 160,
+          minWidth: 140,
           formatter: (row: PatientRow) => {
             // 只有「已确诊DLI + 诊断后」存在待医生确认，其他入口/阶段不显示待确认
             if (!isStagePending(row)) return h('span', {}, row.stage)
@@ -314,8 +300,9 @@
         },
         {
           prop: 'projectCount',
+          className: 'patient-compact-cell',
           label: '研究项目',
-          width: 175,
+          minWidth: 94,
           formatter: (row: PatientRow) => {
             const text = row.projectCount ? `关联${row.projectCount}个项目` : '暂无项目'
             return h(
@@ -331,8 +318,9 @@
         },
         {
           prop: 'pendingReportCount',
+          className: 'patient-compact-cell',
           label: '上报',
-          width: 130,
+          minWidth: 94,
           align: 'center' as const,
           // 显示待核对条数，点击进患者详情的「上报」页签
           formatter: (row: PatientRow) =>
@@ -346,19 +334,19 @@
               () => (row.pendingReportCount ? `${row.pendingReportCount} 条待核对` : '无')
             )
         },
-        { prop: 'center', label: '所属中心', width: 115 },
-        { prop: 'doctor', label: '主管医生', width: 105 },
+        { prop: 'center', label: '所属中心', minWidth: 80 },
+        { prop: 'doctor', label: '主管医生', minWidth: 80 },
         {
           prop: 'status',
           label: '管理状态',
-          width: 105,
+          minWidth: 84,
           formatter: (row: PatientRow) =>
             h(ElTag, { type: STATUS_TAG[row.status], effect: 'light' }, () => row.status)
         },
         {
           prop: 'consent',
           label: '知情同意',
-          width: 110,
+          minWidth: 80,
           formatter: (row: PatientRow) =>
             h(ElTag, { type: row.consent.signed ? 'success' : 'warning', effect: 'light' }, () =>
               row.consent.signed ? row.consent.version : '未签署'
@@ -366,22 +354,24 @@
         },
         {
           prop: 'earlyScreen',
+          className: 'patient-compact-cell',
           label: '早筛预警',
-          width: 130,
+          minWidth: 88,
           align: 'center' as const,
           formatter: (row: PatientRow) => renderWarn(row, 'earlyScreen')
         },
         {
           prop: 'earlyDiagnosis',
+          className: 'patient-compact-cell',
           label: '早诊预警',
-          width: 130,
+          minWidth: 88,
           align: 'center' as const,
           formatter: (row: PatientRow) => renderWarn(row, 'earlyDiagnosis')
         },
         {
           prop: 'outcome',
           label: '转归预测',
-          minWidth: 170,
+          minWidth: 112,
           align: 'center' as const,
           formatter: (row: PatientRow) =>
             isAiGroup(row)
@@ -398,7 +388,7 @@
         {
           prop: 'chat',
           label: '对话',
-          width: 120,
+          minWidth: 88,
           align: 'center' as const,
           formatter: (row: PatientRow) =>
             isAiGroup(row)
@@ -412,7 +402,7 @@
         {
           prop: 'history',
           label: '诊疗历程',
-          width: 100,
+          minWidth: 88,
           align: 'center' as const,
           formatter: (row: PatientRow) =>
             h(
@@ -424,7 +414,7 @@
         {
           prop: 'action',
           label: '操作',
-          width: 150,
+          minWidth: 108,
           fixed: 'right' as const,
           formatter: (row: PatientRow) => {
             const buttons = [
@@ -451,54 +441,6 @@
   })
 
   const searchParams = tableSearchParams as PatientSearchParams
-
-  /** 筛选区按容器宽度自适应：第一行能放下的筛选项全部显示，放不下的才收起 */
-  const filterItemsRef = ref<HTMLElement | null>(null)
-  const hiddenCount = ref(0)
-  const filterRowHeight = ref(56)
-  let filterObserver: ResizeObserver | null = null
-  let lastFilterWidth = 0
-
-  /**
-   * 依据各筛选项的 offsetTop 判断第一行之后的项。
-   * 收起用 max-height 裁剪而非 display:none，元素仍参与布局，重复测量不会失真。
-   */
-  function measureFilterRow() {
-    const box = filterItemsRef.value
-    if (!box) return
-    const items = Array.from(box.children) as HTMLElement[]
-    if (!items.length) return
-    const top0 = items[0].offsetTop
-    const overflowing = items.filter((el) => el.offsetTop > top0 + 1)
-    hiddenCount.value = overflowing.length
-    filterRowHeight.value = Math.max(
-      ...items.filter((el) => el.offsetTop <= top0 + 1).map((el) => el.offsetTop + el.offsetHeight)
-    )
-  }
-
-  function scheduleFilterMeasure() {
-    void nextTick(measureFilterRow)
-  }
-
-  /** 容器宽度变化才重新测量，避免收起/展开引起的高度变化造成回调循环 */
-  function initFilterObserver() {
-    // 兜底：部分环境下容器宽度变化不触发 ResizeObserver
-    window.addEventListener('resize', scheduleFilterMeasure)
-    const form = filterItemsRef.value?.parentElement
-    if (!form || typeof ResizeObserver === 'undefined') return
-    lastFilterWidth = Math.round(form.getBoundingClientRect().width)
-    filterObserver = new ResizeObserver((entries) => {
-      const width = Math.round(entries[0].contentRect.width)
-      if (width === lastFilterWidth) return
-      lastFilterWidth = width
-      scheduleFilterMeasure()
-    })
-    filterObserver.observe(form)
-  }
-
-  watch(hiddenCount, (count) => {
-    if (count === 0) searchExpanded.value = false
-  })
 
   const exportQuery = computed<PatientRowQuery>(() => ({
     keyword: searchParams.keyword,
@@ -530,17 +472,6 @@
       sessionStorage.removeItem(LIST_STATE_KEY)
     }
     void getData()
-    // 首屏布局稳定后测量第一行，再由容器宽度变化驱动后续重算
-    void nextTick(() => {
-      measureFilterRow()
-      initFilterObserver()
-      requestAnimationFrame(measureFilterRow)
-    })
-  })
-
-  onUnmounted(() => {
-    filterObserver?.disconnect()
-    window.removeEventListener('resize', scheduleFilterMeasure)
   })
 
   function openChat(row: PatientRow) {
@@ -597,11 +528,14 @@
 </script>
 
 <style scoped lang="scss">
+  :deep(.patient-compact-cell > .cell) {
+    padding-inline: 4px;
+  }
+
   :deep(.patient-table-secondary) {
     color: var(--el-text-color-regular);
   }
 
-  /* 筛选区自适应：第一行铺满后，只有换行的筛选项才进入「展开」 */
   .dli-filter-form.el-form {
     display: flex;
     align-items: flex-start;
@@ -609,19 +543,12 @@
   }
 
   .dli-filter-items {
-    position: relative; // 让子项 offsetTop 相对本容器，测量更精确
     display: flex;
     flex: 1 1 auto;
     flex-wrap: wrap;
     row-gap: 12px;
     align-items: flex-start;
     min-width: 0;
-    transition: max-height 0.2s ease;
-
-    &.is-collapsed {
-      max-height: var(--dli-filter-row-h, 36px);
-      overflow: hidden;
-    }
 
     :deep(.el-form-item) {
       flex: 0 0 auto;
@@ -635,6 +562,17 @@
 
     :deep(.el-form-item__content) {
       flex-wrap: nowrap;
+    }
+  }
+
+  @media (width <= 768px) {
+    .dli-filter-form.el-form {
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .dli-filter-actions {
+      align-self: flex-end;
     }
   }
 </style>

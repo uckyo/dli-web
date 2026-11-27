@@ -202,7 +202,7 @@
         {
           prop: 'name',
           label: '研究项目',
-          minWidth: 240,
+          minWidth: 280,
           formatter: (row: ResearchItem) =>
             h('div', { class: 'leading-5' }, [
               h('div', { class: 'text-g-900' }, row.name),
@@ -239,26 +239,19 @@
         {
           prop: 'shared',
           label: '共享范围',
-          minWidth: 190,
+          minWidth: 150,
           formatter: (row: ResearchItem) =>
-            h('div', { class: 'leading-5' }, [
-              h(
-                ElTag,
-                {
-                  effect: row.shared ? 'light' : 'plain',
-                  type: row.shared ? 'success' : 'info',
-                  size: 'small'
-                },
-                () => (row.shared ? `已共享 · ${row.shareLevel}` : '未共享')
-              ),
-              h('div', { class: 'text-xs text-g-500' }, row.actualVisibleScope ?? '仅项目成员可见')
-            ])
+            h(
+              ElTag,
+              { effect: 'light', type: row.shared ? 'success' : 'info', size: 'small' },
+              () => (row.shared ? `已共享 · ${row.shareLevel}` : '未共享')
+            )
         },
         { prop: 'updatedAt', label: '最近更新时间', width: 140 },
         {
           prop: 'operation',
           label: '操作',
-          width: 250,
+          minWidth: 202,
           fixed: 'right' as const,
           align: 'center' as const,
           formatter: (row: ResearchItem) =>

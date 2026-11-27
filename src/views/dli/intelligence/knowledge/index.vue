@@ -147,28 +147,24 @@
           prop: 'docs',
           label: '文档数',
           width: 85,
-          align: 'right' as const,
           formatter: (row: KnowledgeItem) => formatInt(row.docs)
         },
         {
           prop: 'size',
           label: '容量',
           width: 95,
-          align: 'right' as const,
           formatter: (row: KnowledgeItem) => formatBytes(row.sizeBytes)
         },
         {
           prop: 'retrievals7d',
           label: '近 7 天检索',
           width: 110,
-          align: 'right' as const,
           formatter: (row: KnowledgeItem) => formatInt(row.retrievals7d)
         },
         {
           prop: 'hitRate',
           label: '命中率',
           width: 90,
-          align: 'right' as const,
           formatter: (row: KnowledgeItem) => formatPercent(row.hitRate)
         },
         { prop: 'maintainer', label: '维护人', width: 90 },
@@ -177,7 +173,6 @@
           prop: 'enabled',
           label: '状态',
           width: 80,
-          align: 'center' as const,
           formatter: (row: KnowledgeItem) =>
             isAdmin.value
               ? h(ElSwitch, {

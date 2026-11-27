@@ -506,12 +506,12 @@
   const planColumns: ColumnOption<FollowupPlanWithProgress>[] = [
     { prop: 'id', label: '计划编号', width: 110 },
     { prop: 'patientId', label: '患者编号', width: 140 },
-    { prop: 'name', label: '计划名称', minWidth: 180, showOverflowTooltip: true },
+    { prop: 'name', label: '计划名称', minWidth: 140, showOverflowTooltip: true },
     { prop: 'doctor', label: '主管医生', width: 100 },
     {
       prop: 'dateRange',
       label: '计划起止日期',
-      width: 190,
+      width: 220,
       formatter: (row) => `${row.startDate} ~ ${row.endDate}`
     },
     {

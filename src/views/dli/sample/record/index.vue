@@ -38,7 +38,7 @@
   import { fetchGetSampleList } from '@/mock/dli/api'
   import { CENTERS_DATA } from '@/mock/dli/data'
   import type { SampleRecord } from '@/mock/dli/types'
-  import { SAMPLE_STATUS_TAG, SCOPE_TAG, SYNC_STATUS_TAG } from '../format'
+  import { SAMPLE_STATUS_TAG, SCOPE_TAG } from '../format'
   import SampleDetailDrawer from './modules/sample-detail-drawer.vue'
 
   defineOptions({ name: 'DliSampleRecord' })
@@ -148,10 +148,9 @@
         syncStatus: ''
       },
       columnsFactory: () => [
-        { prop: 'id', label: '样本编号', minWidth: 205 },
+        { prop: 'id', label: '样本编号', minWidth: 185 },
         { prop: 'name', label: '样本名称', width: 88 },
         { prop: 'patientId', label: '患者编号', width: 118 },
-        { prop: 'center', label: '所属中心', width: 78 },
         {
           prop: 'type',
           label: '样本类型',
@@ -159,38 +158,31 @@
           formatter: (row: SampleRecord) =>
             h(ElTag, { effect: 'light', type: 'primary' }, () => row.type)
         },
-        { prop: 'collectedAt', label: '采集时间', width: 138 },
+        { prop: 'collectedAt', label: '采集时间', width: 128 },
         {
           prop: 'remaining',
           label: '剩余样本量',
           width: 88,
-          align: 'right' as const,
           formatter: (row: SampleRecord) => `${row.remaining} ${row.unit}`
         },
         {
           prop: 'status',
           label: '样本状态',
-          width: 128,
+          width: 108,
           formatter: (row: SampleRecord) =>
-            h('div', { class: 'flex-c gap-1' }, [
-              h(ElTag, { effect: 'light', type: SAMPLE_STATUS_TAG[row.status] }, () => row.status),
-              ...(row.syncStatus !== '正常'
-                ? [
-                    h(
-                      ElTag,
-                      {
-                        effect: 'light',
-                        size: 'small',
-                        type: SYNC_STATUS_TAG[row.syncStatus],
-                        title: row.syncNote
-                      },
-                      () => `同步${row.syncStatus}`
-                    )
-                  ]
-                : [])
-            ])
+            h(ElTag, { effect: 'light', type: SAMPLE_STATUS_TAG[row.status] }, () => row.status)
         },
-        { prop: 'location', label: '保存位置', minWidth: 120 },
+        { prop: 'center', label: '所属中心', width: 78 },
+        {
+          prop: 'location',
+          label: '保存位置',
+          minWidth: 80,
+          showOverflowTooltip: true,
+          formatter: (row: SampleRecord) =>
+            row.location.startsWith(row.center + ' ')
+              ? row.location.slice(row.center.length).trimStart()
+              : row.location
+        },
         {
           prop: 'shareLevel',
           label: '共享级别',
@@ -201,7 +193,7 @@
         {
           prop: 'operation',
           label: '操作',
-          width: 235,
+          minWidth: 210,
           fixed: 'right' as const,
           align: 'center' as const,
           formatter: (row: SampleRecord) =>
@@ -209,7 +201,7 @@
               h(
                 ElButton,
                 { link: true, type: 'primary', onClick: () => openDetail(row, 'detail') },
-                () => '查看详情'
+                () => '详情'
               ),
               h(
                 ElButton,

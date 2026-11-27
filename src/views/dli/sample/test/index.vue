@@ -50,7 +50,7 @@
   import { useTable } from '@/hooks/core/useTable'
   import { fetchGetSampleById, fetchGetSampleTestList } from '@/mock/dli/api'
   import type { SampleRecord, SampleTestRecord } from '@/mock/dli/types'
-  import { QC_TAG, SCOPE_TAG, SYNC_STATUS_TAG, TEST_STATUS_TAG } from '../format'
+  import { QC_TAG, SCOPE_TAG, TEST_STATUS_TAG } from '../format'
   import SampleDetailDrawer from '../record/modules/sample-detail-drawer.vue'
   import SampleTestDetailDrawer from './modules/sample-test-detail-drawer.vue'
 
@@ -172,62 +172,37 @@
               ])
             ])
         },
-        { prop: 'id', label: '检测编号', minWidth: 216 },
+        { prop: 'id', label: '检测编号', minWidth: 190 },
         {
           prop: 'type',
           label: '检测类型',
-          width: 76,
+          minWidth: 76,
           formatter: (row: SampleTestRecord) =>
             h(ElTag, { effect: 'light', type: 'primary' }, () => row.type)
         },
-        { prop: 'item', label: '检测项目', minWidth: 102 },
-        { prop: 'batch', label: '检测批次', width: 92 },
+        { prop: 'item', label: '检测项目', minWidth: 80 },
+        { prop: 'batch', label: '检测批次', minWidth: 80 },
         {
           prop: 'sampleId',
           label: '关联样本编号',
-          minWidth: 252,
+          minWidth: 212,
           formatter: (row: SampleTestRecord) =>
             h('div', { class: 'flex-c gap-1' }, [
               h(
                 ElButton,
                 { link: true, type: 'primary', onClick: () => openSample(row) },
                 () => row.sampleId
-              ),
-              ...(row.linkedSamples.length > 1
-                ? [
-                    h(
-                      ElTag,
-                      { size: 'small', effect: 'light', type: 'info' },
-                      () => `共 ${row.linkedSamples.length} 份`
-                    )
-                  ]
-                : [])
+              )
             ])
         },
-        { prop: 'center', label: '所属中心', width: 76 },
-        { prop: 'testedAt', label: '检测时间', width: 138 },
+        { prop: 'center', label: '所属中心', width: 60 },
+        { prop: 'testedAt', label: '检测时间', width: 80 },
         {
           prop: 'status',
           label: '检测状态',
-          width: 132,
+          width: 76,
           formatter: (row: SampleTestRecord) =>
-            h('div', { class: 'flex-c gap-1' }, [
-              h(ElTag, { effect: 'light', type: TEST_STATUS_TAG[row.status] }, () => row.status),
-              ...(row.syncStatus !== '正常'
-                ? [
-                    h(
-                      ElTag,
-                      {
-                        effect: 'light',
-                        size: 'small',
-                        type: SYNC_STATUS_TAG[row.syncStatus],
-                        title: row.syncNote
-                      },
-                      () => `同步${row.syncStatus}`
-                    )
-                  ]
-                : [])
-            ])
+            h(ElTag, { effect: 'light', type: TEST_STATUS_TAG[row.status] }, () => row.status)
         },
         {
           prop: 'qc',
@@ -246,7 +221,7 @@
         {
           prop: 'operation',
           label: '操作',
-          width: 235,
+          width: 130,
           fixed: 'right' as const,
           align: 'center' as const,
           formatter: (row: SampleTestRecord) =>
@@ -254,12 +229,12 @@
               h(
                 ElButton,
                 { link: true, type: 'primary', onClick: () => openTest(row, 'detail') },
-                () => '查看详情'
+                () => '详情'
               ),
               h(
                 ElButton,
                 { link: true, type: 'primary', onClick: () => openTest(row, 'report') },
-                () => '查看报告／数据文件'
+                () => '报告'
               )
             ])
         }

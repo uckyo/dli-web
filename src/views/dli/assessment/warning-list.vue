@@ -246,7 +246,7 @@
         {
           prop: 'level',
           label: '预警等级',
-          width: 100,
+          width: 200,
           formatter: (row: WarningTicket) =>
             h(ElTag, { effect: 'light', type: LEVEL_TAG[row.level] }, () => row.level)
         },

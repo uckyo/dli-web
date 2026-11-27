@@ -13,7 +13,7 @@
         <div
           ref="itemsRef"
           class="art-search-items"
-          :class="{ 'is-collapsed': !isExpand && !isExpanded && hiddenCount > 0 }"
+          :class="{ 'is-collapsed': showExpand && !isExpand && !isExpanded && hiddenCount > 0 }"
           :style="{ '--art-row-h': `${rowHeight}px` }"
         >
           <ElFormItem
@@ -235,7 +235,7 @@
     isExpand: false,
     labelPosition: 'right',
     labelWidth: '70px',
-    showExpand: true,
+    showExpand: false,
     defaultExpanded: false,
     buttonLeftLimit: 2,
     showReset: true,

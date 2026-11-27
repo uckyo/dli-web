@@ -11,7 +11,7 @@
     <ElTable ref="elTableRef" v-loading="!!loading" v-bind="mergedTableProps">
       <template v-for="col in columns" :key="col.prop || col.type">
         <!-- 渲染全局序号列 -->
-        <ElTableColumn v-if="col.type === 'globalIndex'" v-bind="{ ...col }">
+        <ElTableColumn v-if="col.type === 'globalIndex'" v-bind="cleanColumnProps(col)">
           <template #default="{ $index }">
             <span>{{ getGlobalIndex($index) }}</span>
           </template>
@@ -251,6 +251,7 @@
 
   // 表头背景颜色样式
   const headerCellStyle = computed(() => ({
+    fontWeight: 500,
     background: props.listLayout
       ? 'var(--art-list-table-header-bg)'
       : isHeaderBackground.value
@@ -297,6 +298,31 @@
     delete columnProps.headerSlotName
     delete columnProps.useSlot
     delete columnProps.slotName
+    if (props.listLayout) {
+      columnProps.minWidth = col.minWidth ?? col.width ?? (col.type === 'selection' ? 48 : 80)
+      delete columnProps.width
+    }
+    const field = col.prop
+    if (props.listLayout && field && !col.type && !col.fixed && !col.formatter && !col.useSlot) {
+      const labelWidth = (col.label?.length ?? 0) * 14 + 40
+      const contentWidth = Math.max(
+        0,
+        ...(props.data ?? [])
+          .slice(0, 100)
+          .map((row) =>
+            Array.from(String(row[field] ?? '')).reduce(
+              (width, character) => width + (character.charCodeAt(0) > 127 ? 14 : 8),
+              36
+            )
+          )
+      )
+      const configuredFloor = Number.parseInt(String(col.minWidth ?? 80), 10) || 80
+      columnProps.minWidth = Math.max(
+        configuredFloor,
+        Math.min(240, Math.max(labelWidth, contentWidth))
+      )
+      columnProps.showOverflowTooltip ??= true
+    }
     return columnProps
   }
 

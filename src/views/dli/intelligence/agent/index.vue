@@ -53,7 +53,7 @@
   } from '@/mock/dli/api'
   import type { AgentItem, AgentOverview } from '@/mock/dli/types'
   import { useIntelligenceRole } from '../useIntelligenceRole'
-  import { formatInt, formatPercent } from '../format'
+  import { formatInt } from '../format'
   import AgentDetailDrawer from './modules/agent-detail-drawer.vue'
   import AgentFormDialog from './modules/agent-form-dialog.vue'
 
@@ -130,7 +130,7 @@
         {
           prop: 'name',
           label: '智能体',
-          minWidth: 250,
+          minWidth: 350,
           formatter: (row: AgentItem) =>
             h('div', { class: 'leading-5' }, [
               h('div', { class: 'flex-c gap-2' }, [
@@ -142,7 +142,6 @@
               h('div', { class: 'text-xs text-g-500' }, row.description)
             ])
         },
-        { prop: 'model', label: '绑定模型', width: 140 },
         {
           prop: 'role',
           label: '职责',
@@ -170,22 +169,13 @@
           prop: 'knowledge',
           label: '知识库',
           width: 90,
-          align: 'center' as const,
           formatter: (row: AgentItem) => `${row.knowledge.length} 个`
         },
         {
           prop: 'sessions',
           label: '今日会话',
           width: 100,
-          align: 'right' as const,
           formatter: (row: AgentItem) => formatInt(row.sessions)
-        },
-        {
-          prop: 'satisfaction',
-          label: '满意度',
-          width: 90,
-          align: 'right' as const,
-          formatter: (row: AgentItem) => formatPercent(row.satisfaction)
         },
         { prop: 'version', label: '版本', width: 90 },
         { prop: 'updatedAt', label: '更新时间', width: 110 },
@@ -209,7 +199,7 @@
         {
           prop: 'operation',
           label: '操作',
-          width: 185,
+          width: 80,
           fixed: 'right' as const,
           align: 'center' as const,
           formatter: (row: AgentItem) =>

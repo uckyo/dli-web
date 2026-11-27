@@ -135,7 +135,7 @@
         {
           prop: 'name',
           label: '技能',
-          minWidth: 230,
+          minWidth: 350,
           formatter: (row: SkillItem) =>
             h('div', { class: 'leading-5' }, [
               h('div', { class: 'text-g-900' }, row.name),
@@ -158,25 +158,22 @@
           prop: 'successRate',
           label: '成功率',
           width: 95,
-          align: 'right' as const,
           formatter: (row: SkillItem) => formatPercent(row.successRate)
         },
         {
           prop: 'avgLatency',
           label: '平均延迟',
           width: 100,
-          align: 'right' as const,
           formatter: (row: SkillItem) => formatLatency(row.avgLatency)
         },
         {
           prop: 'calls',
           label: '近 30 天调用',
           width: 115,
-          align: 'right' as const,
           formatter: (row: SkillItem) => formatInt(row.calls)
         },
         { prop: 'version', label: '版本', width: 90 },
-        { prop: 'updatedAt', label: '更新时间', width: 110 },
+        { prop: 'updatedAt', label: '更新时间', width: 180 },
         {
           prop: 'enabled',
           label: '状态',
@@ -197,7 +194,7 @@
         {
           prop: 'operation',
           label: '操作',
-          width: 180,
+          width: 130,
           fixed: 'right' as const,
           align: 'center' as const,
           formatter: (row: SkillItem) =>

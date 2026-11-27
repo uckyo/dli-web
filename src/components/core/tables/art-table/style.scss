@@ -11,6 +11,11 @@
     height: 48px;
   }
 
+  :deep(.el-table__header th.el-table__cell > .cell) {
+    font-weight: 500;
+    -webkit-text-stroke: 0.12px currentcolor;
+  }
+
   :deep(.el-loading-mask) {
     z-index: 100;
     background-color: var(--default-box-color) !important;
@@ -111,12 +116,11 @@
 
   .el-table {
     --el-table-text-color: var(--el-text-color-primary);
-    --el-table-header-text-color: var(--el-text-color-regular);
+    --el-table-header-text-color: var(--el-text-color-primary);
 
     flex: 1 1 0;
     min-height: 0;
     margin-top: 0;
-    font-weight: 500;
   }
 
   :deep(.el-table .el-tag) {
